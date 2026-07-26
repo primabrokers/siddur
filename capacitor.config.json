@@ -1,6 +1,6 @@
 {
-  "appId": "com.luach.app",
-  "appName": "Luach",
+  "appId": "com.vecker.app",
+  "appName": "Vecker",
   "webDir": ".",
   "bundledWebRuntime": false,
   "backgroundColor": "#1C2440",

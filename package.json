@@ -1,8 +1,8 @@
 {
-  "name": "luach-app",
+  "name": "vecker",
   "version": "1.0.0",
   "private": true,
-  "description": "Jewish calendar, zmanim, Shabbos-mode alarm clock, reminders and siddur — PWA + native iOS/Android via Capacitor.",
+  "description": "Vecker — Shabbos-mode alarm clock, zmanim, Jewish calendar, reminders and siddur. PWA + native iOS/Android via Capacitor. https://vecker.app",
   "scripts": {
     "serve": "npx serve . -l 5173",
     "sync": "npx cap sync",

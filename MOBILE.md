@@ -75,7 +75,7 @@ Ship custom alarm sounds as `ios/App/App/chime.wav` and
 ## Store submission notes
 
 - **Permissions copy.** iOS `Info.plist` needs `NSLocationWhenInUseUsageDescription`
-  ("Luach uses your location to calculate zmanim for where you are") — vague strings
+  ("Vecker uses your location to calculate zmanim for where you are") — vague strings
   get rejected.
 - **Both stores:** declare that notifications are local-only if you add no push
   service; complete the privacy questionnaire honestly (location used on-device for

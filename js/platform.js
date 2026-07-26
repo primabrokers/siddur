@@ -1,4 +1,4 @@
-/* Luach platform layer
+/* Vecker platform layer
    One file that makes the same HTML behave correctly as a website, an installed PWA,
    and a native iOS/Android app (Capacitor). Include it on every page:
      <script src="js/platform.js" defer></script> */
@@ -174,8 +174,8 @@
     bar.className = 'luach-install';
     const txt = document.createElement('span');
     txt.textContent = iosMode
-      ? 'Add Luach to your home screen: tap Share, then “Add to Home Screen”.'
-      : 'Install Luach for offline zmanim, siddur, and Shabbos alarms.';
+      ? 'Add Vecker to your home screen: tap Share, then “Add to Home Screen”.'
+      : 'Install Vecker for offline zmanim, siddur, and Shabbos alarms.';
     bar.appendChild(txt);
     if (!iosMode) {
       const go = document.createElement('button');

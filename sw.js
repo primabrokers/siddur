@@ -1,10 +1,10 @@
-/* Luach service worker
+/* Vecker service worker
    Shell: precached, cache-first (app must open with zero network, every time).
    Sefaria + Supabase texts: stale-while-revalidate into a separate, long-lived cache
    so a section read once is readable forever offline. */
 
-const VERSION = 'v1.1.0';
-const SHELL = `luach-shell-${VERSION}`;
+const VERSION = 'v1.2.0';
+const SHELL = `vecker-shell-${VERSION}`;
 const TEXTS = 'luach-texts';
 
 const SHELL_FILES = [
@@ -42,7 +42,7 @@ self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys()
       .then(keys => Promise.all(
-        keys.filter(k => k.startsWith('luach-shell-') && k !== SHELL)
+        keys.filter(k => (k.startsWith('vecker-shell-') || k.startsWith('luach-shell-')) && k !== SHELL)
             .map(k => caches.delete(k))
       ))
       .then(() => self.clients.claim())

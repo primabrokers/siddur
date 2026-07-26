@@ -1,4 +1,6 @@
-# Luach — Jewish calendar, zmanim, Shabbos clock & siddur
+# Vecker — Shabbos clock, zmanim, luach & siddur
+
+Der vecker is back. Live at [vecker.app](https://vecker.app) (and [primabrokers.github.io/siddur](https://primabrokers.github.io/siddur/)).
 
 A frum-focused day-to-day app: Hebrew calendar (1900–2100), zmanim, a Shabbos-mode
 alarm clock, minyan & omer reminders, kiddush levana windows computed from the real
