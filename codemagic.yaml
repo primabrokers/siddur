@@ -1,0 +1,51 @@
+# Builds the iOS app on Codemagic's cloud Macs and uploads it to TestFlight.
+# Exists because there is no Mac in this project's toolchain — Xcode only runs
+# on macOS, so the compile happens on a rented one.
+#
+# One-time setup in the Codemagic UI (not in this file):
+#   1. Teams > Integrations > Developer Portal > connect an App Store Connect
+#      API key, named exactly "vecker-appstore" to match `integrations` below.
+#   2. An app record for com.vecker.app must exist in App Store Connect.
+# After that, every build is one click (or push) and lands in TestFlight.
+
+workflows:
+  ios-testflight:
+    name: iOS → TestFlight
+    max_build_duration: 45
+    instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: vecker-appstore
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.vecker.app
+      node: 20
+      xcode: latest
+      cocoapods: default
+      vars:
+        # playwright is a devDependency for the web tests; without this its
+        # postinstall pulls ~400MB of browsers into every iOS build.
+        PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+    triggering:
+      events: []          # manual builds only, until alarms are device-tested
+    scripts:
+      - name: Install dependencies
+        script: npm install --no-audit --no-fund
+      - name: Stage web assets and sync Capacitor
+        script: |
+          npm run stage
+          npx cap sync ios
+      - name: Set up code signing
+        script: xcode-project use-profiles
+      - name: Build the archive
+        script: |
+          xcode-project build-ipa \
+            --workspace ios/App/App.xcworkspace \
+            --scheme App
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
