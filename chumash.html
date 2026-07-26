@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Chumash — Vecker</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5.0">
+<meta name="theme-color" content="#1C2440">
+<meta name="color-scheme" content="light">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Vecker">
+<script src="js/config.js"></script>
+<script src="js/store.js"></script>
+<script src="js/texts.js"></script>
+<script src="js/platform.js" defer></script>
+<style>
+  :root{
+    --night:#1C2440; --ivory:#FBF8F1; --card:#FFFFFF;
+    --ink:#25293B; --ink-2:#6A6E80; --ink-3:#9A9DAC;
+    --gold:#B8811B; --gold-bg:#F5E7C8; --gold-ink:#6E4D0D;
+    --line:#E8E2D4; --line-2:#D9D2C0;
+    --serif:'Frank Ruhl Libre','David Libre',Georgia,'Times New Roman',serif;
+    --sans:'Heebo',-apple-system,'Segoe UI',Roboto,Arial,sans-serif;
+  }
+  *{box-sizing:border-box; margin:0; -webkit-tap-highlight-color:transparent;}
+  html{height:100%;}
+  body{background:var(--ivory); font-family:var(--sans); color:var(--ink);
+       min-height:100dvh; padding:0 0 env(safe-area-inset-bottom);}
+  .wrap{width:100%; max-width:600px; margin:0 auto; padding:calc(10px + env(safe-area-inset-top)) 16px 28px;}
+  header{display:flex; align-items:center; gap:10px; padding:6px 0 14px;}
+  header .back{border:1px solid var(--line-2); background:var(--card); color:var(--night);
+               width:34px; height:34px; border-radius:10px; font-size:17px; flex:none;
+               display:grid; place-items:center; text-decoration:none; cursor:pointer;}
+  header h1{font-family:var(--serif); font-size:21px; color:var(--night); flex:1; line-height:1.25;}
+  .status{font-size:11px; color:var(--ink-2);}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:14px; margin-bottom:12px;}
+  .card h2{font-size:11.5px; font-weight:700; color:var(--ink-2); text-transform:uppercase;
+           letter-spacing:.06em; margin-bottom:6px;}
+  .hero{background:linear-gradient(165deg,#28304F 0%,var(--night) 62%); color:#F4E9CF;
+        border-radius:16px; padding:15px; margin-bottom:12px; cursor:pointer;}
+  .hero .l{display:block; font-size:10.5px; letter-spacing:.09em; text-transform:uppercase;
+           color:rgba(244,233,207,.62); font-weight:600;}
+  .hero .v{display:block; font-size:24px; font-weight:700; color:#FFF; margin:3px 0 1px;}
+  .hero .s{display:block; font-size:12.5px; color:rgba(244,233,207,.82);}
+  .hero .bar{height:5px; background:rgba(251,248,241,.18); border-radius:3px; margin-top:11px; overflow:hidden;}
+  .hero .bar i{display:block; height:100%; background:#E0A83A; border-radius:3px; width:0;}
+  .row{display:flex; align-items:center; gap:10px; padding:11px 2px;
+       border-top:1px solid var(--line); cursor:pointer;}
+  .row:first-of-type{border-top:none;}
+  .row .t{flex:1; font-size:14px; font-weight:600;}
+  .row .he{font-family:var(--serif); font-size:14px; color:var(--ink-2); direction:rtl;}
+  .row .chev{color:var(--ink-3); font-size:18px;}
+  .crumb{font-size:11.5px; color:var(--ink-2); margin-bottom:10px;}
+  .crumb a{color:var(--gold-ink); text-decoration:none;}
+  .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(50px,1fr)); gap:6px;}
+  .chip{border:1px solid var(--line); background:var(--card); border-radius:10px; padding:9px 0;
+        font-size:14px; font-weight:600; color:var(--ink); text-align:center; cursor:pointer;
+        font-family:var(--sans); min-height:40px;}
+  .chip.done{background:#DFEEDF; border-color:#B9DCC0; color:#2E6B45;}
+
+  /* A posuk and its meforshim. */
+  .pk{padding:13px 0; border-top:1px solid var(--line);}
+  .pk:first-of-type{border-top:none;}
+  .pk-head{display:flex; align-items:center; gap:8px; margin-bottom:5px;}
+  .pk-n{font-size:10.5px; color:var(--gold-ink); font-weight:700; letter-spacing:.05em;}
+  .pk-mark{margin-left:auto; border:1px solid var(--line-2); background:var(--card);
+           border-radius:999px; font-size:10.5px; font-weight:700; color:var(--ink-2);
+           padding:3px 10px; cursor:pointer; font-family:var(--sans); min-height:26px;}
+  .pk-mark.on{background:#DFEEDF; border-color:#B9DCC0; color:#2E6B45;}
+  .pk .he{font-family:var(--serif); font-size:20px; line-height:1.95; direction:rtl; text-align:right;}
+  .pk .en{font-size:12.5px; line-height:1.7; color:var(--ink-2); margin-top:5px;}
+  .pk .onk{font-family:var(--serif); font-size:15.5px; line-height:1.85; direction:rtl;
+           text-align:right; color:var(--gold-ink); background:#FCF7EA;
+           border-right:3px solid #E8CE97; border-radius:6px; padding:7px 10px; margin-top:8px;}
+  .pk .onk-l{font-size:9.5px; letter-spacing:.08em; text-transform:uppercase;
+             color:var(--ink-3); font-weight:700; margin-bottom:2px; direction:ltr; text-align:left;}
+  .rashi{margin-top:8px; background:#F7F5EF; border-radius:8px; padding:8px 10px;}
+  .rashi-l{font-size:9.5px; letter-spacing:.08em; text-transform:uppercase;
+           color:var(--ink-3); font-weight:700; margin-bottom:3px;}
+  .rashi .c{font-family:var(--serif); font-size:15px; line-height:1.8; direction:rtl;
+            text-align:right; padding:4px 0; border-top:1px dotted var(--line-2);}
+  .rashi .c:first-of-type{border-top:none;}
+  .rashi .ce{font-family:var(--sans); font-size:11.5px; line-height:1.6; color:var(--ink-2);
+             direction:ltr; text-align:left; margin-top:2px;}
+  /* Display modes hide layers rather than refetching them. */
+  .m-heb .en,.m-heb .ce{display:none;}
+  .no-onk .onk,.no-onk .onk-l{display:none;}
+  .no-rashi .rashi{display:none;}
+
+  .seg{display:flex; gap:4px; background:#EFE9DA; border:1px solid var(--line-2);
+       border-radius:12px; padding:3px; margin-bottom:10px; flex-wrap:wrap;}
+  .segbtn{flex:1; min-width:76px; border:none; background:transparent; border-radius:9px;
+          padding:9px 4px; font-size:12px; font-weight:600; color:var(--ink-2);
+          cursor:pointer; font-family:var(--sans); min-height:40px;}
+  .segbtn.on{background:var(--card); color:var(--night); box-shadow:0 1px 2px rgba(40,36,20,.1);}
+  .loading{text-align:center; color:var(--ink-2); font-size:13px; padding:24px 0;}
+  .spin{display:inline-block; width:15px; height:15px; border:2px solid var(--line-2);
+        border-top-color:var(--gold); border-radius:50%; animation:sp .8s linear infinite;
+        vertical-align:-3px; margin-right:7px;}
+  @keyframes sp{to{transform:rotate(360deg);}}
+  @media (prefers-reduced-motion:reduce){.spin{animation:none;}}
+  .err{background:#F5DFDB; border:1px solid #E5C4BD; color:#7A2A1F; border-radius:12px;
+       padding:12px 14px; font-size:12.5px; line-height:1.6;}
+  .attr{font-size:10.5px; color:var(--ink-3); line-height:1.7; margin-top:12px;
+        padding-top:10px; border-top:1px dashed var(--line-2);}
+  .navbtns{display:flex; gap:8px; margin-top:14px;}
+  .navbtns button{flex:1; border:1px solid var(--line-2); background:var(--card);
+                  color:var(--night); border-radius:10px; padding:11px; font-size:13px;
+                  font-weight:600; cursor:pointer; font-family:var(--sans);}
+  .navbtns button:disabled{opacity:.4;}
+  .note{font-size:11.5px; color:var(--ink-2); line-height:1.6;}
+  .hide{display:none;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="back" id="back" href="index.html" aria-label="Back">‹</a>
+    <h1 id="h">Chumash</h1>
+    <span class="status" id="status"></span>
+  </header>
+  <div class="crumb hide" id="crumb"></div>
+  <div id="view"></div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = t => { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; };
+
+/* Sefaria's book names for the Chumash, with the names people actually use. */
+const BOOKS = [
+  { ref: 'Genesis',     name: 'Bereishis', he: 'בְּרֵאשִׁית', chapters: 50 },
+  { ref: 'Exodus',      name: 'Shemos',    he: 'שְׁמוֹת',    chapters: 40 },
+  { ref: 'Leviticus',   name: 'Vayikra',   he: 'וַיִּקְרָא',  chapters: 27 },
+  { ref: 'Numbers',     name: 'Bamidbar',  he: 'בְּמִדְבָּר',  chapters: 36 },
+  { ref: 'Deuteronomy', name: 'Devarim',   he: 'דְּבָרִים',   chapters: 34 }
+];
+
+let mode = 'all';                 // all | heb | torah
+let at = { level: 'home' };
+let progress = {};                // 'Genesis 1:1' -> true, for shnayim mikra
+
+function setStatus(t){ $('status').textContent = t || ''; }
+function loading(){ $('view').innerHTML = '<div class="loading"><span class="spin"></span>Loading…</div>'; }
+
+function crumbs(parts){
+  const c = $('crumb');
+  if (!parts.length){ c.classList.add('hide'); return; }
+  c.classList.remove('hide');
+  c.innerHTML = parts.map((p,i) =>
+    i < parts.length-1 ? '<a href="#" data-up="'+(parts.length-1-i)+'">'+esc(p)+'</a>' : esc(p)).join(' › ');
+  c.querySelectorAll('[data-up]').forEach(a => a.addEventListener('click', e => {
+    e.preventDefault(); up(Number(a.dataset.up));
+  }));
+}
+
+function up(n){
+  for (let i=0;i<n;i++){
+    if (at.level === 'perek') at = { level: 'chapters', book: at.book };
+    else if (at.level === 'chapters') at = { level: 'home' };
+  }
+  render();
+}
+
+async function render(){
+  loading();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  try {
+    if (at.level === 'home') return await showHome();
+    if (at.level === 'chapters') return showChapters();
+    if (at.level === 'perek') return await showPerek();
+  } catch (e){
+    console.warn(e);
+    $('view').innerHTML = '<div class="err"><b>Couldn’t load that.</b><br>' +
+      'The first read of a perek needs a connection; after that it stays on the device.</div>';
+    setStatus('offline');
+  }
+}
+
+/* ---- home: this week's parsha, then the five books ---- */
+async function showHome(){
+  $('h').textContent = 'Chumash';
+  crumbs([]);
+  setStatus('');
+  const view = $('view');
+  view.innerHTML = '';
+
+  const p = await Texts.parsha().catch(() => null);
+  if (p && p.book){
+    const book = BOOKS.find(b => b.ref === p.book);
+    const done = countDone(p);
+    const total = countTotal(p);
+    const hero = document.createElement('div');
+    hero.className = 'hero';
+    hero.innerHTML = '<span class="l">Shnayim mikra · this week</span>' +
+      '<span class="v"></span><span class="s"></span>' +
+      '<span class="bar"><i></i></span>';
+    hero.querySelector('.v').textContent = p.name || (book ? book.name : p.book);
+    hero.querySelector('.s').textContent = p.ref +
+      (total ? ' · ' + done + ' of ' + total + ' pesukim read' : '');
+    if (total) hero.querySelector('.bar i').style.width = Math.round(done/total*100) + '%';
+    hero.addEventListener('click', () => {
+      at = { level: 'perek', book: book || BOOKS[0], chapter: p.startChapter, parsha: p };
+      render();
+    });
+    view.appendChild(hero);
+  } else {
+    const n = document.createElement('div');
+    n.className = 'card';
+    n.innerHTML = '<h2>This week</h2><div class="note">Couldn’t reach Sefaria for the parsha. ' +
+      'Pick a sefer below — everything still works once a perek is saved.</div>';
+    view.appendChild(n);
+  }
+
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.innerHTML = '<h2>Chamisha chumshei Torah</h2>';
+  BOOKS.forEach(b => {
+    const r = document.createElement('div');
+    r.className = 'row';
+    r.innerHTML = '<span class="t"></span><span class="he"></span><span class="chev">›</span>';
+    r.children[0].textContent = b.name;
+    r.children[1].textContent = b.he;
+    r.addEventListener('click', () => { at = { level: 'chapters', book: b }; render(); });
+    card.appendChild(r);
+  });
+  view.appendChild(card);
+
+  const help = document.createElement('div');
+  help.className = 'card';
+  help.innerHTML = '<h2>Shnayim mikra v’echad targum</h2>' +
+    '<div class="note">Each posuk shows the Torah text, Onkelos, and Rashi. Tap the mark ' +
+    'beside a posuk once you have said it twice with the targum — progress is saved on ' +
+    'this device and shows on the parsha above.</div>';
+  view.appendChild(help);
+}
+
+function showChapters(){
+  const b = at.book;
+  $('h').textContent = b.name;
+  crumbs(['Chumash', b.name]);
+  setStatus(b.chapters + ' perakim');
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.innerHTML = '<h2>Perakim</h2>';
+  const g = document.createElement('div');
+  g.className = 'grid';
+  for (let i = 1; i <= b.chapters; i++){
+    const btn = document.createElement('button');
+    btn.className = 'chip';
+    btn.textContent = i;
+    btn.addEventListener('click', () => { at = { level: 'perek', book: b, chapter: i }; render(); });
+    g.appendChild(btn);
+  }
+  card.appendChild(g);
+  $('view').innerHTML = ''; $('view').appendChild(card);
+}
+
+/* ---- the perek: Torah, Onkelos, Rashi per posuk ---- */
+async function showPerek(){
+  const b = at.book, ch = at.chapter;
+  $('h').textContent = b.name + ' ' + ch;
+  crumbs(['Chumash', b.name, 'Perek ' + ch]);
+
+  const seg = document.createElement('div');
+  seg.className = 'seg';
+  seg.innerHTML =
+    '<button class="segbtn' + (mode==='all'?' on':'') + '" data-mode="all">Torah · Onkelos · Rashi</button>' +
+    '<button class="segbtn' + (mode==='torah'?' on':'') + '" data-mode="torah">Torah only</button>' +
+    '<button class="segbtn' + (mode==='heb'?' on':'') + '" data-mode="heb">Hebrew only</button>';
+
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.innerHTML = '<div class="loading"><span class="spin"></span>Loading Torah, Onkelos and Rashi…</div>';
+
+  $('view').innerHTML = '';
+  $('view').appendChild(seg);
+  $('view').appendChild(card);
+  seg.querySelectorAll('.segbtn').forEach(x => x.addEventListener('click', () => {
+    mode = x.dataset.mode; render();
+  }));
+
+  const data = await Texts.chumashPerek(b.ref, ch);
+  applyMode(card);
+  card.innerHTML = '';
+
+  if (!data.posukim.length){
+    card.innerHTML = '<div class="err">No text returned for this perek.</div>';
+    return;
+  }
+
+  data.posukim.forEach(p => {
+    const key = b.ref + ' ' + ch + ':' + p.n;
+    const d = document.createElement('div');
+    d.className = 'pk';
+
+    const head = document.createElement('div');
+    head.className = 'pk-head';
+    head.innerHTML = '<span class="pk-n"></span>';
+    head.firstChild.textContent = 'Posuk ' + p.n;
+    const mark = document.createElement('button');
+    mark.className = 'pk-mark' + (progress[key] ? ' on' : '');
+    mark.textContent = progress[key] ? '✓ read' : 'mark read';
+    mark.addEventListener('click', async () => {
+      progress[key] = !progress[key];
+      mark.classList.toggle('on', !!progress[key]);
+      mark.textContent = progress[key] ? '✓ read' : 'mark read';
+      await Store.set('chumash:progress', progress).catch(() => {});
+    });
+    head.appendChild(mark);
+    d.appendChild(head);
+
+    const he = document.createElement('div'); he.className = 'he'; he.textContent = p.he;
+    d.appendChild(he);
+    if (p.en){ const en = document.createElement('div'); en.className = 'en'; en.textContent = p.en; d.appendChild(en); }
+
+    if (p.onkelos){
+      const l = document.createElement('div'); l.className = 'onk-l'; l.textContent = 'Onkelos';
+      const o = document.createElement('div'); o.className = 'onk'; o.textContent = p.onkelos;
+      d.appendChild(l); d.appendChild(o);
+    }
+
+    if (p.rashi && p.rashi.length){
+      const box = document.createElement('div'); box.className = 'rashi';
+      const l = document.createElement('div'); l.className = 'rashi-l';
+      l.textContent = 'Rashi (' + p.rashi.length + ')';
+      box.appendChild(l);
+      p.rashi.forEach(c => {
+        const cc = document.createElement('div'); cc.className = 'c'; cc.textContent = c.he;
+        box.appendChild(cc);
+        if (c.en){ const ce = document.createElement('div'); ce.className = 'ce'; ce.textContent = c.en; box.appendChild(ce); }
+      });
+      d.appendChild(box);
+    }
+    card.appendChild(d);
+  });
+
+  const missing = [];
+  if (!data.hasOnkelos) missing.push('Onkelos');
+  if (!data.hasRashi) missing.push('Rashi');
+  const attr = document.createElement('div');
+  attr.className = 'attr';
+  attr.textContent = data.attribution +
+    (missing.length ? ' · ' + missing.join(' and ') + ' unavailable for this perek' : '');
+  card.appendChild(attr);
+
+  const nav = document.createElement('div');
+  nav.className = 'navbtns';
+  nav.innerHTML = '<button id="pv">‹ Previous</button><button id="nx">Next ›</button>';
+  card.appendChild(nav);
+  $('pv').disabled = ch <= 1; $('nx').disabled = ch >= b.chapters;
+  $('pv').addEventListener('click', () => { at.chapter = ch - 1; render(); });
+  $('nx').addEventListener('click', () => { at.chapter = ch + 1; render(); });
+
+  setStatus(data.posukim.length + ' pesukim');
+  Store.set('chumash:last', { book: b.ref, chapter: ch }).catch(() => {});
+}
+
+function applyMode(card){
+  card.classList.toggle('m-heb', mode === 'heb');
+  card.classList.toggle('no-onk', mode === 'torah');
+  card.classList.toggle('no-rashi', mode === 'torah');
+}
+
+function countDone(p){
+  const prefix = p.book + ' ';
+  return Object.keys(progress).filter(k => progress[k] && k.startsWith(prefix) &&
+    withinParsha(k, p)).length;
+}
+/* The parsha ref gives chapter bounds, so progress counts pesukim inside them.
+   Chapter-level rather than posuk-exact: the first and last chapters of a parsha
+   are shared with its neighbours, so this slightly over-counts at the seams
+   rather than pretending to a precision the ref alone cannot give. */
+function withinParsha(key, p){
+  const m = key.match(/:(\d+)$/), c = key.match(/\s(\d+):/);
+  if (!c) return false;
+  const ch = Number(c[1]);
+  return ch >= p.startChapter && ch <= p.endChapter;
+}
+function countTotal(p){
+  // Unknown until each perek is loaded; use chapters as a coarse denominator.
+  return 0;
+}
+
+$('back').addEventListener('click', e => {
+  if (at.level !== 'home'){ e.preventDefault(); up(1); }
+});
+
+(function(){
+  Store.migrate().catch(() => {}).then(() => {
+    Store.persist().catch(() => {});
+    return Store.get('chumash:progress');
+  }).then(p => { progress = p || {}; render(); });
+})();
+</script>
+</body>
+</html>

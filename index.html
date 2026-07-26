@@ -373,10 +373,21 @@
           <div class="footnote" id="sh-foot">Loading candle lighting…</div>
         </div>
 
-        <!-- Today's learning. The calendar engine already knows the Hebrew date, so
-             the daily Tehillim follows from it rather than being a static link. -->
+        <!-- Learn hub. Every text the app carries, reachable in one tap from the
+             screen people actually open. Tehillim and Chumash carry the day's
+             portion, computed rather than linked to a front page. -->
         <div class="card">
-          <h2>Today's learning</h2>
+          <h2>Learn</h2>
+          <a class="learn" id="learn-chumash" href="chumash.html">
+            <span class="learn-ic" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M12 3v18M5 7h14M5 12h14M5 17h14"/></svg>
+            </span>
+            <span class="learn-txt">
+              <span class="learn-t">Chumash</span>
+              <span class="learn-s" id="learn-chum-sub">Shnayim mikra with Onkelos and Rashi</span>
+            </span>
+            <span class="learn-go" aria-hidden="true">›</span>
+          </a>
           <a class="learn" id="learn-tehillim" href="tehillim.html">
             <span class="learn-ic" aria-hidden="true">
               <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5v14z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg>
@@ -389,11 +400,21 @@
           </a>
           <a class="learn" id="learn-mishna" href="mishnayos.html">
             <span class="learn-ic" aria-hidden="true">
-              <svg viewBox="0 0 24 24"><path d="M12 3v18M5 7h14M5 12h14M5 17h14"/></svg>
+              <svg viewBox="0 0 24 24"><path d="M4 6h16M4 10h16M4 14h10M4 18h10"/></svg>
             </span>
             <span class="learn-txt">
               <span class="learn-t">Mishnayos</span>
-              <span class="learn-s">Pick up where you left off</span>
+              <span class="learn-s">All six sedarim · pick up where you left off</span>
+            </span>
+            <span class="learn-go" aria-hidden="true">›</span>
+          </a>
+          <a class="learn" href="siddur.html">
+            <span class="learn-ic" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5v14z"/><path d="M9 7h7M9 11h7"/></svg>
+            </span>
+            <span class="learn-txt">
+              <span class="learn-t">Siddur</span>
+              <span class="learn-s">Full siddur · Ashkenaz, Sefard, Edot Hamizrach</span>
             </span>
             <span class="learn-go" aria-hidden="true">›</span>
           </a>
@@ -495,7 +516,7 @@
           </span>
           <span class="learn-txt">
             <span class="learn-t">Open the full Siddur</span>
-            <span class="learn-s">Every section, all three nusachos, English where it exists</span>
+            <span class="learn-s">Every section, all three nusachos · Chumash, Tehillim and Mishnayos are on the Today screen</span>
           </span>
           <span class="learn-go" aria-hidden="true">›</span>
         </a>

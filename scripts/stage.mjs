@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = path.join(ROOT, 'www');
 
-const FILES = ['index.html', 'siddur.html', 'tehillim.html', 'mishnayos.html',
+const FILES = ['index.html', 'siddur.html', 'chumash.html', 'tehillim.html', 'mishnayos.html',
                'offline.html', 'manifest.webmanifest', 'sw.js'];
 const DIRS = ['icons', 'js'];
 

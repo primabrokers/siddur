@@ -36,7 +36,7 @@ jobs:
         # and write to storage, and publishing them would make them live pages.
         run: |
           mkdir -p _site
-          cp index.html siddur.html tehillim.html mishnayos.html offline.html manifest.webmanifest sw.js _site/
+          cp index.html siddur.html chumash.html tehillim.html mishnayos.html offline.html manifest.webmanifest sw.js _site/
           cp -r icons js _site/
           # Jekyll would otherwise process this hand-written site and skip files
           # it does not recognise.
