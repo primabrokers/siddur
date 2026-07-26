@@ -217,11 +217,15 @@ async function showPerakim(){
 }
 
 async function showText(){
+  /* The mishnayos table carries structure only — all 4,192 rows have NULL
+     hebrew_text and english_text — so the words come from Sefaria, keyed by the
+     masechta's sefaria_title plus the perek number. One request per perek, then
+     cached like every other text. The stored rows still supply the numbering and
+     the per-mishnah sefaria_ref, which is what makes the fallback possible. */
   const rows = await Texts.mishnayos(at.perek.id);
   const title = at.masechta.name + ' ' + at.perek.chapter_number;
   $('h').textContent = title;
   crumbs(['Mishnayos', at.seder.name, at.masechta.name, 'Perek ' + at.perek.chapter_number]);
-  setStatus(rows.length + ' mishnayos');
 
   const seg = document.createElement('div');
   seg.className = 'seg';
@@ -230,46 +234,64 @@ async function showText(){
 
   const card = document.createElement('div');
   card.className = 'card' + (mode === 'heb' ? ' m-heb' : '');
-
-  if (!rows.length){
-    card.innerHTML = '<div class="loading">This perek has no text stored yet.</div>';
-  } else {
-    rows.forEach(m => {
-      const d = document.createElement('div');
-      d.className = 'mish';
-      d.innerHTML = '<div class="n"></div><div class="he"></div><div class="en"></div>';
-      d.children[0].textContent = 'Mishnah ' + m.mishnah_number;
-      d.children[1].textContent = m.hebrew_text || '';
-      d.children[2].textContent = m.english_text || '';
-      card.appendChild(d);
-    });
-  }
-
-  const attr = document.createElement('div');
-  attr.className = 'attr';
-  attr.textContent = 'Text and translation via Sefaria.';
-  card.appendChild(attr);
-
-  // Previous/next perek within this masechta.
-  const idx = at.perakim.findIndex(p => p.id === at.perek.id);
-  const nav = document.createElement('div');
-  nav.className = 'navbtns';
-  nav.innerHTML = '<button id="pv">‹ Previous</button><button id="nx">Next ›</button>';
-  card.appendChild(nav);
+  card.innerHTML = '<div class="loading"><span class="spin"></span>Loading text…</div>';
 
   $('view').innerHTML = '';
   $('view').appendChild(seg);
   $('view').appendChild(card);
-
   seg.querySelectorAll('.segbtn').forEach(b => b.addEventListener('click', () => {
     mode = b.dataset.mode; render();
   }));
+
+  // Build the perek ref from the masechta title: "Mishnah Berakhot" + " 1".
+  const ref = (at.masechta.sefaria_title || ('Mishnah ' + at.masechta.name)) +
+              ' ' + at.perek.chapter_number;
+
+  let segs = [], attribution = 'Text and translation via Sefaria.';
+  try {
+    const data = await Texts.section(ref);
+    segs = Texts.segments(data);
+    attribution = Texts.attribution(data);
+  } catch (e) {
+    console.warn('Sefaria fetch failed for ' + ref, e);
+  }
+
+  card.innerHTML = '';
+  if (!segs.length){
+    card.innerHTML = '<div class="err"><b>Couldn\u2019t load this perek.</b><br>' +
+      esc(ref) + ' needs a connection the first time; after that it stays on the device.</div>';
+    setStatus('offline');
+  } else {
+    segs.forEach((p, i) => {
+      const d = document.createElement('div');
+      d.className = 'mish';
+      d.innerHTML = '<div class="n"></div><div class="he"></div><div class="en"></div>';
+      // Prefer the stored numbering where it lines up; Sefaria returns the
+      // perek's mishnayos in order, so the index is the mishnah number.
+      d.children[0].textContent = 'Mishnah ' + ((rows[i] && rows[i].mishnah_number) || (i + 1));
+      d.children[1].textContent = p.he;
+      d.children[2].textContent = p.en;
+      card.appendChild(d);
+    });
+    setStatus(segs.length + ' mishnayos');
+  }
+
+  const attr = document.createElement('div');
+  attr.className = 'attr';
+  attr.textContent = attribution;
+  card.appendChild(attr);
+
+  const idx = at.perakim.findIndex(p => p.id === at.perek.id);
+  const nav = document.createElement('div');
+  nav.className = 'navbtns';
+  nav.innerHTML = '<button id="pv">\u2039 Previous</button><button id="nx">Next \u203a</button>';
+  card.appendChild(nav);
+
   const pv = $('pv'), nx = $('nx');
   pv.disabled = idx <= 0; nx.disabled = idx < 0 || idx >= at.perakim.length - 1;
   pv.addEventListener('click', () => { at.perek = at.perakim[idx - 1]; render(); });
   nx.addEventListener('click', () => { at.perek = at.perakim[idx + 1]; render(); });
 
-  // Save the place so the app can offer to pick up here.
   Store.set('mishna:last', {
     sederName: at.seder.name, masechtaName: at.masechta.name,
     perekNumber: at.perek.chapter_number,
