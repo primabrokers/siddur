@@ -1,28 +1,25 @@
 name: Deploy to GitHub Pages
 
-# Publishes the PWA to GitHub Pages on every push to main.
+# Publishes the PWA on every push to main.
 #
-# One-time setup, which cannot be automated: Settings -> Pages -> Build and
-# deployment -> Source -> GitHub Actions. See the note on configure-pages below.
+# Pages here serves the gh-pages branch, so this builds the site and force-pushes
+# it there. The alternative — Pages' own Actions deployment — needs Source set to
+# "GitHub Actions" in the repository settings, and switching that on a site
+# already serving happily from a branch would take it down for no gain.
 #
-# HTTPS matters here beyond good practice: service workers refuse to register
-# over plain HTTP, so the offline cache and the install prompt only work once
-# the app is served from a real origin. Pages provides that.
+# gh-pages is generated, never edited by hand, which is why the push is a force:
+# its history is disposable and always exactly what main produced.
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
-# deploy-pages needs pages:write to publish and id-token:write to prove the
-# artifact came from this workflow.
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write        # to push the built site to gh-pages
 
-# Let a running deploy finish rather than cancelling it — a half-published
-# site is worse than a slightly stale one.
+# Let a running deploy finish rather than cancelling it — a half-published site
+# is worse than a slightly stale one.
 concurrency:
   group: pages
   cancel-in-progress: false
@@ -30,32 +27,34 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Stage the site
-        # Copy only what the app serves. Tests, fixtures, the sync script and
-        # the migration have no business on a public site, and the fixtures in
-        # particular would be live pages if published.
+        # Only what the app serves. The tests, browser fixtures, sync script and
+        # SQL migration stay out — the fixtures especially, since they stub fetch
+        # and write to storage, and publishing them would make them live pages.
         run: |
           mkdir -p _site
           cp index.html siddur.html offline.html manifest.webmanifest sw.js _site/
           cp -r icons js _site/
-          echo "Staged:"; find _site -type f | sort
+          # Jekyll would otherwise process this hand-written site and skip files
+          # it does not recognise.
+          touch _site/.nojekyll
+          echo "Staging:"; find _site -type f | sort
 
-      # Pages must already be enabled with Source: GitHub Actions. This step
-      # cannot turn it on: enablement:true fails with "Resource not accessible
-      # by integration", because creating a Pages site needs repository
-      # administration rights that GITHUB_TOKEN does not carry — pages:write
-      # covers deploying to an existing site, not creating one.
-      - uses: actions/configure-pages@v5
+      - name: Publish to gh-pages
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd _site
+          git init -q
+          git checkout -qb gh-pages
+          git add -A
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -q -m "Publish ${GITHUB_SHA::7}
 
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: _site
-
-      - id: deployment
-        uses: actions/deploy-pages@v4
+          Built from ${GITHUB_SHA} on ${GITHUB_REF_NAME}."
+          git push -f "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}" gh-pages
+          echo "Published to gh-pages. Live at https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}/"

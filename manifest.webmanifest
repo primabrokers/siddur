@@ -2,7 +2,6 @@
   "name": "Luach — calendar, zmanim & siddur",
   "short_name": "Luach",
   "description": "Jewish calendar 1900–2100, zmanim, Shabbos-mode alarm clock, minyan and omer reminders, kiddush levana, and a weekday siddur in three nusachos.",
-  "id": "/",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
