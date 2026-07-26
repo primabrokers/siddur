@@ -15,7 +15,12 @@
 <meta name="apple-mobile-web-app-title" content="Luach">
 <meta name="format-detection" content="telephone=no">
 <script src="js/platform.js" defer></script>
-<script src="js/zmanim.js" defer></script>
+<!-- Not deferred. The inline script at the foot of the body runs during parsing,
+     before deferred scripts execute, and it guards on `if(!window.Zmanim)return`.
+     With defer that guard always tripped, so zmanim never rendered at all —
+     the Today screen sat on "Loading zmanim…" forever. zmanim.js touches no DOM
+     at load, so evaluating it here is safe. -->
+<script src="js/zmanim.js"></script>
 
 <style>
   :root{
@@ -105,6 +110,57 @@
   .bigclock{text-align:center; padding:10px 0 4px;}
   .bigclock .t{font-family:var(--serif); font-size:58px; font-weight:600; color:var(--night); font-variant-numeric:tabular-nums; line-height:1;}
   .bigclock .s{font-size:12.5px; color:var(--ink-2); margin-top:6px;}
+  /* ---- Today: hero ---- */
+  /* Night ground so the first card reads as the headline rather than one of a
+     stack of equal cream panels. The gradient is two steps of the same navy —
+     depth without introducing a hue the palette does not already carry. */
+  .hero{background:linear-gradient(165deg,var(--night-2) 0%,var(--night) 62%);
+        border-radius:18px; padding:16px 16px 10px; margin-bottom:14px; color:#F4E9CF;
+        box-shadow:0 6px 20px -8px rgba(28,36,64,.45);}
+  .hero-top{display:flex; justify-content:space-between; align-items:flex-start; gap:10px;}
+  .heb-date.hd{color:#FBF8F1;}
+  .hero-badges{display:flex; flex-wrap:wrap; gap:4px; justify-content:flex-end; max-width:58%;}
+  .hero-badges .pill{background:rgba(251,248,241,.14); color:#F4E9CF;}
+  .hero-badges .pill.gold{background:var(--gold); color:#2A1D04;}
+  .hero-badges .pill.fast{background:var(--fast); color:#FBF0EE;}
+
+  /* Hero figure: the one number the screen leads with. */
+  .hero-fig{text-align:center; padding:14px 0 2px;}
+  .hf-label{font-size:11px; letter-spacing:.09em; text-transform:uppercase;
+            color:rgba(244,233,207,.62); font-weight:600;}
+  .hf-value{font-family:var(--sans); font-size:52px; line-height:1.05; font-weight:700;
+            color:#FFF; font-variant-numeric:tabular-nums; letter-spacing:-.02em; margin:2px 0 1px;}
+  .hf-caption{font-size:13px; color:rgba(244,233,207,.82); font-weight:500;}
+  .hero-foot{font-size:10.5px; color:rgba(244,233,207,.48); text-align:center; padding:2px 0 4px;}
+
+  /* ---- Today: zmanim KPI tiles ---- */
+  .zgrid{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:14px;}
+  .ztile{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:9px 11px;}
+  .ztile .zl{font-size:10.5px; color:var(--ink-2); text-transform:uppercase;
+             letter-spacing:.05em; font-weight:600; display:block; margin-bottom:1px;}
+  .ztile .zt{font-size:17px; font-weight:700; color:var(--ink); font-variant-numeric:tabular-nums;}
+  /* Emphasis, not a new colour: the imminent zman is the point, the rest are context. */
+  .ztile.next{background:var(--gold-bg); border-color:#E8CE97;}
+  .ztile.next .zl{color:var(--gold-ink);}
+  .ztile.next .zt{color:var(--gold-ink);}
+  .ztile.past .zl,.ztile.past .zt{color:var(--ink-3);}
+  .zgrid .footnote{grid-column:1/-1;}
+
+  /* ---- Today: learning rows ---- */
+  .learn{display:flex; align-items:center; gap:11px; padding:10px 2px;
+         border-top:1px solid var(--line); text-decoration:none; color:inherit;}
+  .learn:first-of-type{border-top:none;}
+  .learn-ic{flex:0 0 34px; height:34px; border-radius:10px; background:var(--gold-bg);
+            display:grid; place-items:center;}
+  .learn-ic svg{width:18px; height:18px; fill:none; stroke:var(--gold-ink);
+                stroke-width:1.7; stroke-linecap:round;}
+  .learn-txt{flex:1; min-width:0;}
+  .learn-t{display:block; font-size:14px; font-weight:600; color:var(--ink);}
+  .learn-s{display:block; font-size:12px; color:var(--ink-2);}
+  .learn-go{color:var(--ink-3); font-size:20px; line-height:1;}
+  .sh-count{text-align:center; font-size:12.5px; font-weight:600;
+            color:var(--gold-ink); margin-top:9px;}
+
   .duo{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
   .mini{background:#F6F1E4; border-radius:12px; padding:10px 12px;}
   .mini .l{font-size:11px; color:var(--ink-2);}
@@ -247,23 +303,62 @@
       <!-- TODAY -->
       <section class="screen active" id="scr-today">
         <div class="apphead"><h1>Luach</h1><div class="sub" id="today-greg"></div></div>
-        <div class="card">
-          <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-            <div class="heb-date" id="today-heb"></div>
-            <span class="pill gold">Va'eschanan · Nachamu</span>
+
+        <!-- Hero. Dark against the cream cards below, so the eye lands here first,
+             and it carries the single number the screen exists to answer: how long
+             until the next zman. -->
+        <div class="hero">
+          <div class="hero-top">
+            <div class="heb-date hd" id="today-heb"></div>
+            <div class="hero-badges" id="today-badges"></div>
+          </div>
+          <div class="hero-fig">
+            <div class="hf-label" id="z-next-label">Next zman</div>
+            <div class="hf-value" id="z-next-in">—</div>
+            <div class="hf-caption" id="z-next-at">Loading zmanim…</div>
           </div>
           <div id="sun-arc"></div>
-          <div id="z-next" style="text-align:center; font-size:12.5px; color:var(--gold-ink); font-weight:600; margin-bottom:6px;">Loading zmanim…</div>
-          <div id="z-rows"></div>
-          <div class="footnote" id="z-foot"></div>
+          <div class="hero-foot" id="z-foot"></div>
         </div>
+
+        <!-- KPI row: a handful of headline times, as tiles rather than a flat list.
+             The imminent one is emphasised; the rest are context. -->
+        <div class="zgrid" id="z-rows"></div>
+
         <div class="card">
           <h2>This Shabbos</h2>
           <div class="duo">
             <div class="mini"><div class="l">Candle lighting · Fri</div><div class="v" id="sh-candles">—</div></div>
             <div class="mini"><div class="l">Havdalah · Motzei</div><div class="v" id="sh-havdalah">—</div></div>
           </div>
+          <div class="sh-count" id="sh-count"></div>
           <div class="footnote" id="sh-foot">Loading candle lighting…</div>
+        </div>
+
+        <!-- Today's learning. The calendar engine already knows the Hebrew date, so
+             the daily Tehillim follows from it rather than being a static link. -->
+        <div class="card">
+          <h2>Today's learning</h2>
+          <a class="learn" id="learn-tehillim" href="#">
+            <span class="learn-ic" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5v14z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg>
+            </span>
+            <span class="learn-txt">
+              <span class="learn-t">Tehillim</span>
+              <span class="learn-s" id="learn-teh-sub">—</span>
+            </span>
+            <span class="learn-go" aria-hidden="true">›</span>
+          </a>
+          <a class="learn" id="learn-mishna" href="#">
+            <span class="learn-ic" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M12 3v18M5 7h14M5 12h14M5 17h14"/></svg>
+            </span>
+            <span class="learn-txt">
+              <span class="learn-t">Mishnayos</span>
+              <span class="learn-s">Pick up where you left off</span>
+            </span>
+            <span class="learn-go" aria-hidden="true">›</span>
+          </a>
         </div>
       </section>
 
@@ -685,14 +780,60 @@ $('btnToday').onclick=()=>{if(todayRD){const[y,m]=rdToGreg(todayRD);curY=y;curM=
 render();
 
 // ===== Today screen live Hebrew date =====
+/* The monthly division of Tehillim (chalukas hatehillim l'fi yemei hachodesh),
+   as printed in the siddur: [firstKapitel, lastKapitel] for days 1–30, with 119
+   split across the 25th and 26th.
+
+   VERIFY AGAINST A PRINTED SIDDUR BEFORE RELEASE. These divisions are standard
+   and widely reproduced, but they are liturgical data, and a wrong day here is
+   the kind of error that should never reach a user. */
+const TEHILLIM_BY_DAY=[
+  null,[1,9],[10,17],[18,22],[23,28],[29,34],[35,38],[39,43],[44,48],[49,54],[55,59],
+  [60,65],[66,68],[69,71],[72,76],[77,78],[79,82],[83,87],[88,89],[90,96],[97,103],
+  [104,105],[106,107],[108,112],[113,118],[119,119],[119,119],[120,134],[135,139],
+  [140,144],[145,150]
+];
+
+function tehillimForDay(hy,hm,hd){
+  const p=TEHILLIM_BY_DAY[hd];
+  if(!p)return null;
+  // The 25th and 26th share kapitel 119, which is too long for one day.
+  if(hd===25)return 'Kapitel 119 · verses 1–96';
+  if(hd===26)return 'Kapitel 119 · verses 97–176';
+  // A 29-day month has no 30th, so the 29th carries both portions.
+  if(hd===29&&hebMonthDays(hy,hm)===29)return 'Kapitel 140–150 (29th and 30th)';
+  return p[0]===p[1]?('Kapitel '+p[0]):('Kapitel '+p[0]+'–'+p[1]);
+}
+
 (function(){
   const now=new Date();
   const y=now.getFullYear();
-  if(y>=MIN_Y&&y<=MAX_Y){
-    const rd=gRD(y,now.getMonth()+1,now.getDate());
-    const [hy,hm,hd]=rdToHeb(rd);
-    document.getElementById('today-heb').textContent=gematriaDay(hd)+' '+hebMonthHe(hy,hm)+' '+hebYearStr(hy);
-    document.getElementById('today-greg').textContent=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Shabbos'][dow(rd)]+', '+GMON[now.getMonth()]+' '+now.getDate()+', '+y+' · '+hd+' '+hebMonthName(hy,hm)+' '+hy;
+  if(y<MIN_Y||y>MAX_Y)return;
+  const rd=gRD(y,now.getMonth()+1,now.getDate());
+  const [hy,hm,hd]=rdToHeb(rd);
+  document.getElementById('today-heb').textContent=gematriaDay(hd)+' '+hebMonthHe(hy,hm)+' '+hebYearStr(hy);
+  document.getElementById('today-greg').textContent=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Shabbos'][dow(rd)]+', '+GMON[now.getMonth()]+' '+now.getDate()+', '+y+' · '+hd+' '+hebMonthName(hy,hm)+' '+hy;
+
+  /* Badges come from the same calendar engine the Luach tab uses, so a fast day
+     or Rosh Chodesh is stated here rather than being something the user has to
+     go and look up. Fasts keep the palette's status colour; everything else is
+     neutral so the one that matters stands out. */
+  const badges=document.getElementById('today-badges');
+  if(badges){
+    const evs=eventsForRD(rd).sort((a,b)=>TYPE_RANK[a.type]-TYPE_RANK[b.type]);
+    badges.innerHTML='';
+    evs.slice(0,3).forEach(ev=>{
+      const s=document.createElement('span');
+      s.className='pill '+(ev.type==='fast'?'fast':(ev.type==='yt'?'gold':''));
+      s.textContent=ev.name;
+      badges.appendChild(s);
+    });
+  }
+
+  const teh=document.getElementById('learn-teh-sub');
+  if(teh){
+    const t=tehillimForDay(hy,hm,hd);
+    teh.textContent=t?(t+' · day '+hd):'Daily kapitlach';
   }
 })();
 
@@ -950,21 +1091,29 @@ document.getElementById('rb-add').addEventListener('click',()=>{
     if(!netz||!shkia){el.innerHTML='';return;}
     const now=new Date();
     let f=(now-netz)/(shkia-netz); f=Math.max(0,Math.min(1,f));
-    const A={x:24,y:92}, B={x:296,y:92}, R=136;
+    /* R must exceed half the span, or the arc becomes a semicircle whose apex
+       sits above the viewBox and gets clipped — which is what R=136 across a
+       272px span did, leaving two dashed stubs and an empty middle. At 164 the
+       apex lands near y=20, inside the 0–104 box. */
+    const A={x:24,y:92}, B={x:296,y:92}, R=164;
     // point at fraction f along the arc from A to B
     const cxm=(A.x+B.x)/2, half=(B.x-A.x)/2, h=Math.sqrt(R*R-half*half), cy=A.y+h;
     const a0=Math.atan2(A.y-cy,A.x-cxm), a1=Math.atan2(B.y-cy,B.x-cxm);
     const ang=a0+(a1-a0)*f;
     const px=cxm+R*Math.cos(ang), py=cy+R*Math.sin(ang);
     const day=now>=netz&&now<=shkia;
-    el.innerHTML='<svg viewBox="0 0 320 104" style="width:100%; margin:14px 0 2px;" role="img" aria-label="Sun position between netz and shkia">'
-      +'<path d="M 24 92 A 136 136 0 0 1 296 92" fill="none" stroke="#D9D2C0" stroke-width="1.6" stroke-dasharray="3 5"/>'
-      +(day?'<path d="M 24 92 A 136 136 0 0 1 '+px.toFixed(1)+' '+py.toFixed(1)+'" fill="none" stroke="#B8811B" stroke-width="2.6"/>':'')
-      +'<circle cx="24" cy="92" r="3.5" fill="#9A9DAC"/><circle cx="296" cy="92" r="3.5" fill="#9A9DAC"/>'
-      +(day?'<circle cx="'+px.toFixed(1)+'" cy="'+py.toFixed(1)+'" r="7" fill="#B8811B"/><circle cx="'+px.toFixed(1)+'" cy="'+py.toFixed(1)+'" r="2.6" fill="#FBF8F1"/>':'')
-      +'<text x="24" y="84" font-size="10" fill="#6A6E80" font-family="Heebo,Arial">netz '+esc(Z.fmt(netz).replace(/ (AM|PM)/,''))+'</text>'
-      +'<text x="296" y="84" font-size="10" fill="#6A6E80" text-anchor="end" font-family="Heebo,Arial">shkia '+esc(Z.fmt(shkia).replace(/ (AM|PM)/,''))+'</text>'
-      +(chatz?'<text x="160" y="16" font-size="10" fill="#6A6E80" text-anchor="middle" font-family="Heebo,Arial">chatzos '+esc(Z.fmt(chatz).replace(/ (AM|PM)/,''))+'</text>':'')
+    // Drawn on the hero's night ground, so the track and labels are light-on-dark
+    // and the sun carries a surface ring to stay legible where it crosses the arc.
+    const TRACK='rgba(251,248,241,.20)', LABEL='rgba(244,233,207,.62)',
+          SUN='#F0C05A', PATH='#E0A83A';
+    el.innerHTML='<svg viewBox="0 0 320 110" style="width:100%; margin:6px 0 2px;" role="img" aria-label="Sun position between netz and shkia">'
+      +'<path d="M 24 92 A 164 164 0 0 1 296 92" fill="none" stroke="'+TRACK+'" stroke-width="1.6" stroke-dasharray="3 5"/>'
+      +(day?'<path d="M 24 92 A 164 164 0 0 1 '+px.toFixed(1)+' '+py.toFixed(1)+'" fill="none" stroke="'+PATH+'" stroke-width="2.6" stroke-linecap="round"/>':'')
+      +'<circle cx="24" cy="92" r="3" fill="'+TRACK+'"/><circle cx="296" cy="92" r="3" fill="'+TRACK+'"/>'
+      +(day?'<circle cx="'+px.toFixed(1)+'" cy="'+py.toFixed(1)+'" r="8" fill="'+SUN+'" stroke="#1C2440" stroke-width="2"/>':'')
+      +'<text x="24" y="106" font-size="10" fill="'+LABEL+'" font-family="Heebo,Arial">netz '+esc(Z.fmt(netz).replace(/ (AM|PM)/,''))+'</text>'
+      +'<text x="296" y="106" font-size="10" fill="'+LABEL+'" text-anchor="end" font-family="Heebo,Arial">shkia '+esc(Z.fmt(shkia).replace(/ (AM|PM)/,''))+'</text>'
+      +(chatz?'<text x="160" y="16" font-size="10" fill="'+LABEL+'" text-anchor="middle" font-family="Heebo,Arial">chatzos '+esc(Z.fmt(chatz).replace(/ (AM|PM)/,''))+'</text>':'')
       +'</svg>';
   }
 
@@ -973,20 +1122,37 @@ document.getElementById('rb-add').addEventListener('click',()=>{
     const times=r.times, rows=document.getElementById('z-rows');
     if(!rows)return;
     if(!Object.keys(times).length){rows.innerHTML='<div class="footnote">Zmanim unavailable — set your location in Menu, then refresh.</div>';return;}
-    const nx=Z.next(times);
+    const nx=Z.next(times), now=new Date();
     rows.innerHTML='';
     Z.rows.forEach(row=>{
       const d=times[row.key]; if(!d)return;
       const div=document.createElement('div');
-      div.className='zrow'+(nx&&nx.key===row.key?' next':'');
+      // Three states rather than two: what is imminent, what is still ahead, and
+      // what has passed. A time already gone should recede, not read as pending.
+      const state=(nx&&nx.key===row.key)?' next':(d<now?' past':'');
+      div.className='ztile'+state;
       div.innerHTML='<span class="zl"></span><span class="zt"></span>';
-      div.firstChild.textContent=row.label;
+      div.firstChild.textContent=row.short||row.label;
       div.lastChild.textContent=Z.fmt(d);
+      // Full name for anyone who needs it without crowding the tile.
+      div.title=row.label;
       rows.appendChild(div);
     });
-    const nextEl=document.getElementById('z-next');
-    if(nx){const u=Z.until(nx.at);nextEl.textContent=nx.label+(u?' in '+u:' now');}
-    else nextEl.textContent='All of today\u2019s zmanim have passed';
+
+    // Hero figure: the interval is the number, the zman it belongs to is the caption.
+    const inEl=document.getElementById('z-next-in'),
+          atEl=document.getElementById('z-next-at'),
+          lbEl=document.getElementById('z-next-label');
+    if(nx){
+      const u=Z.until(nx.at);
+      lbEl.textContent='Until '+nx.label;
+      inEl.textContent=u||'now';
+      atEl.textContent=Z.fmt(nx.at);
+    }else{
+      lbEl.textContent='Today';
+      inEl.textContent='\u2014';
+      atEl.textContent='All of today\u2019s zmanim have passed';
+    }
     const loc=Z.getLocation();
     const srcTxt=r.source==='cache'?'Hebcal (cached)':'computed on device';
     document.getElementById('z-foot').innerHTML=esc((loc.city||loc.lat.toFixed(3)+', '+loc.lng.toFixed(3))+' \u00b7 GRA / M"A shown \u00b7 '+srcTxt);
@@ -1003,6 +1169,13 @@ document.getElementById('rb-add').addEventListener('click',()=>{
     if(c&&sh.candles)c.innerHTML=esc(Z.fmt(new Date(sh.candles)).replace(' ','&nbsp;'));
     if(h&&sh.havdalah)h.innerHTML=esc(Z.fmt(new Date(sh.havdalah)).replace(' ','&nbsp;'));
     if(f)f.textContent=(sh.parsha?sh.parsha+' \u00b7 ':'')+(sh.holidays.length?sh.holidays.join(', ')+' \u00b7 ':'')+'candle lighting and havdalah from Hebcal';
+    /* How long until licht is the question this card is really asked, so answer
+       it rather than leaving two bare times to be subtracted mentally. */
+    const cnt=document.getElementById('sh-count');
+    if(cnt&&sh.candles){
+      const at=new Date(sh.candles), u=Z.until(at);
+      cnt.textContent=u?('Candle lighting in '+u):'';
+    }
     // lock screen mirrors the same values
     const lt=document.querySelector('#lockscr .lk-times');
     if(lt&&sh.candles&&sh.havdalah)lt.innerHTML='<span>Candles '+esc(Z.fmt(new Date(sh.candles)))+'</span><span class="lk-dot">\u00b7</span><span>Havdalah '+esc(Z.fmt(new Date(sh.havdalah)))+'</span>';

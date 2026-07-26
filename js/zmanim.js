@@ -21,22 +21,23 @@
 
   const DEFAULT_LOC = { lat: 40.6501, lng: -73.9496, tz: 'America/New_York', city: 'Brooklyn, NY' };
 
-  /* Which Hebcal keys we surface, in davening order, with the labels the app shows.
-     `alt` lets one row carry a second shita (e.g. GRA and Magen Avraham). */
+  /* Which Hebcal keys we surface, in davening order. `label` is the full name for
+     lists and notifications; `short` fits a tile on one line, so a grid of them
+     keeps an even baseline instead of some cells wrapping to two rows. */
   const ROWS = [
-    { key: 'alotHaShachar',   label: 'Alos hashachar' },
-    { key: 'misheyakir',      label: 'Misheyakir' },
-    { key: 'sunrise',         label: 'Netz hachama' },
-    { key: 'sofZmanShmaMGA',  label: 'Sof zman krias shema (M"A)' },
-    { key: 'sofZmanShma',     label: 'Sof zman krias shema (GRA)' },
-    { key: 'sofZmanTfilla',   label: 'Sof zman tefilla' },
-    { key: 'chatzot',         label: 'Chatzos' },
-    { key: 'minchaGedola',    label: 'Mincha gedola' },
-    { key: 'minchaKetana',    label: 'Mincha ketana' },
-    { key: 'plagHaMincha',    label: 'Plag hamincha' },
-    { key: 'sunset',          label: 'Shkia' },
-    { key: 'tzeit42min',      label: 'Tzeis hakochavim' },
-    { key: 'tzeit72min',      label: 'Tzeis (Rabbeinu Tam)' }
+    { key: 'alotHaShachar',   label: 'Alos hashachar',              short: 'Alos' },
+    { key: 'misheyakir',      label: 'Misheyakir',                  short: 'Misheyakir' },
+    { key: 'sunrise',         label: 'Netz hachama',                short: 'Netz' },
+    { key: 'sofZmanShmaMGA',  label: 'Sof zman krias shema (M"A)',  short: 'Shema M"A' },
+    { key: 'sofZmanShma',     label: 'Sof zman krias shema (GRA)',  short: 'Shema GRA' },
+    { key: 'sofZmanTfilla',   label: 'Sof zman tefilla',            short: 'Tefilla' },
+    { key: 'chatzot',         label: 'Chatzos',                     short: 'Chatzos' },
+    { key: 'minchaGedola',    label: 'Mincha gedola',               short: 'Mincha gedola' },
+    { key: 'minchaKetana',    label: 'Mincha ketana',               short: 'Mincha ketana' },
+    { key: 'plagHaMincha',    label: 'Plag hamincha',               short: 'Plag' },
+    { key: 'sunset',          label: 'Shkia',                       short: 'Shkia' },
+    { key: 'tzeit42min',      label: 'Tzeis hakochavim',            short: 'Tzeis' },
+    { key: 'tzeit72min',      label: 'Tzeis (Rabbeinu Tam)',        short: 'Tzeis R"T' }
   ];
 
   const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
