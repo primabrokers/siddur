@@ -29,6 +29,7 @@
 <script src="js/reminders.js" defer></script>
 <script src="js/notify.js" defer></script>
 <script src="js/settings.js" defer></script>
+<script src="js/clock.js" defer></script>
 
 <style>
   :root{
@@ -434,106 +435,50 @@
 
       <!-- CLOCK -->
       <section class="screen" id="scr-clock">
-        <div class="apphead"><h1>Clock</h1><div class="sub"><span class="pill night">Shabbos mode arms Fri 7:52 PM</span></div></div>
+        <div class="apphead"><h1>Clock</h1><div class="sub"><span class="pill night" id="clock-armed">—</span></div></div>
         <div class="card">
           <h2>Shabbos &amp; Yom Tov mode</h2>
           <p style="font-size:12.5px; color:var(--ink-2); line-height:1.6;">At candle lighting the whole app locks into a single clock screen — time, next alarm, nothing to touch. Alarms ring for their set duration and shut off by themselves. The app unlocks on its own after havdalah.</p>
           <button class="cta" id="btnPreview" style="margin-top:12px;">Preview the locked screen</button>
         </div>
         <div class="card">
-          <h2>Next block · Rosh Hashana 5787</h2>
-          <p style="font-size:12.5px; color:var(--ink-2); line-height:1.6; margin-bottom:8px;">Fri night Sep 11 → Motzei Sun Sep 13 · <b>Day 1 falls on Shabbos, Day 2 Sunday.</b> Set each alarm per day — every day of a Yom Tov / Shabbos block is configured on its own.</p>
-          <div class="pdhead"><span></span><span>Day 1<br><small>Shabbos</small></span><span>Day 2<br><small>Sunday</small></span></div>
-          <div class="pdrow"><div><div class="at">7:00 AM</div><div class="an">Shacharis · rings <select class="dur" aria-label="Ring duration"><option>30s</option><option selected>60s</option><option>90s</option><option>2 min</option><option>5 min</option></select> then auto-stops</div></div><button class="daychip on" onclick="this.classList.toggle('on')" aria-label="Day 1">✓</button><button class="daychip on" onclick="this.classList.toggle('on')" aria-label="Day 2">✓</button></div>
-          <div class="pdrow"><div><div class="at">4:30 PM</div><div class="an">Wake from nap · rings <select class="dur" aria-label="Ring duration"><option selected>30s</option><option>60s</option><option>90s</option><option>2 min</option><option>5 min</option></select> · gentle chime</div></div><button class="daychip on" onclick="this.classList.toggle('on')" aria-label="Day 1">✓</button><button class="daychip" onclick="this.classList.toggle('on')" aria-label="Day 2">✓</button></div>
-          <div class="pdrow"><div><div class="at">6:15 PM</div><div class="an">Mincha at shul · rings <select class="dur" aria-label="Ring duration"><option>30s</option><option selected>60s</option><option>90s</option><option>2 min</option><option>5 min</option></select></div></div><button class="daychip" onclick="this.classList.toggle('on')" aria-label="Day 1">✓</button><button class="daychip on" onclick="this.classList.toggle('on')" aria-label="Day 2">✓</button></div>
-          <div class="footnote">+ Add alarm to this block · edits lock at candle lighting Friday</div>
+          <h2 id="clock-block-title">Next block</h2>
+          <p style="font-size:12.5px; color:var(--ink-2); line-height:1.6; margin-bottom:8px;">Every day of a block is set on its own — Day 1 falling on Shabbos and Day 2 on Sunday usually want different times. Everything is queued before candle lighting, because nothing may be set during the block.</p>
+          <div class="pdhead" id="clock-block-head"></div>
+          <div id="clock-block"></div>
         </div>
         <div class="card">
           <h2>Every Shabbos</h2>
-          <div class="alarm"><div><div class="at">7:00 AM</div><div class="an">Shacharis · rings 60s, auto-stops · no snooze, no dismiss</div></div><span class="lockchip">Armed</span></div>
-          <div class="alarm"><div><div class="at">4:45 PM</div><div class="an">Shabbos nap · rings 30s · gentle chime</div></div><span class="lockchip">Armed</span></div>
-          <div class="footnote">Multiple alarms per day, each with its own ring duration and sound.</div>
+          <div id="clock-shabbos"></div>
         </div>
         <div class="card">
           <h2>Weekday alarms</h2>
-          <div class="alarm"><div><div class="at">6:05 AM</div><div class="an">Wake for Shacharis · Sun–Fri · rings until dismissed</div></div><button class="toggle on" aria-label="Toggle alarm" onclick="this.classList.toggle('on')"></button></div>
-          <div class="alarm"><div><div class="at">10:15 PM</div><div class="an">Krias Shema al hamita reminder</div></div><button class="toggle" aria-label="Toggle alarm" onclick="this.classList.toggle('on')"></button></div>
-        </div>
-      </section>
-
-      <!-- REMINDERS -->
-      <section class="screen" id="scr-rem">
-        <div class="apphead"><h1>Reminders</h1><div class="sub">Minyan · Omer · Tefilla</div></div>
-        <div class="card hide" id="rem-next" style="background:#F6F1E4; border-color:#E7DFC9;">
-          <div style="font-size:13.5px; font-weight:700; color:var(--gold-ink);" id="rem-next-t"></div>
-          <div style="font-size:12px; color:var(--ink-2); margin-top:2px;" id="rem-next-s"></div>
+          <div id="clock-weekday"></div>
         </div>
         <div class="card">
-          <h2>My minyanim</h2>
-          <div id="minyan-list"></div>
+          <h2>Add an alarm</h2>
           <div class="rulebuilder">
             <div class="rb-row">
-              <input id="mn-shul" type="text" placeholder="Shul name" aria-label="Shul name">
-              <select id="mn-tef" aria-label="Tefillah">
-                <option value="shacharis">Shacharis</option>
-                <option value="mincha">Mincha</option>
-                <option value="maariv">Maariv</option>
+              <input id="al-time" type="time" aria-label="Alarm time">
+              <select id="al-scope" aria-label="When it applies">
+                <option value="weekday">Weekdays</option>
+                <option value="every_shabbos">Every Shabbos</option>
+                <option value="yomtov_block">Yom Tov block</option>
               </select>
             </div>
             <div class="rb-row">
-              <input id="mn-time" type="time" aria-label="Minyan time">
-              <select id="mn-before" aria-label="Remind before">
-                <option value="10">10 min before</option>
-                <option value="15" selected>15 min before</option>
-                <option value="20">20 min before</option>
-                <option value="30">30 min before</option>
+              <input id="al-label" type="text" placeholder="Label, e.g. Wake for Shacharis" aria-label="Alarm label">
+              <select id="al-dur" aria-label="Ring duration">
+                <option value="30">30s</option>
+                <option value="60" selected>60s</option>
+                <option value="90">90s</option>
+                <option value="120">2 min</option>
+                <option value="300">5 min</option>
               </select>
-              <button class="today-btn" id="mn-add">Add</button>
+              <button class="today-btn" id="al-add">Add</button>
             </div>
+            <div class="footnote" style="text-align:left;">No snooze and no dismiss: each alarm rings for its set duration and stops by itself, so nothing needs touching on Shabbos. Long-press an alarm to remove it.</div>
           </div>
-        </div>
-        <div class="card" id="omer-card">
-          <h2>Sefiras Haomer</h2>
-          <div id="omer-body"></div>
-        </div>
-        <div class="card">
-        <h2>Notification rules — all bespoke</h2>
-          <div id="rule-list"></div>
-          <div class="rulebuilder">
-            <div class="rb-row">
-              <select id="rb-off" aria-label="Minutes"><option>At</option><option selected>15 min before</option><option>30 min before</option><option>45 min before</option><option>60 min before</option><option>15 min after</option><option>30 min after</option></select>
-              <select id="rb-anchor" aria-label="Anchor zman"><option>candle lighting</option><option selected>shkia</option><option>tzeis</option><option>alos</option><option>netz</option><option>chatzos</option><option>plag hamincha</option><option>sof zman shema</option></select>
-            </div>
-            <div class="rb-row">
-              <input id="rb-msg" type="text" placeholder="Reminder text, e.g. Leave for maariv" aria-label="Reminder text">
-              <button class="today-btn" id="rb-add">Add rule</button>
-            </div>
-            <div class="footnote" style="text-align:left;">Every rule can be anchored to any zman, offset by any amount, and limited to certain days (weekdays, erev Shabbos, fast days, Rosh Chodesh…).</div>
-          </div>
-        </div>
-        <div class="card">
-          <h2>Kiddush Levana <span class="pill gold" id="kl-status" style="float:right;">…</span></h2>
-          <div class="zrow"><span class="zl">Molad <span id="kl-month"></span></span><span class="zt" id="kl-molad" style="font-size:12.5px;"></span></div>
-          <div class="zrow"><span class="zl">Window opens</span><span class="zt" id="kl-opens" style="font-size:12.5px;"></span></div>
-          <div class="zrow"><span class="zl">Sof zman (14d 18h 22m)</span><span class="zt" id="kl-sof" style="font-size:12.5px;"></span></div>
-          <div class="zrow"><span class="zl">Next Motzei Shabbos in window</span><span class="zt" id="kl-motzei" style="font-size:12.5px;"></span></div>
-          <div id="kl-note" class="footnote" style="text-align:left; margin-top:6px;"></div>
-          <div class="rb-row" style="margin-top:10px;">
-            <select id="kl-minhag" aria-label="Minhag for start of window">
-              <option value="3" selected>Start 3 days after molad</option>
-              <option value="7">Start 7 days after molad</option>
-            </select>
-          </div>
-          <div class="rem"><div><div class="rn">Window opens</div><div class="rd">Alert the first night, after tzeis</div></div><button class="toggle on" aria-label="Toggle reminder" onclick="this.classList.toggle('on')"></button></div>
-          <div class="rem"><div><div class="rn">Motzei Shabbos prompt</div><div class="rd">Preferred night — remind after havdalah while window is open</div></div><button class="toggle on" aria-label="Toggle reminder" onclick="this.classList.toggle('on')"></button></div>
-          <div class="rem"><div><div class="rn">Last chance</div><div class="rd">Urgent alert the final night before sof zman</div></div><button class="toggle on" aria-label="Toggle reminder" onclick="this.classList.toggle('on')"></button></div>
-          <div class="rem"><div><div class="rn">Clear-sky alert</div><div class="rd">Weather check — ping when the moon is actually visible tonight</div></div><button class="toggle" aria-label="Toggle reminder" onclick="this.classList.toggle('on')"></button></div>
-        </div>
-        <div class="card">
-          <h2>Seasonal</h2>
-          <div class="rem"><div><div class="rn">V'sein tal umatar switch</div><div class="rd">Alerts on Dec 4/5 (chutz la'aretz) and 7 Cheshvan</div></div><button class="toggle on" aria-label="Toggle reminder" onclick="this.classList.toggle('on')"></button></div>
-          <div class="rem"><div><div class="rn">Yaaleh v'yavo</div><div class="rd">Rosh Chodesh and Yom Tov davening reminder</div></div><button class="toggle on" aria-label="Toggle reminder" onclick="this.classList.toggle('on')"></button></div>
         </div>
       </section>
 
@@ -591,6 +536,101 @@
       </section>
 
       <!-- MENU -->
+      <section class="screen" id="scr-rem">
+        <div class="apphead"><h1>Reminders</h1><div class="sub">Minyan · Omer · Tefilla</div></div>
+
+        <div class="card hide" id="rem-next" style="background:#F6F1E4; border-color:#E7DFC9;">
+          <div style="font-size:13.5px; font-weight:700; color:var(--gold-ink);" id="rem-next-t"></div>
+          <div style="font-size:12px; color:var(--ink-2); margin-top:2px;" id="rem-next-s"></div>
+        </div>
+
+        <div class="card">
+          <h2>My minyanim</h2>
+          <div id="minyan-list"></div>
+          <div class="rulebuilder">
+            <div class="rb-row">
+              <input id="mn-shul" type="text" placeholder="Shul name" aria-label="Shul name">
+              <select id="mn-tef" aria-label="Tefillah">
+                <option value="shacharis">Shacharis</option>
+                <option value="mincha">Mincha</option>
+                <option value="maariv">Maariv</option>
+              </select>
+            </div>
+            <div class="rb-row">
+              <input id="mn-time" type="time" aria-label="Minyan time">
+              <select id="mn-before" aria-label="Remind before">
+                <option value="10">10 min before</option>
+                <option value="15" selected>15 min before</option>
+                <option value="20">20 min before</option>
+                <option value="30">30 min before</option>
+              </select>
+              <button class="today-btn" id="mn-add">Add</button>
+            </div>
+            <div class="footnote" style="text-align:left;">Long-press a minyan to remove it. Reminders are suppressed on Shabbos and Yom Tov — pre-set alarms are used instead.</div>
+          </div>
+        </div>
+
+        <div class="card hide" id="omer-card">
+          <h2>Sefiras Haomer</h2>
+          <div id="omer-body"></div>
+        </div>
+
+        <div class="card">
+          <h2>Notification rules</h2>
+          <div id="rule-list"></div>
+          <div class="rulebuilder">
+            <div class="rb-row">
+              <select id="rb-off" aria-label="Offset">
+                <option>At</option>
+                <option selected>15 min before</option>
+                <option>30 min before</option>
+                <option>45 min before</option>
+                <option>60 min before</option>
+                <option>15 min after</option>
+                <option>30 min after</option>
+              </select>
+              <select id="rb-anchor" aria-label="Anchor zman">
+                <option>candle lighting</option>
+                <option selected>shkia</option>
+                <option>tzeis</option>
+                <option>alos</option>
+                <option>netz</option>
+                <option>chatzos</option>
+                <option>plag hamincha</option>
+                <option>sof zman shema</option>
+              </select>
+            </div>
+            <div class="rb-row">
+              <input id="rb-msg" type="text" placeholder="Reminder text, e.g. Leave for maariv" aria-label="Reminder text">
+              <button class="today-btn" id="rb-add">Add rule</button>
+            </div>
+            <div class="footnote" style="text-align:left;">Any rule can be anchored to any zman and offset by any amount. Long-press to remove.</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Kiddush levana · <span id="kl-month"></span></h2>
+          <div class="duo">
+            <div class="mini"><div class="l">Molad</div><div class="v" id="kl-molad">—</div></div>
+            <div class="mini"><div class="l">Window opens</div><div class="v" id="kl-opens">—</div></div>
+          </div>
+          <div class="duo" style="margin-top:10px;">
+            <div class="mini"><div class="l">Latest (sof zman)</div><div class="v" id="kl-sof">—</div></div>
+            <div class="mini"><div class="l">Best: Motzei Shabbos</div><div class="v" id="kl-motzei">—</div></div>
+          </div>
+          <div class="sh-count" id="kl-status"></div>
+          <div class="footnote" id="kl-note"></div>
+          <div class="rulebuilder">
+            <div class="rb-row">
+              <select id="kl-minhag" aria-label="Kiddush levana minhag">
+                <option value="3" selected>Wait 3 days after the molad</option>
+                <option value="7">Wait 7 days (Shulchan Aruch)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section class="screen" id="scr-menu">
         <div class="apphead"><h1>Menu</h1><div class="sub">Settings &amp; more</div></div>
         <div class="card">
@@ -1149,22 +1189,7 @@ document.getElementById('kl-minhag').addEventListener('change',renderLevana);
 renderLevana();
 
 // ===== Custom notification rule builder =====
-document.getElementById('rb-add').addEventListener('click',()=>{
-  const off=document.getElementById('rb-off').value;
-  const anchor=document.getElementById('rb-anchor').value;
-  const msg=document.getElementById('rb-msg').value.trim()||'Reminder';
-  const row=document.createElement('div');
-  row.className='rem';
-  row.innerHTML='<div><div class="rn"></div><div class="rd"></div></div>';
-  row.querySelector('.rn').textContent=msg;
-  row.querySelector('.rd').textContent=(off==='At'?'At ':off+' ')+anchor+' · every day · custom rule';
-  const tg=document.createElement('button');
-  tg.className='toggle on'; tg.setAttribute('aria-label','Toggle rule');
-  tg.addEventListener('click',()=>tg.classList.toggle('on'));
-  row.appendChild(tg);
-  document.getElementById('customRules').appendChild(row);
-  document.getElementById('rb-msg').value='';
-});
+/* Rule creation lives in js/reminders.js, which persists through Sync. */
 
 // ===== Deep links from PWA shortcuts (#today / #cal / #clock / #rem / #menu / #sid) =====
 (function(){
