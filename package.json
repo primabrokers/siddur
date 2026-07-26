@@ -13,7 +13,7 @@
     "audit:ashkenaz": "node scripts/sync-siddur-cache.mjs \"Siddur Ashkenaz\"",
     "audit:sefard": "node scripts/sync-siddur-cache.mjs \"Siddur Sefard\"",
     "audit:edot": "node scripts/sync-siddur-cache.mjs \"Siddur Edot HaMizrach\"",
-    "test": "node test/store.test.mjs"
+    "test": "node test/store.test.mjs && node test/api.test.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^6.1.2",

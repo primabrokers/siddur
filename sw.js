@@ -16,9 +16,12 @@ const SHELL_FILES = [
   './icons/icon-512.png',
   './icons/apple-touch-icon.png',
   './icons/favicon-32.png',
-  // store.js is a blocking dependency of siddur.html — without it the page
-  // cannot start, so it must be in the shell rather than fetched on demand.
+  // config.js and store.js are blocking dependencies of siddur.html — without
+  // them the page cannot start, so they belong in the shell rather than being
+  // fetched on demand.
+  './js/config.js',
   './js/store.js',
+  './js/api.js',
   './js/platform.js',
   './js/zmanim.js',
   './offline.html'
