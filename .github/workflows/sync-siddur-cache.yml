@@ -1,0 +1,53 @@
+name: Sync siddur cache
+
+# Populates the luach_siddur_texts shared cache from Sefaria.
+# Run it by hand from the Actions tab — there is no schedule, because the
+# liturgy does not change and re-running only refreshes translations.
+
+on:
+  workflow_dispatch:
+    inputs:
+      nusach:
+        description: Which nusach to sync
+        type: choice
+        default: all
+        options:
+          - all
+          - Siddur Ashkenaz
+          - Siddur Sefard
+          - Siddur Edot HaMizrach
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # No `npm install`: the sync script uses only Node built-ins.
+      - name: Sync cache
+        env:
+          SUPABASE_URL: https://qdofumucgrggpehrxvdr.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          # Passed through the environment rather than interpolated into the
+          # shell, so the input can never be treated as script.
+          NUSACH: ${{ inputs.nusach }}
+        run: |
+          if [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "::error::Repository secret SUPABASE_SERVICE_ROLE_KEY is not set. Add it under Settings -> Secrets and variables -> Actions."
+            exit 1
+          fi
+
+          if [ "$NUSACH" = "all" ]; then
+            for n in "Siddur Ashkenaz" "Siddur Sefard" "Siddur Edot HaMizrach"; do
+              echo "::group::$n"
+              node scripts/sync-siddur-cache.mjs "$n"
+              echo "::endgroup::"
+            done
+          else
+            node scripts/sync-siddur-cache.mjs "$NUSACH"
+          fi
