@@ -14,6 +14,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Luach">
 <meta name="format-detection" content="telephone=no">
+<!-- Not deferred: the inline script below calls loadIndex() during parsing,
+     before deferred scripts run, and it needs Store to already exist. -->
+<script src="js/store.js"></script>
 <script src="js/platform.js" defer></script>
 
 <style>
@@ -33,6 +36,8 @@
   .status{font-size:11.5px; color:var(--ink-2);}
   .status .dot{display:inline-block; width:8px; height:8px; border-radius:50%; background:#9A9DAC; margin-right:5px; vertical-align:0;}
   .status.ok .dot{background:#3E8E5A;} .status.err .dot{background:#A63D2F;}
+  /* warn: the text is on screen, but it could not be saved for offline use. */
+  .status.warn .dot{background:#B8811B;}
   .seg{display:flex; gap:4px; background:#EFE9DA; border:1px solid var(--line-2); border-radius:12px; padding:3px; margin-bottom:8px;}
   .segbtn{flex:1; border:none; background:transparent; border-radius:9px; padding:8px 4px; font-size:12.5px; font-weight:600; color:var(--ink-2); cursor:pointer; font-family:var(--sans);}
   .segbtn.on{background:var(--card); color:var(--night); box-shadow:0 1px 2px rgba(40,36,20,.1);}
@@ -135,8 +140,18 @@ const NUSACH={
 };
 let nus='ash', mode='inter', leaves=[], curIdx=-1;
 const mem={};
-function store(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
-function load(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):null;}catch(e){return null;}}
+// Cached texts live in IndexedDB via js/store.js. The former localStorage
+// store()/load() pair is gone deliberately rather than wrapped: its writes
+// were synchronous and swallowed quota errors, so any call site missed during
+// the move should fail loudly instead of silently not caching.
+
+/* A text that is on screen but unsaved still works right now and breaks only
+   later, offline. Say so at the point of failure rather than leaving the user
+   to discover it on Shabbos. */
+function cacheWriteFailed(err){
+  setStatus('warn','online only — couldn’t save for offline');
+  console.warn('Text cache write failed; this section will need a connection again.', err);
+}
 function setStatus(cls,txt){const s=document.getElementById('status');s.className='status '+cls;document.getElementById('status-t').textContent=txt;}
 async function api(path){
   const r=await fetch(API+path,{headers:{'Accept':'application/json'}});
@@ -160,10 +175,13 @@ async function loadIndex(){
   showToc();
   try{
     const key='idx:'+t;
-    let idx=mem[key]||load(key);
+    let idx=mem[key]||await Store.get(key);
     if(!idx){
       idx=await api('/v2/index/'+encodeURIComponent(t.replace(/ /g,'_')));
-      mem[key]=idx; store(key,idx);
+      mem[key]=idx;
+      // Not awaited inside the try: a cache write that fails must not be
+      // mistaken for an index that failed to load.
+      Store.set(key,idx).catch(cacheWriteFailed);
     }
     leaves=[];
     walk(idx.schema,[],leaves);
@@ -228,11 +246,14 @@ async function openSection(i){
   showReader();
   const key='txt:'+l.ref;
   try{
-    let data=mem[key]||load(key);
+    let data=mem[key]||await Store.get(key);
     if(!data){
       data=await fetchSection(l.ref);
-      mem[key]=data; store(key,data);
+      mem[key]=data;
       setStatus('ok','connected');
+      // Same reasoning as the index: the section is in hand and about to
+      // render, so a failed write is a warning, not a load failure.
+      Store.set(key,data).catch(cacheWriteFailed);
     }
     const ps=pairs(data.he,data.text,[]);
     body.innerHTML='';
@@ -259,7 +280,8 @@ async function openSection(i){
     document.getElementById('r-attr').textContent=(bits.length?bits.join(' · ')+' · ':'')+'via Sefaria';
   }catch(e){
     setStatus('err','offline / blocked');
-    body.innerHTML='<div class="err"><b>Couldn\u2019t load this section.</b><br>'+(load(key)?'':'It hasn\u2019t been cached yet, so it needs a connection once. ')+'Check your network, or open the file outside the sandboxed preview.</div>';
+    const cached=await Store.get(key).catch(()=>null);
+    body.innerHTML='<div class="err"><b>Couldn\u2019t load this section.</b><br>'+(cached?'':'It hasn\u2019t been cached yet, so it needs a connection once. ')+'Check your network, or open the file outside the sandboxed preview.</div>';
   }
   document.getElementById('prevSec').disabled=curIdx<=0;
   document.getElementById('nextSec').disabled=curIdx>=leaves.length-1;
@@ -282,7 +304,13 @@ document.querySelectorAll('.segbtn[data-mode]').forEach(b=>b.addEventListener('c
 document.getElementById('back').addEventListener('click',showToc);
 document.getElementById('prevSec').addEventListener('click',()=>{if(curIdx>0)openSection(curIdx-1);});
 document.getElementById('nextSec').addEventListener('click',()=>{if(curIdx<leaves.length-1)openSection(curIdx+1);});
-loadIndex();
+/* Migration completes before the first read: a user who cached sections under
+   the old localStorage scheme and is now offline must still find them. persist()
+   is advisory and fire-and-forget — it asks the browser not to evict texts that
+   are only useful precisely when there is no network to refetch them. */
+Store.migrate()
+  .catch(err=>console.warn('Text cache migration skipped.',err))
+  .then(()=>{ Store.persist().catch(()=>{}); loadIndex(); });
 </script>
 </body>
 </html>

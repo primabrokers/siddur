@@ -12,7 +12,8 @@
     "add:android": "npx cap add android",
     "audit:ashkenaz": "node scripts/sync-siddur-cache.mjs \"Siddur Ashkenaz\"",
     "audit:sefard": "node scripts/sync-siddur-cache.mjs \"Siddur Sefard\"",
-    "audit:edot": "node scripts/sync-siddur-cache.mjs \"Siddur Edot HaMizrach\""
+    "audit:edot": "node scripts/sync-siddur-cache.mjs \"Siddur Edot HaMizrach\"",
+    "test": "node test/store.test.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^6.1.2",
@@ -27,6 +28,7 @@
     "@capacitor-community/keep-awake": "^5.0.1"
   },
   "devDependencies": {
-    "@capacitor/cli": "^6.1.2"
+    "@capacitor/cli": "^6.1.2",
+    "playwright": "^1.62.0"
   }
 }

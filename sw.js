@@ -3,7 +3,7 @@
    Sefaria + Supabase texts: stale-while-revalidate into a separate, long-lived cache
    so a section read once is readable forever offline. */
 
-const VERSION = 'v1.0.0';
+const VERSION = 'v1.1.0';
 const SHELL = `luach-shell-${VERSION}`;
 const TEXTS = 'luach-texts';
 
@@ -16,6 +16,9 @@ const SHELL_FILES = [
   './icons/icon-512.png',
   './icons/apple-touch-icon.png',
   './icons/favicon-32.png',
+  // store.js is a blocking dependency of siddur.html — without it the page
+  // cannot start, so it must be in the shell rather than fetched on demand.
+  './js/store.js',
   './js/platform.js',
   './js/zmanim.js',
   './offline.html'
