@@ -3,7 +3,7 @@
    Sefaria + Supabase texts: stale-while-revalidate into a separate, long-lived cache
    so a section read once is readable forever offline. */
 
-const VERSION = 'v1.2.0';
+const VERSION = 'v1.3.0';
 const SHELL = `vecker-shell-${VERSION}`;
 const TEXTS = 'luach-texts';
 
@@ -23,6 +23,7 @@ const SHELL_FILES = [
   './js/store.js',
   './js/api.js',
   './js/sync.js',
+  './js/reminders.js',
   './js/platform.js',
   './js/zmanim.js',
   './offline.html'
