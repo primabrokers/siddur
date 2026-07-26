@@ -1,0 +1,10 @@
+# Only what the app serves goes to Vercel — mirrors the GitHub Pages staging.
+# The test fixtures especially must never deploy: they are live pages that
+# stub fetch and write to storage.
+test
+scripts
+supabase
+.github
+node_modules
+*.md
+.gitignore
