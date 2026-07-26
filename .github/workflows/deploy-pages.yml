@@ -2,8 +2,8 @@ name: Deploy to GitHub Pages
 
 # Publishes the PWA to GitHub Pages on every push to main.
 #
-# configure-pages runs with enablement:true, so the first run turns Pages on
-# by itself rather than needing someone in the repository settings.
+# One-time setup, which cannot be automated: Settings -> Pages -> Build and
+# deployment -> Source -> GitHub Actions. See the note on configure-pages below.
 #
 # HTTPS matters here beyond good practice: service workers refuse to register
 # over plain HTTP, so the offline cache and the install prompt only work once
@@ -46,10 +46,12 @@ jobs:
           cp -r icons js _site/
           echo "Staged:"; find _site -type f | sort
 
+      # Pages must already be enabled with Source: GitHub Actions. This step
+      # cannot turn it on: enablement:true fails with "Resource not accessible
+      # by integration", because creating a Pages site needs repository
+      # administration rights that GITHUB_TOKEN does not carry — pages:write
+      # covers deploying to an existing site, not creating one.
       - uses: actions/configure-pages@v5
-        with:
-          # Turns Pages on if it is not already. Needs pages:write, granted above.
-          enablement: true
 
       - uses: actions/upload-pages-artifact@v3
         with:
