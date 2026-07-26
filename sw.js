@@ -22,6 +22,7 @@ const SHELL_FILES = [
   './js/config.js',
   './js/store.js',
   './js/api.js',
+  './js/sync.js',
   './js/platform.js',
   './js/zmanim.js',
   './offline.html'
