@@ -8,3 +8,7 @@ supabase
 node_modules
 *.md
 .gitignore
+ios
+android
+www
+codemagic.yaml

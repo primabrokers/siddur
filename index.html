@@ -494,6 +494,20 @@
       <!-- SIDDUR -->
       <section class="screen" id="scr-sid">
         <div class="apphead"><h1>Siddur</h1><div class="sub">Weekday only</div></div>
+        <!-- The full siddur lives in siddur.html (every section, streamed from the
+             shared cache / Sefaria). This tab's own texts below are a few bundled
+             excerpts for instant offline use — they are not the siddur, and the
+             difference must be visible, not discovered. -->
+        <a class="card learn" href="siddur.html" style="display:flex; margin-bottom:14px;">
+          <span class="learn-ic" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5v14z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg>
+          </span>
+          <span class="learn-txt">
+            <span class="learn-t">Open the full Siddur</span>
+            <span class="learn-s">Every section, all three nusachos, English where it exists</span>
+          </span>
+          <span class="learn-go" aria-hidden="true">›</span>
+        </a>
         <div class="seg" role="tablist" aria-label="Nusach">
           <button class="segbtn on" data-nus="ashkenaz">Ashkenaz</button>
           <button class="segbtn" data-nus="sefard">Sefard</button>
@@ -512,12 +526,12 @@
         </div>
         <div class="card">
           <h2>Weekday davening</h2>
-          <div class="mrow" data-txt="modeh"><div class="mi">☀</div><div><div class="mt">Shacharis</div><div class="md">Birchos hashachar · Pesukei d'zimra · Shema · Shemoneh Esrei · Tachanun · Aleinu</div></div><span class="chev">›</span></div>
-          <div class="mrow" data-txt="ashrei"><div class="mi">◐</div><div><div class="mt">Mincha</div><div class="md">Ashrei · Shemoneh Esrei · Tachanun · Aleinu</div></div><span class="chev">›</span></div>
-          <div class="mrow" data-txt="kaddish"><div class="mi">☽</div><div><div class="mt">Maariv</div><div class="md">Shema u'birchoseha · Shemoneh Esrei · Aleinu</div></div><span class="chev">›</span></div>
+          <div class="mrow" data-href="siddur.html"><div class="mi">☀</div><div><div class="mt">Shacharis</div><div class="md">Birchos hashachar · Pesukei d'zimra · Shema · Shemoneh Esrei · Tachanun · Aleinu</div></div><span class="chev">›</span></div>
+          <div class="mrow" data-href="siddur.html"><div class="mi">◐</div><div><div class="mt">Mincha</div><div class="md">Ashrei · Shemoneh Esrei · Tachanun · Aleinu</div></div><span class="chev">›</span></div>
+          <div class="mrow" data-href="siddur.html"><div class="mi">☽</div><div><div class="mt">Maariv</div><div class="md">Shema u'birchoseha · Shemoneh Esrei · Aleinu</div></div><span class="chev">›</span></div>
         </div>
         <div class="card">
-          <h2>Bentching &amp; berachos</h2>
+          <h2>Quick berachos — saved on this device</h2>
           <div class="mrow" data-txt="bentch"><div class="mi">🍞</div><div><div class="mt">Birkas Hamazon</div><div class="md">Full bentching · with zimun · harachamans per nusach</div></div><span class="chev">›</span></div>
           <div class="mrow" data-txt="alham"><div class="mi">♦</div><div><div class="mt">Al Hamichya · Borei Nefashos</div><div class="md">Berachos acharonos</div></div><span class="chev">›</span></div>
         </div>
@@ -931,6 +945,12 @@ document.querySelectorAll('#scr-sid .mrow[data-txt]').forEach(r=>r.addEventListe
   sidCur=r.dataset.txt; renderSid();
   document.getElementById('content').scrollTo({top:0,behavior:'smooth'});
 }));
+// Rows for whole tefillos open the full siddur — the bundled excerpts cannot
+// honestly stand in for Shacharis.
+document.querySelectorAll('#scr-sid .mrow[data-href]').forEach(r=>{
+  r.style.cursor='pointer';
+  r.addEventListener('click',()=>{location.href=r.dataset.href;});
+});
 renderSid();
 
 // ===== Nav =====

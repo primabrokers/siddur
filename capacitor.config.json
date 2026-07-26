@@ -1,7 +1,7 @@
 {
   "appId": "com.vecker.app",
   "appName": "Vecker",
-  "webDir": ".",
+  "webDir": "www",
   "bundledWebRuntime": false,
   "backgroundColor": "#1C2440",
   "ios": {

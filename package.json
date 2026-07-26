@@ -5,15 +5,16 @@
   "description": "Vecker — Shabbos-mode alarm clock, zmanim, Jewish calendar, reminders and siddur. PWA + native iOS/Android via Capacitor. https://vecker.app",
   "scripts": {
     "serve": "npx serve . -l 5173",
-    "sync": "npx cap sync",
-    "ios": "npx cap sync ios && npx cap open ios",
-    "android": "npx cap sync android && npx cap open android",
+    "sync": "npm run stage && npx cap sync",
+    "ios": "npm run stage && npx cap sync ios && npx cap open ios",
+    "android": "npm run stage && npx cap sync android && npx cap open android",
     "add:ios": "npx cap add ios",
     "add:android": "npx cap add android",
     "audit:ashkenaz": "node scripts/sync-siddur-cache.mjs \"Siddur Ashkenaz\"",
     "audit:sefard": "node scripts/sync-siddur-cache.mjs \"Siddur Sefard\"",
     "audit:edot": "node scripts/sync-siddur-cache.mjs \"Siddur Edot HaMizrach\"",
-    "test": "node test/store.test.mjs && node test/api.test.mjs && node test/sync.test.mjs"
+    "test": "node test/store.test.mjs && node test/api.test.mjs && node test/sync.test.mjs",
+    "stage": "node scripts/stage.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^6.1.2",
