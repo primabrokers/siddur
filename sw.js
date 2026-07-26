@@ -1,9 +1,14 @@
 /* Vecker service worker
-   Shell: precached, cache-first (app must open with zero network, every time).
+   Documents and scripts: network-first, falling back to cache. Cache-first was
+   wrong here and shipped a real bug — a deployed fix could never reach anyone,
+   because the cached index.html won every time and users kept tapping dead
+   links from an older build. Offline still works: fetch rejects immediately
+   with no connection and the cache answers.
+   Icons and the manifest: cache-first, since they change by filename.
    Sefaria + Supabase texts: stale-while-revalidate into a separate, long-lived cache
    so a section read once is readable forever offline. */
 
-const VERSION = 'v1.4.0';
+const VERSION = 'v2.0.0';
 const SHELL = `vecker-shell-${VERSION}`;
 const TEXTS = 'luach-texts';
 
@@ -83,8 +88,32 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Same-origin shell: cache-first, fall back to network, then to index.html for navigations.
+  // Same-origin.
   if (url.origin === self.location.origin) {
+    const fresh = req.mode === 'navigate' ||
+                  /\.(?:html|js|webmanifest)$/.test(url.pathname) ||
+                  url.pathname === '/' || url.pathname.endsWith('/');
+
+    if (fresh) {
+      // Network-first: a deploy must reach the user on their next load.
+      event.respondWith(
+        fetch(req)
+          .then(res => {
+            if (res && res.ok && res.type === 'basic') {
+              const copy = res.clone();
+              caches.open(SHELL).then(c => c.put(req, copy));
+            }
+            return res;
+          })
+          .catch(() => caches.match(req).then(hit =>
+            hit || (req.mode === 'navigate'
+              ? caches.match('./index.html')
+              : new Response('', { status: 504 }))))
+      );
+      return;
+    }
+
+    // Everything else (icons): cache-first.
     event.respondWith(
       caches.match(req).then(hit => hit || fetch(req)
         .then(res => {
@@ -94,10 +123,7 @@ self.addEventListener('fetch', event => {
           }
           return res;
         })
-        .catch(() => req.mode === 'navigate'
-          ? caches.match('./index.html')
-          : new Response('', { status: 504 }))
-      )
+        .catch(() => new Response('', { status: 504 })))
     );
   }
 });
@@ -117,4 +143,14 @@ self.addEventListener('notificationclick', event => {
 self.addEventListener('message', event => {
   if (event.data === 'skipWaiting') self.skipWaiting();
   if (event.data === 'clearTexts') caches.delete(TEXTS);
+  /* Nuclear option for an install stuck on an old shell: drop every cache and
+     take over immediately. The page reloads itself afterwards. */
+  if (event.data === 'clearAll') {
+    event.waitUntil(
+      caches.keys()
+        .then(keys => Promise.all(keys.map(k => caches.delete(k))))
+        .then(() => self.skipWaiting())
+        .then(() => self.clients.claim())
+    );
+  }
 });

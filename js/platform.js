@@ -22,6 +22,7 @@
   if (isNative) root.classList.add('app-native');
 
   const Luach = window.Luach = {
+    hardRefresh,
     isNative, isStandalone, platform,
     /* ---- Notifications: native local notifications when wrapped, Web Notifications otherwise ---- */
     async requestNotificationPermission() {
@@ -137,14 +138,53 @@
   if (!isNative && 'serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('sw.js').then(reg => {
+        /* Check on every load. Without this a long-lived installed PWA can sit on
+           one service worker for days and never notice a deploy. */
+        reg.update().catch(() => {});
+
         reg.addEventListener('updatefound', () => {
           const w = reg.installing || reg.waiting;
           if (w) w.addEventListener('statechange', () => {
             if (w.state === 'installed' && navigator.serviceWorker.controller) showUpdateToast(reg);
           });
         });
+
+        /* A waiting worker at load time means a previous visit installed an
+           update that was never activated. Take it now rather than serving the
+           old shell again. */
+        if (reg.waiting && navigator.serviceWorker.controller) {
+          reg.waiting.postMessage('skipWaiting');
+        }
       }).catch(() => {});
+
+      /* When a new worker takes control, reload once so the page and its
+           scripts come from the same build. Guarded so it can only ever
+           happen a single time per load. */
+      let swapped = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (swapped) return;
+        swapped = true;
+        location.reload();
+      });
     });
+  }
+
+  /* Last resort for an install stuck on an old cache: Luach.hardRefresh() from
+     the console, or the Menu row wired to it, drops every cache and reloads. */
+  async function hardRefresh() {
+    try {
+      if ('serviceWorker' in navigator) {
+        const reg = await navigator.serviceWorker.getRegistration();
+        if (reg && reg.active) reg.active.postMessage('clearAll');
+        if (reg) await reg.unregister();
+      }
+      if (window.caches) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map(k => caches.delete(k)));
+      }
+    } catch (e) { /* proceed to reload regardless */ }
+    // Cache-busted so no intermediary can answer from its own copy.
+    location.replace(location.pathname + '?fresh=' + Date.now());
   }
 
   function showUpdateToast(reg) {

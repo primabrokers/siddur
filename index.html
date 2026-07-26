@@ -584,6 +584,7 @@
         <div class="card">
           <h2>About</h2>
           <div class="mrow"><div class="mi">?</div><div><div class="mt">Help &amp; halachic sources</div><div class="md">How each zman is calculated, with sources</div></div><span class="chev">›</span></div>
+          <div class="mrow" id="row-hard"><div class="mi">↻</div><div><div class="mt">Force update</div><div class="md">Clears the offline cache and reloads from the server</div></div><span class="chev">›</span></div>
           <div class="mrow"><div class="mi">✉</div><div><div class="mt">Ask a rov / feedback</div><div class="md">Zmanim questions go to your configured rov</div></div><span class="chev">›</span></div>
         </div>
         <div class="version">Vecker 1.0 · calendar verified 1900–2100 · zmanim by Hebcal · texts by Sefaria</div>
@@ -996,6 +997,15 @@ renderSid();
   }
   paint();
   if(window.Auth&&Auth.onChange)Auth.onChange(paint);
+})();
+
+/* Escape hatch when an install is stuck on an old cached build. */
+(function(){
+  const r=document.getElementById('row-hard');
+  if(r)r.addEventListener('click',()=>{
+    if(window.Luach&&Luach.hardRefresh)Luach.hardRefresh();
+    else location.reload();
+  });
 })();
 
 // ===== Nav =====
