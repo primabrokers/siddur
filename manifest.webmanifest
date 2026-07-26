@@ -1,0 +1,35 @@
+{
+  "name": "Luach — calendar, zmanim & siddur",
+  "short_name": "Luach",
+  "description": "Jewish calendar 1900–2100, zmanim, Shabbos-mode alarm clock, minyan and omer reminders, kiddush levana, and a weekday siddur in three nusachos.",
+  "id": "/",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["standalone", "fullscreen", "minimal-ui"],
+  "orientation": "portrait",
+  "background_color": "#1C2440",
+  "theme_color": "#1C2440",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["lifestyle", "utilities", "books"],
+  "prefer_related_applications": false,
+  "icons": [
+    { "src": "icons/icon-72.png", "sizes": "72x72", "type": "image/png" },
+    { "src": "icons/icon-96.png", "sizes": "96x96", "type": "image/png" },
+    { "src": "icons/icon-128.png", "sizes": "128x128", "type": "image/png" },
+    { "src": "icons/icon-152.png", "sizes": "152x152", "type": "image/png" },
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-256.png", "sizes": "256x256", "type": "image/png" },
+    { "src": "icons/icon-384.png", "sizes": "384x384", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Today's zmanim", "short_name": "Zmanim", "url": "./index.html#today", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Shabbos clock", "short_name": "Clock", "url": "./index.html#clock", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Siddur", "short_name": "Siddur", "url": "./siddur.html", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Luach calendar", "short_name": "Luach", "url": "./index.html#cal", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

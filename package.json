@@ -1,0 +1,32 @@
+{
+  "name": "luach-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Jewish calendar, zmanim, Shabbos-mode alarm clock, reminders and siddur — PWA + native iOS/Android via Capacitor.",
+  "scripts": {
+    "serve": "npx serve . -l 5173",
+    "sync": "npx cap sync",
+    "ios": "npx cap sync ios && npx cap open ios",
+    "android": "npx cap sync android && npx cap open android",
+    "add:ios": "npx cap add ios",
+    "add:android": "npx cap add android",
+    "audit:ashkenaz": "node scripts/sync-siddur-cache.mjs \"Siddur Ashkenaz\"",
+    "audit:sefard": "node scripts/sync-siddur-cache.mjs \"Siddur Sefard\"",
+    "audit:edot": "node scripts/sync-siddur-cache.mjs \"Siddur Edot HaMizrach\""
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.1.2",
+    "@capacitor/app": "^6.0.1",
+    "@capacitor/core": "^6.1.2",
+    "@capacitor/geolocation": "^6.0.1",
+    "@capacitor/haptics": "^6.0.1",
+    "@capacitor/ios": "^6.1.2",
+    "@capacitor/local-notifications": "^6.1.0",
+    "@capacitor/splash-screen": "^6.0.2",
+    "@capacitor/status-bar": "^6.0.1",
+    "@capacitor-community/keep-awake": "^5.0.1"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.1.2"
+  }
+}

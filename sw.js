@@ -1,0 +1,109 @@
+/* Luach service worker
+   Shell: precached, cache-first (app must open with zero network, every time).
+   Sefaria + Supabase texts: stale-while-revalidate into a separate, long-lived cache
+   so a section read once is readable forever offline. */
+
+const VERSION = 'v1.0.0';
+const SHELL = `luach-shell-${VERSION}`;
+const TEXTS = 'luach-texts';
+
+const SHELL_FILES = [
+  './',
+  './index.html',
+  './siddur.html',
+  './manifest.webmanifest',
+  './icons/icon-192.png',
+  './icons/icon-512.png',
+  './icons/apple-touch-icon.png',
+  './icons/favicon-32.png',
+  './js/platform.js',
+  './js/zmanim.js',
+  './offline.html'
+];
+
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(SHELL)
+      .then(c => c.addAll(SHELL_FILES).catch(() => Promise.all(
+        SHELL_FILES.map(f => c.add(f).catch(() => null))
+      )))
+      .then(() => self.skipWaiting())
+  );
+});
+
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys()
+      .then(keys => Promise.all(
+        keys.filter(k => k.startsWith('luach-shell-') && k !== SHELL)
+            .map(k => caches.delete(k))
+      ))
+      .then(() => self.clients.claim())
+  );
+});
+
+function isTextApi(url) {
+  return url.hostname.endsWith('sefaria.org') ||
+         url.hostname.endsWith('hebcal.com') ||
+         (url.hostname.endsWith('supabase.co') && url.pathname.includes('luach_siddur_texts'));
+}
+
+self.addEventListener('fetch', event => {
+  const req = event.request;
+  if (req.method !== 'GET') return;
+  const url = new URL(req.url);
+
+  // Texts: serve cache immediately, refresh in the background.
+  if (isTextApi(url)) {
+    event.respondWith(
+      caches.open(TEXTS).then(async cache => {
+        const hit = await cache.match(req);
+        const network = fetch(req)
+          .then(res => { if (res && res.ok) cache.put(req, res.clone()); return res; })
+          .catch(() => null);
+        if (hit) { event.waitUntil(network); return hit; }
+        const res = await network;
+        return res || new Response(
+          JSON.stringify({ error: 'offline', message: 'This section has not been cached yet.' }),
+          { status: 503, headers: { 'Content-Type': 'application/json' } }
+        );
+      })
+    );
+    return;
+  }
+
+  // Same-origin shell: cache-first, fall back to network, then to index.html for navigations.
+  if (url.origin === self.location.origin) {
+    event.respondWith(
+      caches.match(req).then(hit => hit || fetch(req)
+        .then(res => {
+          if (res && res.ok && res.type === 'basic') {
+            const copy = res.clone();
+            caches.open(SHELL).then(c => c.put(req, copy));
+          }
+          return res;
+        })
+        .catch(() => req.mode === 'navigate'
+          ? caches.match('./index.html')
+          : new Response('', { status: 504 }))
+      )
+    );
+  }
+});
+
+/* Notification taps: focus an existing window rather than opening a new one. */
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const target = event.notification.data && event.notification.data.url || './index.html';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+      for (const c of list) if ('focus' in c) { c.navigate(target); return c.focus(); }
+      return self.clients.openWindow(target);
+    })
+  );
+});
+
+self.addEventListener('message', event => {
+  if (event.data === 'skipWaiting') self.skipWaiting();
+  if (event.data === 'clearTexts') caches.delete(TEXTS);
+});

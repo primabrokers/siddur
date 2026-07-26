@@ -1,0 +1,38 @@
+{
+  "appId": "com.luach.app",
+  "appName": "Luach",
+  "webDir": ".",
+  "bundledWebRuntime": false,
+  "backgroundColor": "#1C2440",
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#1C2440",
+    "limitsNavigationsToAppBoundDomains": false
+  },
+  "android": {
+    "backgroundColor": "#1C2440",
+    "allowMixedContent": false
+  },
+  "server": {
+    "androidScheme": "https",
+    "iosScheme": "capacitor"
+  },
+  "plugins": {
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_luach",
+      "iconColor": "#B8811B",
+      "sound": "chime.wav"
+    },
+    "SplashScreen": {
+      "launchShowDuration": 600,
+      "backgroundColor": "#1C2440",
+      "showSpinner": false,
+      "androidScaleType": "CENTER_CROP"
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#1C2440",
+      "overlaysWebView": false
+    }
+  }
+}
