@@ -14,7 +14,8 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = path.join(ROOT, 'www');
 
-const FILES = ['index.html', 'siddur.html', 'offline.html', 'manifest.webmanifest', 'sw.js'];
+const FILES = ['index.html', 'siddur.html', 'tehillim.html', 'mishnayos.html',
+               'offline.html', 'manifest.webmanifest', 'sw.js'];
 const DIRS = ['icons', 'js'];
 
 fs.rmSync(OUT, { recursive: true, force: true });

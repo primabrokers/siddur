@@ -24,6 +24,7 @@
 <script src="js/store.js"></script>
 <script src="js/api.js"></script>
 <script src="js/sync.js"></script>
+<script src="js/texts.js"></script>
 <script src="js/zmanim.js"></script>
 <script src="js/reminders.js" defer></script>
 
@@ -342,7 +343,7 @@
              the daily Tehillim follows from it rather than being a static link. -->
         <div class="card">
           <h2>Today's learning</h2>
-          <a class="learn" id="learn-tehillim" href="#">
+          <a class="learn" id="learn-tehillim" href="tehillim.html">
             <span class="learn-ic" aria-hidden="true">
               <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5v14z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg>
             </span>
@@ -352,7 +353,7 @@
             </span>
             <span class="learn-go" aria-hidden="true">›</span>
           </a>
-          <a class="learn" id="learn-mishna" href="#">
+          <a class="learn" id="learn-mishna" href="mishnayos.html">
             <span class="learn-ic" aria-hidden="true">
               <svg viewBox="0 0 24 24"><path d="M12 3v18M5 7h14M5 12h14M5 17h14"/></svg>
             </span>
@@ -859,6 +860,9 @@ function tehillimForDay(hy,hm,hd){
   if(teh){
     const t=tehillimForDay(hy,hm,hd);
     teh.textContent=t?(t+' · day '+hd):'Daily kapitlach';
+    // The reader has no calendar engine of its own, so the day travels with it.
+    const link=document.getElementById('learn-tehillim');
+    if(link)link.href='tehillim.html?day='+hd;
   }
 })();
 

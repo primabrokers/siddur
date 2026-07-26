@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Mishnayos — Vecker</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5.0">
+<meta name="theme-color" content="#1C2440">
+<meta name="color-scheme" content="light">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Vecker">
+<script src="js/config.js"></script>
+<script src="js/store.js"></script>
+<script src="js/texts.js"></script>
+<script src="js/platform.js" defer></script>
+<style>
+  :root{
+    --night:#1C2440; --ivory:#FBF8F1; --card:#FFFFFF;
+    --ink:#25293B; --ink-2:#6A6E80; --ink-3:#9A9DAC;
+    --gold:#B8811B; --gold-bg:#F5E7C8; --gold-ink:#6E4D0D;
+    --line:#E8E2D4; --line-2:#D9D2C0;
+    --serif:'Frank Ruhl Libre','David Libre',Georgia,'Times New Roman',serif;
+    --sans:'Heebo',-apple-system,'Segoe UI',Roboto,Arial,sans-serif;
+  }
+  *{box-sizing:border-box; margin:0; -webkit-tap-highlight-color:transparent;}
+  html{height:100%;}
+  body{background:var(--ivory); font-family:var(--sans); color:var(--ink);
+       min-height:100dvh; padding:0 0 env(safe-area-inset-bottom);}
+  .wrap{width:100%; max-width:560px; margin:0 auto; padding:calc(10px + env(safe-area-inset-top)) 16px 28px;}
+  header{display:flex; align-items:center; gap:10px; padding:6px 0 14px;}
+  header .back{border:1px solid var(--line-2); background:var(--card); color:var(--night);
+               width:34px; height:34px; border-radius:10px; font-size:17px; cursor:pointer; flex:none;
+               display:grid; place-items:center; text-decoration:none;}
+  header h1{font-family:var(--serif); font-size:21px; color:var(--night); flex:1; line-height:1.25;}
+  .status{font-size:11px; color:var(--ink-2);}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:14px; margin-bottom:12px;}
+  .card h2{font-size:11.5px; font-weight:700; color:var(--ink-2); text-transform:uppercase;
+           letter-spacing:.06em; margin-bottom:6px;}
+  .row{display:flex; align-items:center; gap:10px; padding:11px 2px; border-top:1px solid var(--line);
+       cursor:pointer;}
+  .row:first-of-type{border-top:none;}
+  .row .t{flex:1; font-size:14px; font-weight:600;}
+  .row .he{font-family:var(--serif); font-size:14px; color:var(--ink-2); direction:rtl;}
+  .row .c{font-size:11px; color:var(--ink-3);}
+  .row .chev{color:var(--ink-3); font-size:18px;}
+  .crumb{font-size:11.5px; color:var(--ink-2); margin-bottom:10px;}
+  .crumb a{color:var(--gold-ink); text-decoration:none;}
+  .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(54px,1fr)); gap:6px;}
+  .chip{border:1px solid var(--line); background:var(--card); border-radius:10px; padding:9px 0;
+        font-size:14px; font-weight:600; color:var(--ink); text-align:center; cursor:pointer;
+        font-family:var(--sans); min-height:40px;}
+  .mish{padding:12px 0; border-top:1px solid var(--line);}
+  .mish:first-of-type{border-top:none;}
+  .mish .n{font-size:10.5px; color:var(--gold-ink); font-weight:700; letter-spacing:.05em;
+           text-transform:uppercase; margin-bottom:4px;}
+  .mish .he{font-family:var(--serif); font-size:19px; line-height:1.95; direction:rtl; text-align:right;}
+  .mish .en{font-size:12.5px; line-height:1.7; color:var(--ink-2); margin-top:6px;}
+  .m-heb .mish .en{display:none;}
+  .seg{display:flex; gap:4px; background:#EFE9DA; border:1px solid var(--line-2);
+       border-radius:12px; padding:3px; margin-bottom:12px;}
+  .segbtn{flex:1; border:none; background:transparent; border-radius:9px; padding:9px 4px;
+          font-size:12.5px; font-weight:600; color:var(--ink-2); cursor:pointer; font-family:var(--sans);}
+  .segbtn.on{background:var(--card); color:var(--night); box-shadow:0 1px 2px rgba(40,36,20,.1);}
+  .loading{text-align:center; color:var(--ink-2); font-size:13px; padding:24px 0;}
+  .spin{display:inline-block; width:15px; height:15px; border:2px solid var(--line-2);
+        border-top-color:var(--gold); border-radius:50%; animation:sp .8s linear infinite;
+        vertical-align:-3px; margin-right:7px;}
+  @keyframes sp{to{transform:rotate(360deg);}}
+  @media (prefers-reduced-motion:reduce){.spin{animation:none;}}
+  .err{background:#F5DFDB; border:1px solid #E5C4BD; color:#7A2A1F; border-radius:12px;
+       padding:12px 14px; font-size:12.5px; line-height:1.6;}
+  .resume{background:linear-gradient(165deg,#28304F 0%,var(--night) 62%); color:#F4E9CF;
+          border-radius:16px; padding:15px; margin-bottom:12px; cursor:pointer;}
+  .resume .l{font-size:10.5px; letter-spacing:.09em; text-transform:uppercase;
+             color:rgba(244,233,207,.62); font-weight:600;}
+  .resume .v{font-size:20px; font-weight:700; color:#FFF; margin:3px 0 1px;}
+  .attr{font-size:10.5px; color:var(--ink-3); line-height:1.7; margin-top:12px;
+        padding-top:10px; border-top:1px dashed var(--line-2);}
+  .navbtns{display:flex; gap:8px; margin-top:14px;}
+  .navbtns button{flex:1; border:1px solid var(--line-2); background:var(--card);
+                  color:var(--night); border-radius:10px; padding:11px; font-size:13px;
+                  font-weight:600; cursor:pointer; font-family:var(--sans);}
+  .navbtns button:disabled{opacity:.4;}
+  .hide{display:none;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="back" id="back" href="index.html" aria-label="Back">‹</a>
+    <h1 id="h">Mishnayos</h1>
+    <span class="status" id="status"></span>
+  </header>
+  <div class="resume hide" id="resume">
+    <div class="l">Continue learning</div>
+    <div class="v" id="resume-v"></div>
+  </div>
+  <div class="crumb hide" id="crumb"></div>
+  <div id="view"></div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = t => { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; };
+let mode = 'inter';
+// Where we are: {level:'sedarim'|'masechtos'|'perakim'|'text', ...ids and names}
+let at = { level: 'sedarim' };
+
+function setStatus(t){ $('status').textContent = t || ''; }
+function loading(){ $('view').innerHTML = '<div class="loading"><span class="spin"></span>Loading…</div>'; }
+function failed(what){
+  $('view').innerHTML = '<div class="err"><b>Couldn’t load ' + esc(what) + '.</b><br>' +
+    'This needs a connection the first time; after that it is saved on the device.</div>';
+  setStatus('offline');
+}
+
+function crumbs(parts){
+  const c = $('crumb');
+  if (!parts.length){ c.classList.add('hide'); return; }
+  c.classList.remove('hide');
+  c.innerHTML = parts.map((p, i) =>
+    i < parts.length - 1 ? '<a href="#" data-up="' + (parts.length - 1 - i) + '">' + esc(p) + '</a>' : esc(p)
+  ).join(' › ');
+  c.querySelectorAll('[data-up]').forEach(a => a.addEventListener('click', e => {
+    e.preventDefault(); up(Number(a.dataset.up));
+  }));
+}
+
+function up(n){
+  for (let i = 0; i < n; i++){
+    if (at.level === 'text') at = { level: 'perakim', seder: at.seder, masechta: at.masechta };
+    else if (at.level === 'perakim') at = { level: 'masechtos', seder: at.seder };
+    else if (at.level === 'masechtos') at = { level: 'sedarim' };
+  }
+  render();
+}
+
+async function render(){
+  loading();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  try {
+    if (at.level === 'sedarim') return await showSedarim();
+    if (at.level === 'masechtos') return await showMasechtos();
+    if (at.level === 'perakim') return await showPerakim();
+    if (at.level === 'text') return await showText();
+  } catch (e) {
+    console.warn(e);
+    failed('this section');
+  }
+}
+
+async function showSedarim(){
+  const rows = await Texts.sedarim();
+  $('h').textContent = 'Mishnayos';
+  crumbs([]);
+  setStatus(rows.length + ' sedarim');
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.innerHTML = '<h2>Shisha sedarim</h2>';
+  rows.forEach(s => {
+    const r = document.createElement('div');
+    r.className = 'row';
+    r.innerHTML = '<span class="t"></span><span class="he"></span><span class="chev">›</span>';
+    r.children[0].textContent = s.name;
+    r.children[1].textContent = s.hebrew_name || '';
+    r.addEventListener('click', () => { at = { level: 'masechtos', seder: s }; render(); });
+    card.appendChild(r);
+  });
+  $('view').innerHTML = ''; $('view').appendChild(card);
+}
+
+async function showMasechtos(){
+  const rows = await Texts.masechtos(at.seder.id);
+  $('h').textContent = at.seder.name;
+  crumbs(['Mishnayos', at.seder.name]);
+  setStatus(rows.length + ' masechtos');
+  const card = document.createElement('div');
+  card.className = 'card';
+  rows.forEach(m => {
+    const r = document.createElement('div');
+    r.className = 'row';
+    r.innerHTML = '<span class="t"></span><span class="he"></span><span class="c"></span><span class="chev">›</span>';
+    r.children[0].textContent = m.name;
+    r.children[1].textContent = m.hebrew_name || '';
+    r.children[2].textContent = m.chapter_count ? m.chapter_count + ' perakim' : '';
+    r.addEventListener('click', () => { at = { level: 'perakim', seder: at.seder, masechta: m }; render(); });
+    card.appendChild(r);
+  });
+  $('view').innerHTML = ''; $('view').appendChild(card);
+}
+
+async function showPerakim(){
+  const rows = await Texts.perakim(at.masechta.id);
+  $('h').textContent = at.masechta.name;
+  crumbs(['Mishnayos', at.seder.name, at.masechta.name]);
+  setStatus(rows.length + ' perakim');
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.innerHTML = '<h2>Perakim</h2>';
+  const g = document.createElement('div');
+  g.className = 'grid';
+  rows.forEach(p => {
+    const b = document.createElement('button');
+    b.className = 'chip';
+    b.textContent = p.chapter_number;
+    b.addEventListener('click', () => {
+      at = { level: 'text', seder: at.seder, masechta: at.masechta, perek: p, perakim: rows };
+      render();
+    });
+    g.appendChild(b);
+  });
+  card.appendChild(g);
+  $('view').innerHTML = ''; $('view').appendChild(card);
+}
+
+async function showText(){
+  const rows = await Texts.mishnayos(at.perek.id);
+  const title = at.masechta.name + ' ' + at.perek.chapter_number;
+  $('h').textContent = title;
+  crumbs(['Mishnayos', at.seder.name, at.masechta.name, 'Perek ' + at.perek.chapter_number]);
+  setStatus(rows.length + ' mishnayos');
+
+  const seg = document.createElement('div');
+  seg.className = 'seg';
+  seg.innerHTML = '<button class="segbtn' + (mode === 'inter' ? ' on' : '') + '" data-mode="inter">With English</button>' +
+                  '<button class="segbtn' + (mode === 'heb' ? ' on' : '') + '" data-mode="heb">Hebrew only</button>';
+
+  const card = document.createElement('div');
+  card.className = 'card' + (mode === 'heb' ? ' m-heb' : '');
+
+  if (!rows.length){
+    card.innerHTML = '<div class="loading">This perek has no text stored yet.</div>';
+  } else {
+    rows.forEach(m => {
+      const d = document.createElement('div');
+      d.className = 'mish';
+      d.innerHTML = '<div class="n"></div><div class="he"></div><div class="en"></div>';
+      d.children[0].textContent = 'Mishnah ' + m.mishnah_number;
+      d.children[1].textContent = m.hebrew_text || '';
+      d.children[2].textContent = m.english_text || '';
+      card.appendChild(d);
+    });
+  }
+
+  const attr = document.createElement('div');
+  attr.className = 'attr';
+  attr.textContent = 'Text and translation via Sefaria.';
+  card.appendChild(attr);
+
+  // Previous/next perek within this masechta.
+  const idx = at.perakim.findIndex(p => p.id === at.perek.id);
+  const nav = document.createElement('div');
+  nav.className = 'navbtns';
+  nav.innerHTML = '<button id="pv">‹ Previous</button><button id="nx">Next ›</button>';
+  card.appendChild(nav);
+
+  $('view').innerHTML = '';
+  $('view').appendChild(seg);
+  $('view').appendChild(card);
+
+  seg.querySelectorAll('.segbtn').forEach(b => b.addEventListener('click', () => {
+    mode = b.dataset.mode; render();
+  }));
+  const pv = $('pv'), nx = $('nx');
+  pv.disabled = idx <= 0; nx.disabled = idx < 0 || idx >= at.perakim.length - 1;
+  pv.addEventListener('click', () => { at.perek = at.perakim[idx - 1]; render(); });
+  nx.addEventListener('click', () => { at.perek = at.perakim[idx + 1]; render(); });
+
+  // Save the place so the app can offer to pick up here.
+  Store.set('mishna:last', {
+    sederName: at.seder.name, masechtaName: at.masechta.name,
+    perekNumber: at.perek.chapter_number,
+    seder: at.seder, masechta: at.masechta, perek: at.perek
+  }).catch(() => {});
+}
+
+/* Back button walks the hierarchy before leaving the page, so a reader deep in
+   a masechta is not thrown out to the Today screen by one tap. */
+$('back').addEventListener('click', e => {
+  if (at.level !== 'sedarim'){ e.preventDefault(); up(1); }
+});
+
+(function(){
+  Store.migrate().catch(() => {}).then(() => {
+    Store.persist().catch(() => {});
+    return Store.get('mishna:last');
+  }).then(last => {
+    if (last && last.perek){
+      $('resume-v').textContent = last.masechtaName + ' ' + last.perekNumber;
+      $('resume').classList.remove('hide');
+      $('resume').addEventListener('click', async () => {
+        const perakim = await Texts.perakim(last.masechta.id).catch(() => [last.perek]);
+        at = { level: 'text', seder: last.seder, masechta: last.masechta, perek: last.perek, perakim };
+        $('resume').classList.add('hide');
+        render();
+      });
+    }
+    render();
+  });
+})();
+</script>
+</body>
+</html>
