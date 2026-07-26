@@ -57,7 +57,11 @@ for (const ref of refs) {
     console.log(`${ref} — EN ${en.length}/${he.length}`);
     if (SB && KEY) await upsert({
       ref, nusach: NUS[indexTitle] || indexTitle, payload: d,
-      english_segments: en.length, total_segments: he.length
+      english_segments: en.length, total_segments: he.length,
+      // Sent explicitly: merge-duplicates only updates columns present in the
+      // payload, so relying on the column default would leave a re-synced row
+      // showing the timestamp of its first insert.
+      fetched_at: new Date().toISOString()
     });
   } catch (e) {
     console.warn(`skip ${ref}: ${e.message}`);
