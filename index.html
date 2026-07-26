@@ -27,6 +27,8 @@
 <script src="js/texts.js"></script>
 <script src="js/zmanim.js"></script>
 <script src="js/reminders.js" defer></script>
+<script src="js/notify.js" defer></script>
+<script src="js/settings.js" defer></script>
 
 <style>
   :root{
@@ -175,6 +177,37 @@
   .learn-go{color:var(--ink-3); font-size:20px; line-height:1;}
   .sh-count{text-align:center; font-size:12.5px; font-weight:600;
             color:var(--gold-ink); margin-top:9px;}
+
+  /* ---- settings sheet ---- */
+  .sheet-back{position:fixed; inset:0; background:rgba(20,24,40,.45); z-index:60;
+              display:flex; align-items:flex-end; justify-content:center;}
+  .sheet{background:var(--ivory); width:100%; max-width:560px; border-radius:18px 18px 0 0;
+         max-height:88vh; display:flex; flex-direction:column;
+         padding-bottom:env(safe-area-inset-bottom);}
+  .sheet-head{display:flex; align-items:center; justify-content:space-between; gap:10px;
+              padding:16px 16px 10px; font-family:var(--serif); font-size:18px; color:var(--night);
+              border-bottom:1px solid var(--line);}
+  .sheet-x{border:none; background:transparent; font-size:15px; color:var(--ink-2);
+           cursor:pointer; padding:6px 2px; min-width:32px; min-height:32px;}
+  .sheet-body{overflow-y:auto; padding:14px 16px 6px; flex:1;}
+  .sheet-foot{padding:10px 16px 16px; border-top:1px solid var(--line);}
+  .sg{margin-bottom:18px;}
+  .sg-l{font-size:12px; font-weight:700; color:var(--ink-2); text-transform:uppercase;
+        letter-spacing:.06em; margin-bottom:4px;}
+  .sg-h{font-size:12px; color:var(--ink-2); line-height:1.6; margin-bottom:8px;}
+  .sg-opts{display:flex; flex-direction:column; gap:6px;}
+  .sg-opt{text-align:left; border:1px solid var(--line-2); background:var(--card);
+          border-radius:11px; padding:11px 13px; cursor:pointer; font-family:var(--sans);
+          color:var(--ink); width:100%; min-height:44px;}
+  .sg-opt .t{display:block; font-size:14px; font-weight:600;}
+  .sg-opt .h{display:block; font-size:11.5px; color:var(--ink-2); margin-top:1px;}
+  .sg-opt.on{background:var(--gold-bg); border-color:#E8CE97;}
+  .sg-opt.on .t{color:var(--gold-ink);}
+  .sg-num{display:flex; align-items:center; gap:8px;}
+  .sg-num input{width:88px; border:1px solid var(--line-2); border-radius:10px;
+                padding:10px 12px; font-size:15px; font-family:var(--sans);
+                font-variant-numeric:tabular-nums; min-height:44px;}
+  .sg-num span{font-size:12.5px; color:var(--ink-2);}
 
   .duo{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
   .mini{background:#F6F1E4; border-radius:12px; padding:10px 12px;}
