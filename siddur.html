@@ -165,7 +165,12 @@ async function api(path){
   if(!r.ok)throw new Error('HTTP '+r.status);
   return r.json();
 }
-function strip(s){const d=document.createElement('div');d.innerHTML=String(s);return d.textContent||'';}
+/* Footnotes are removed, not flattened. Sefaria embeds them inline as a
+   <sup class="footnote-marker"> plus an <i class="footnote">; taking textContent
+   of the lot splices the note into the middle of the text. */
+function strip(s){const d=document.createElement('div');d.innerHTML=String(s);
+  d.querySelectorAll('.footnote-marker,.footnote').forEach(n=>n.remove());
+  return (d.textContent||'').replace(/\s+/g,' ').trim();}
 
 // ---- Index / TOC ----
 function walk(node,path,out){

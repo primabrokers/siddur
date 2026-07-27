@@ -40,10 +40,28 @@
   /* he/text from Sefaria arrive as nested arrays of HTML. Flatten to plain
      paired segments; a missing translation yields an empty string rather than
      dropping the Hebrew alongside it. */
+  /* Sefaria embeds footnotes inline: a <sup class="footnote-marker"> letter plus
+     an <i class="footnote"> containing the note. Taking textContent of the lot
+     splices the note into the posuk — "When God began to createaWhen God began
+     to create In contrast to others..." — which is unreadable and, in a text
+     people daven and learn from, unacceptable. Roughly one verse in six of the
+     Torah carries one, so this is the common case rather than an edge. */
   function strip(html) {
     const d = document.createElement('div');
     d.innerHTML = String(html);
-    return (d.textContent || '').trim();
+    d.querySelectorAll('.footnote-marker, .footnote, sup.footnote-marker, i.footnote')
+      .forEach(n => n.remove());
+    return (d.textContent || '').replace(/\s+/g, ' ').trim();
+  }
+
+  /* The notes themselves, kept rather than discarded — they are worth showing,
+     just not spliced mid-posuk. */
+  function footnotes(html) {
+    const d = document.createElement('div');
+    d.innerHTML = String(html);
+    return Array.from(d.querySelectorAll('.footnote, i.footnote'))
+      .map(n => (n.textContent || '').replace(/\s+/g, ' ').trim())
+      .filter(Boolean);
   }
 
   function pairs(he, en, out) {
@@ -200,6 +218,7 @@
           n: i + 1,
           he: strip(he[i]),
           en: strip(flat(en)[i] || ''),
+          notes: footnotes(flat(en)[i] || ''),
           onkelos: strip(onk[i] || ''),
           rashi: (Array.isArray(rHe[i]) ? rHe[i] : flat(rHe[i])).map((c, j) => ({
             he: strip(c),
