@@ -62,6 +62,13 @@
   .chip.done{background:#DFEEDF; border-color:#B9DCC0; color:#2E6B45;}
 
   /* A posuk and its meforshim. */
+  .bulk{display:flex; align-items:center; gap:10px; padding:0 0 10px;
+        border-bottom:1px solid var(--line); margin-bottom:4px;}
+  .bulk-btn{border:1px solid var(--line-2); background:var(--card); border-radius:999px;
+            font-size:12px; font-weight:700; color:var(--ink); padding:8px 14px;
+            cursor:pointer; font-family:var(--sans); min-height:36px;}
+  .bulk-btn.on{background:#DFEEDF; border-color:#B9DCC0; color:#2E6B45;}
+  .bulk-h{font-size:11.5px; color:var(--ink-2);}
   .pk{padding:13px 0; border-top:1px solid var(--line);}
   .pk:first-of-type{border-top:none;}
   .pk-head{display:flex; align-items:center; gap:8px; margin-bottom:5px;}
@@ -234,7 +241,8 @@ async function showHome(){
   help.innerHTML = '<h2>Shnayim mikra v’echad targum</h2>' +
     '<div class="note">Each posuk shows the Torah text, Onkelos, and Rashi. Tap the mark ' +
     'beside a posuk once you have said it twice with the targum — progress is saved on ' +
-    'this device and shows on the parsha above.</div>';
+    'this device and shows on the parsha above. Mark a whole perek at once, or ' +
+    'long-press a posuk\u2019s mark to catch up everything to that point.</div>';
   view.appendChild(help);
 }
 
@@ -287,6 +295,39 @@ async function showPerek(){
   applyMode(card);
   card.innerHTML = '';
 
+  /* Marking posuk by posuk is right when learning one at a time, and tedious
+     when catching up on a whole perek. Both, then: a bulk control here, and the
+     per-posuk mark below for finer work. */
+  const keyFor = n => b.ref + ' ' + ch + ':' + n;
+  const bulk = document.createElement('div');
+  bulk.className = 'bulk';
+  const allBtn = document.createElement('button');
+  const upto = document.createElement('span');
+  upto.className = 'bulk-h';
+  bulk.appendChild(allBtn); bulk.appendChild(upto);
+  card.appendChild(bulk);
+
+  function perekDone(){
+    return data.posukim.every(p => progress[keyFor(p.n)]);
+  }
+  function paintBulk(){
+    const done = data.posukim.filter(p => progress[keyFor(p.n)]).length;
+    allBtn.className = 'bulk-btn' + (perekDone() ? ' on' : '');
+    allBtn.textContent = perekDone() ? '✓ Whole perek read' : 'Mark whole perek read';
+    upto.textContent = done + ' of ' + data.posukim.length + ' pesukim';
+  }
+  allBtn.addEventListener('click', async () => {
+    const target = !perekDone();
+    data.posukim.forEach(p => { progress[keyFor(p.n)] = target; });
+    await Store.set('chumash:progress', progress).catch(() => {});
+    card.querySelectorAll('.pk-mark').forEach((m, i) => {
+      const on = !!progress[keyFor(data.posukim[i].n)];
+      m.classList.toggle('on', on);
+      m.textContent = on ? '✓ read' : 'mark read';
+    });
+    paintBulk();
+  });
+
   if (!data.posukim.length){
     card.innerHTML = '<div class="err">No text returned for this perek.</div>';
     return;
@@ -309,7 +350,28 @@ async function showPerek(){
       mark.classList.toggle('on', !!progress[key]);
       mark.textContent = progress[key] ? '✓ read' : 'mark read';
       await Store.set('chumash:progress', progress).catch(() => {});
+      paintBulk();
     });
+    /* Long-press marks everything up to and including this posuk — the common
+       case when you stop partway through and come back. */
+    let hold = null;
+    mark.addEventListener('pointerdown', () => {
+      hold = setTimeout(async () => {
+        for (const q of data.posukim){
+          progress[keyFor(q.n)] = true;
+          if (q.n === p.n) break;
+        }
+        await Store.set('chumash:progress', progress).catch(() => {});
+        card.querySelectorAll('.pk-mark').forEach((m, i) => {
+          const on = !!progress[keyFor(data.posukim[i].n)];
+          m.classList.toggle('on', on);
+          m.textContent = on ? '✓ read' : 'mark read';
+        });
+        paintBulk();
+      }, 600);
+    });
+    ['pointerup','pointerleave','pointercancel'].forEach(e =>
+      mark.addEventListener(e, () => clearTimeout(hold)));
     head.appendChild(mark);
     d.appendChild(head);
 
@@ -355,6 +417,7 @@ async function showPerek(){
   $('pv').addEventListener('click', () => { at.chapter = ch - 1; render(); });
   $('nx').addEventListener('click', () => { at.chapter = ch + 1; render(); });
 
+  paintBulk();
   setStatus(data.posukim.length + ' pesukim');
   Store.set('chumash:last', { book: b.ref, chapter: ch }).catch(() => {});
 }

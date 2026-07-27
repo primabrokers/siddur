@@ -314,9 +314,35 @@ document.getElementById('nextSec').addEventListener('click',()=>{if(curIdx<leave
    the old localStorage scheme and is now offline must still find them. persist()
    is advisory and fire-and-forget — it asks the browser not to evict texts that
    are only useful precisely when there is no network to refetch them. */
+/* ?find=<title> opens the first section whose title or path matches, so the
+   app can link straight to Birkas Hamazon rather than dropping the user at the
+   contents and hoping. Matched on the live index rather than a hard-coded ref,
+   because Sefaria's exact ref strings differ between nusachos. */
+function openByName(q){
+  if(!q||!leaves.length)return false;
+  const norm=t=>String(t||'').toLowerCase().replace(/[^a-z0-9]+/g,'');
+  const n=norm(q);
+  let i=leaves.findIndex(l=>norm(l.title)===n);
+  if(i<0)i=leaves.findIndex(l=>norm(l.title).includes(n));
+  if(i<0)i=leaves.findIndex(l=>norm(l.path.join('')).includes(n));
+  if(i<0)return false;
+  openSection(i);
+  return true;
+}
+
 Store.migrate()
   .catch(err=>console.warn('Text cache migration skipped.',err))
-  .then(()=>{ Store.persist().catch(()=>{}); loadIndex(); });
+  .then(()=>{ Store.persist().catch(()=>{}); return loadIndex(); })
+  .then(()=>{
+    const q=new URLSearchParams(location.search).get('find');
+    if(q&&!openByName(q)){
+      setStatus('err','not found');
+      document.getElementById('sandbox-note').classList.remove('hide');
+      document.getElementById('sandbox-note').textContent =
+        'Couldn\u2019t find \u201c'+q+'\u201d in this nusach\u2019s index. It may be named '+
+        'differently here \u2014 the contents below are the full siddur.';
+    }
+  });
 </script>
 </body>
 </html>
