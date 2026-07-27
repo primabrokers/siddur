@@ -47,6 +47,7 @@
   .seg{display:flex; flex-wrap:wrap; gap:4px; background:#EFE9DA; border:1px solid var(--line-2); border-radius:12px; padding:3px; margin-bottom:8px;}
   .segbtn{flex:1 1 auto; min-width:88px; border:none; background:transparent; border-radius:9px; padding:8px 4px; font-size:12.5px; font-weight:600; color:var(--ink-2); cursor:pointer; font-family:var(--sans);}
   .segbtn.on{background:var(--card); color:var(--night); box-shadow:0 1px 2px rgba(40,36,20,.1);}
+  .segbtn:disabled{opacity:.45; cursor:default;}
   .segbtn:focus-visible{outline:2px solid var(--gold); outline-offset:1px;}
   .card{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:16px; margin-bottom:14px;}
   .card h2{font-size:12.5px; font-weight:700; color:var(--ink-2); text-transform:uppercase; letter-spacing:.06em; margin-bottom:8px;}
@@ -106,12 +107,15 @@
     <button class="segbtn on" data-nus="ash">Ashkenaz</button>
     <button class="segbtn" data-nus="sef">Sefard</button>
     <button class="segbtn" data-nus="edot">Edot Hamizrach</button>
-    <button class="segbtn" data-nus="lin" title="Phrase-by-phrase translation">Sefard · linear</button>
   </div>
   <div class="seg" role="tablist" aria-label="Display mode">
     <button class="segbtn on" data-mode="inter">With English</button>
     <button class="segbtn" data-mode="heb">Hebrew only</button>
     <button class="segbtn" data-mode="side">Side by side</button>
+  </div>
+  <div class="seg" role="group" aria-label="Edition">
+    <button class="segbtn" id="lin-toggle" aria-pressed="false"
+            title="Translation broken up phrase by phrase against the Hebrew">Linear edition</button>
   </div>
 
   <div class="notice" id="sandbox-note">This build loads everything live from the Sefaria API. If nothing loads, you're likely viewing it inside a sandboxed preview that blocks network requests — download the file and open it directly in your browser.</div>
@@ -141,20 +145,20 @@
 <script>
 'use strict';
 const API=CONFIG.SEFARIA_URL;
-/* Sefaria publishes a *linear* Sefard siddur — the translation is broken up
-   phrase by phrase against the Hebrew rather than as a paragraph underneath.
-   That is as close to interlinear as any freely licensed siddur gets, and it is
-   the only one of these four that reads that way, so it is labelled honestly
-   rather than lumped in with the others.
-   Index title taken from sefaria.org/Weekday_Siddur_Sefard_Linear; if Sefaria
-   renames it the app shows its normal 'couldn't load' state and the other three
-   are unaffected. */
+/* Sefaria publishes *linear* editions, where the English is broken up phrase by
+   phrase against the Hebrew rather than set as a paragraph underneath. That is a
+   property of an edition, not a nusach, so it is a toggle rather than a fourth
+   button — a linear Ashkenaz is still Ashkenaz.
+   The linear titles follow sefaria.org/Weekday_Siddur_Sefard_Linear and could
+   not be checked against the live API from here, so a linear index that fails to
+   load falls back to the standard edition and says so, rather than leaving the
+   reader on an error for a nusach that works perfectly well. */
 const NUSACH={
-  ash:{title:'Siddur Ashkenaz'},
-  sef:{title:'Siddur Sefard'},
-  edot:{title:'Siddur Edot HaMizrach'},
-  lin:{title:'Weekday Siddur Sefard Linear', linear:true}
+  ash:{title:'Siddur Ashkenaz',        linear:'Weekday Siddur Ashkenaz Linear'},
+  sef:{title:'Siddur Sefard',          linear:'Weekday Siddur Sefard Linear'},
+  edot:{title:'Siddur Edot HaMizrach'}   // no linear edition known
 };
+let linear=false, linearMissing=false;
 let nus='ash', mode='inter', leaves=[], curIdx=-1;
 const mem={};
 // Cached texts live in IndexedDB via js/store.js. The former localStorage
@@ -190,7 +194,9 @@ function walk(node,path,out){
   else out.push({ref:p.join(', '),title:title||p[p.length-1]||'—',he:node.heTitle||'',path:p});
 }
 async function loadIndex(){
-  const t=NUSACH[nus].title;
+  const cfg=NUSACH[nus];
+  const wantLinear=linear&&!!cfg.linear;
+  const t=wantLinear?cfg.linear:cfg.title;
   document.getElementById('toc-title').textContent=t+' — contents';
   const toc=document.getElementById('toc');
   toc.innerHTML='<div class="loading"><span class="spin"></span>Loading index from Sefaria…</div>';
@@ -207,10 +213,23 @@ async function loadIndex(){
     }
     leaves=[];
     walk(idx.schema,[],leaves);
-    setStatus('ok', (NUSACH[nus].linear ? 'linear · ' : '') + leaves.length + ' sections');
+    if(linearMissing){
+      linearMissing=false;
+      setStatus('warn','no linear edition for this nusach — showing standard');
+    }else{
+      setStatus('ok', (wantLinear ? 'linear · ' : '') + leaves.length + ' sections');
+    }
     renderToc();
     document.getElementById('sandbox-note').classList.add('hide');
   }catch(e){
+    /* A linear index that will not load is a missing edition, not a broken app:
+       drop back to the standard one for this nusach and say why. */
+    if(wantLinear){
+      /* Flagged rather than announced here: the retry below succeeds and would
+         overwrite the message, leaving the toggle looking like it did nothing. */
+      linear=false; linearMissing=true; paintLinear();
+      return loadIndex();
+    }
     setStatus('err','offline / blocked');
     toc.innerHTML='<div class="err"><b>Couldn\u2019t reach the Sefaria API.</b><br>If this is inside a sandboxed preview, download the file and open it in your browser. If you\u2019re offline, previously read sections remain available once loaded at least once.</div>';
   }
@@ -315,13 +334,27 @@ function applyMode(){const r=document.getElementById('reader');r.className='card
 // ---- Controls ----
 document.querySelectorAll('.segbtn[data-nus]').forEach(b=>b.addEventListener('click',()=>{
   document.querySelectorAll('.segbtn[data-nus]').forEach(x=>x.classList.remove('on'));
-  b.classList.add('on'); nus=b.dataset.nus; loadIndex();
+  b.classList.add('on'); nus=b.dataset.nus; paintLinear(); loadIndex();
 }));
 document.querySelectorAll('.segbtn[data-mode]').forEach(b=>b.addEventListener('click',()=>{
   document.querySelectorAll('.segbtn[data-mode]').forEach(x=>x.classList.remove('on'));
   b.classList.add('on'); mode=b.dataset.mode;
   if(!document.getElementById('reader').classList.contains('hide'))applyMode();
 }));
+function paintLinear(){
+  const b=document.getElementById('lin-toggle');
+  if(!b)return;
+  const available=!!NUSACH[nus].linear;
+  b.disabled=!available;
+  b.classList.toggle('on',linear&&available);
+  b.setAttribute('aria-pressed',String(linear&&available));
+  b.textContent=available?'Linear edition':'No linear edition for this nusach';
+}
+document.getElementById('lin-toggle').addEventListener('click',()=>{
+  if(!NUSACH[nus].linear)return;
+  linear=!linear; paintLinear(); loadIndex();
+});
+
 document.getElementById('back').addEventListener('click',showToc);
 document.getElementById('prevSec').addEventListener('click',()=>{if(curIdx>0)openSection(curIdx-1);});
 document.getElementById('nextSec').addEventListener('click',()=>{if(curIdx<leaves.length-1)openSection(curIdx+1);});
@@ -349,6 +382,7 @@ Store.migrate()
   .catch(err=>console.warn('Text cache migration skipped.',err))
   .then(()=>{ Store.persist().catch(()=>{}); return loadIndex(); })
   .then(()=>{
+    paintLinear();
     const q=new URLSearchParams(location.search).get('find');
     if(q&&!openByName(q)){
       setStatus('err','not found');
