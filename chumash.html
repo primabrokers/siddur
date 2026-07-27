@@ -94,6 +94,14 @@
              direction:ltr; text-align:left; margin-top:2px;}
   /* Display modes hide layers rather than refetching them. */
   .m-heb .en,.m-heb .ce{display:none;}
+  /* English is opt-in, so hidden unless the toggle is on. */
+  .no-en .en,.no-en .ce{display:none;}
+  .vbanner{background:#F7F5EF; border:1px solid var(--line); border-radius:10px;
+           padding:9px 11px; margin-bottom:10px;}
+  .vbanner b{display:block; font-size:11.5px; color:var(--ink); font-weight:700;}
+  .vbanner span{display:block; font-size:11px; color:var(--ink-2); line-height:1.55; margin-top:2px;}
+  .vbanner.warn{background:#F5DFDB; border-color:#E5C4BD;}
+  .vbanner.warn b,.vbanner.warn span{color:#7A2A1F;}
   .no-onk .onk,.no-onk .onk-l{display:none;}
   .no-rashi .rashi{display:none;}
 
@@ -146,7 +154,12 @@ const BOOKS = [
   { ref: 'Deuteronomy', name: 'Devarim',   he: 'דְּבָרִים',   chapters: 34 }
 ];
 
-let mode = 'all';                 // all | heb | torah
+/* Default is Hebrew with Onkelos and Rashi, and no English at all. Onkelos is
+   the traditional targum and the one shnayim mikra requires, so it carries the
+   meaning rather than a translation the app has chosen for the reader. English
+   is opt-in and always named — see js/texts.js for why. */
+let mode = 'all';                 // all | heb | torah  (Hebrew layers)
+let english = false;
 let at = { level: 'home' };
 let progress = {};                // 'Genesis 1:1' -> true, for shnayim mikra
 
@@ -242,7 +255,11 @@ async function showHome(){
     '<div class="note">Each posuk shows the Torah text, Onkelos, and Rashi. Tap the mark ' +
     'beside a posuk once you have said it twice with the targum — progress is saved on ' +
     'this device and shows on the parsha above. Mark a whole perek at once, or ' +
-    'long-press a posuk\u2019s mark to catch up everything to that point.</div>';
+    'long-press a posuk\u2019s mark to catch up everything to that point.</div>' +
+    '<div class="note" style="margin-top:8px;">Onkelos is shown rather than an English ' +
+    'translation: it is the targum shnayim mikra requires, and every freely available ' +
+    'English Torah translation is academic rather than traditional. English can be ' +
+    'switched on inside a perek, and is always named.</div>';
   view.appendChild(help);
 }
 
@@ -277,8 +294,13 @@ async function showPerek(){
   seg.className = 'seg';
   seg.innerHTML =
     '<button class="segbtn' + (mode==='all'?' on':'') + '" data-mode="all">Torah · Onkelos · Rashi</button>' +
-    '<button class="segbtn' + (mode==='torah'?' on':'') + '" data-mode="torah">Torah only</button>' +
-    '<button class="segbtn' + (mode==='heb'?' on':'') + '" data-mode="heb">Hebrew only</button>';
+    '<button class="segbtn' + (mode==='torah'?' on':'') + '" data-mode="torah">Torah · Onkelos</button>' +
+    '<button class="segbtn' + (mode==='heb'?' on':'') + '" data-mode="heb">Torah only</button>';
+
+  const engRow = document.createElement('div');
+  engRow.className = 'seg';
+  engRow.innerHTML = '<button class="segbtn' + (english?' on':'') + '" id="eng-toggle" ' +
+    'aria-pressed="' + english + '">' + (english ? 'English shown' : 'Show English') + '</button>';
 
   const card = document.createElement('div');
   card.className = 'card';
@@ -286,10 +308,16 @@ async function showPerek(){
 
   $('view').innerHTML = '';
   $('view').appendChild(seg);
+  $('view').appendChild(engRow);
   $('view').appendChild(card);
   seg.querySelectorAll('.segbtn').forEach(x => x.addEventListener('click', () => {
     mode = x.dataset.mode; render();
   }));
+  engRow.querySelector('#eng-toggle').addEventListener('click', async () => {
+    english = !english;
+    await Store.set('chumash:english', english).catch(() => {});
+    render();
+  });
 
   const data = await Texts.chumashPerek(b.ref, ch);
   applyMode(card);
@@ -400,6 +428,20 @@ async function showPerek(){
     card.appendChild(d);
   });
 
+  /* Never show an unnamed translation. If English is on, say which one and flag
+     it where the version is contested for a traditional reader. */
+  if (english && data.englishVersion){
+    const note = window.Versions && Versions.note(data.englishVersion);
+    const contested = window.Versions && Versions.contested(data.englishVersion);
+    const banner = document.createElement('div');
+    banner.className = 'vbanner' + (contested ? ' warn' : '');
+    banner.innerHTML = '<b></b><span></span>';
+    banner.querySelector('b').textContent = 'English: ' + data.englishVersion;
+    banner.querySelector('span').textContent = note ||
+      'Freely licensed via Sefaria. Not produced under Orthodox auspices.';
+    card.insertBefore(banner, card.firstChild);
+  }
+
   const missing = [];
   if (!data.hasOnkelos) missing.push('Onkelos');
   if (!data.hasRashi) missing.push('Rashi');
@@ -423,6 +465,7 @@ async function showPerek(){
 }
 
 function applyMode(card){
+  card.classList.toggle('no-en', !english);
   card.classList.toggle('m-heb', mode === 'heb');
   card.classList.toggle('no-onk', mode === 'torah');
   card.classList.toggle('no-rashi', mode === 'torah');
@@ -455,8 +498,8 @@ $('back').addEventListener('click', e => {
 (function(){
   Store.migrate().catch(() => {}).then(() => {
     Store.persist().catch(() => {});
-    return Store.get('chumash:progress');
-  }).then(p => { progress = p || {}; render(); });
+    return Promise.all([Store.get('chumash:progress'), Store.get('chumash:english')]);
+  }).then(([p, e]) => { progress = p || {}; english = !!e; render(); });
 })();
 </script>
 </body>

@@ -73,6 +73,53 @@
     return out;
   }
 
+
+  /* Which English versions are safe to present to a traditional readership.
+   *
+   * This is a real constraint, not a preference: every English Torah translation
+   * a chareidi reader would accept — ArtScroll/Stone, Metsudah, Judaica Press,
+   * Kaplan's Living Torah — is under copyright and not on Sefaria. Everything
+   * Sefaria can serve freely is academic or non-Orthodox in provenance, and the
+   * recent JPS editions in particular render shemos and gendered language in ways
+   * that are contested well outside chareidi circles.
+   *
+   * The app therefore does not pick a translation on the user's behalf. English is
+   * off by default, Onkelos carries the meaning instead — it is the traditional
+   * targum and the one shnayim mikra requires — and any English that is shown is
+   * named, with a caution where the version is known to be non-traditional.
+   */
+  const VERSION_NOTES = [
+    { match: /gender[- ]sensitive/i,
+      note: 'JPS Gender-Sensitive Edition — renders shemos and gendered language non-traditionally.' },
+    { match: /contemporary torah/i,
+      note: 'JPS Contemporary Torah (2006) — gender-neutral rendering of shemos.' },
+    { match: /^the schocken bible/i,
+      note: 'Academic translation.' },
+    { match: /jps.*(1985|new jps|njps)/i,
+      note: 'New JPS (1985) — academic; follows critical scholarship in places.' },
+    { match: /community translation/i,
+      note: 'Crowd-sourced on Sefaria; not reviewed by a rabbinic authority.' },
+    { match: /jps.*1917|holy scriptures/i,
+      note: 'JPS 1917 — public domain and literal, though not produced under Orthodox auspices.' }
+  ];
+
+  const Versions = {
+    /* A caution for this version, or null when nothing is known against it.
+       Rosenbaum-Silbermann Rashi and Onkelos raise nothing: both are traditional
+       and both are out of copyright. */
+    note(versionTitle) {
+      if (!versionTitle) return null;
+      const hit = VERSION_NOTES.find(v => v.match.test(versionTitle));
+      return hit ? hit.note : null;
+    },
+
+    /* True where a version is known to be contested for a traditional reader, as
+       opposed to merely unfamiliar. Drives the warning styling. */
+    contested(versionTitle) {
+      return /gender[- ]sensitive|contemporary torah|schocken/i.test(versionTitle || '');
+    }
+  };
+
   const Texts = {
     /* A Sefaria section, cached at three levels: memory, IndexedDB, and the
        shared Supabase table that every user benefits from. */
@@ -228,6 +275,7 @@
       }
       return {
         posukim: out,
+        englishVersion: torah.versionTitle || '',
         attribution: Texts.attribution(torah),
         hasOnkelos: onk.length > 0,
         hasRashi: rHe.length > 0
@@ -236,4 +284,5 @@
   };
 
   global.Texts = Texts;
+  global.Versions = Versions;
 })(typeof window !== 'undefined' ? window : this);
