@@ -44,8 +44,8 @@
   .status.ok .dot{background:#3E8E5A;} .status.err .dot{background:#A63D2F;}
   /* warn: the text is on screen, but it could not be saved for offline use. */
   .status.warn .dot{background:#B8811B;}
-  .seg{display:flex; gap:4px; background:#EFE9DA; border:1px solid var(--line-2); border-radius:12px; padding:3px; margin-bottom:8px;}
-  .segbtn{flex:1; border:none; background:transparent; border-radius:9px; padding:8px 4px; font-size:12.5px; font-weight:600; color:var(--ink-2); cursor:pointer; font-family:var(--sans);}
+  .seg{display:flex; flex-wrap:wrap; gap:4px; background:#EFE9DA; border:1px solid var(--line-2); border-radius:12px; padding:3px; margin-bottom:8px;}
+  .segbtn{flex:1 1 auto; min-width:88px; border:none; background:transparent; border-radius:9px; padding:8px 4px; font-size:12.5px; font-weight:600; color:var(--ink-2); cursor:pointer; font-family:var(--sans);}
   .segbtn.on{background:var(--card); color:var(--night); box-shadow:0 1px 2px rgba(40,36,20,.1);}
   .segbtn:focus-visible{outline:2px solid var(--gold); outline-offset:1px;}
   .card{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:16px; margin-bottom:14px;}
@@ -106,6 +106,7 @@
     <button class="segbtn on" data-nus="ash">Ashkenaz</button>
     <button class="segbtn" data-nus="sef">Sefard</button>
     <button class="segbtn" data-nus="edot">Edot Hamizrach</button>
+    <button class="segbtn" data-nus="lin" title="Phrase-by-phrase translation">Sefard · linear</button>
   </div>
   <div class="seg" role="tablist" aria-label="Display mode">
     <button class="segbtn on" data-mode="inter">With English</button>
@@ -140,10 +141,19 @@
 <script>
 'use strict';
 const API=CONFIG.SEFARIA_URL;
+/* Sefaria publishes a *linear* Sefard siddur — the translation is broken up
+   phrase by phrase against the Hebrew rather than as a paragraph underneath.
+   That is as close to interlinear as any freely licensed siddur gets, and it is
+   the only one of these four that reads that way, so it is labelled honestly
+   rather than lumped in with the others.
+   Index title taken from sefaria.org/Weekday_Siddur_Sefard_Linear; if Sefaria
+   renames it the app shows its normal 'couldn't load' state and the other three
+   are unaffected. */
 const NUSACH={
   ash:{title:'Siddur Ashkenaz'},
   sef:{title:'Siddur Sefard'},
-  edot:{title:'Siddur Edot HaMizrach'}
+  edot:{title:'Siddur Edot HaMizrach'},
+  lin:{title:'Weekday Siddur Sefard Linear', linear:true}
 };
 let nus='ash', mode='inter', leaves=[], curIdx=-1;
 const mem={};
@@ -197,7 +207,7 @@ async function loadIndex(){
     }
     leaves=[];
     walk(idx.schema,[],leaves);
-    setStatus('ok','connected · '+leaves.length+' sections');
+    setStatus('ok', (NUSACH[nus].linear ? 'linear · ' : '') + leaves.length + ' sections');
     renderToc();
     document.getElementById('sandbox-note').classList.add('hide');
   }catch(e){
