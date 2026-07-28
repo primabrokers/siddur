@@ -250,8 +250,10 @@ async function showText(){
   let segs = [], attribution = 'Text and translation via Sefaria.';
   try {
     const data = await Texts.section(ref);
-    segs = Texts.segments(data);
-    attribution = Texts.attribution(data);
+    const vcheck = window.Versions ? Versions.englishAllowed(data)
+      : { ok: false, reason: 'Translation could not be checked, so it is not shown.' };
+    segs = Texts.segments(vcheck.ok ? data : Object.assign({}, data, { text: null }));
+    attribution = (vcheck.ok ? '' : vcheck.reason + ' ') + Texts.attribution(data);
   } catch (e) {
     console.warn('Sefaria fetch failed for ' + ref, e);
   }

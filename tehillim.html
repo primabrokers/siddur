@@ -157,8 +157,13 @@ async function open(n){
   window.scrollTo({ top: 0, behavior: 'smooth' });
 
   try {
-    const data = await Texts.section('Psalms ' + n);
-    const segs = Texts.segments(data);
+    // Tanach: ask for the older public-domain English by name rather than
+    // accepting Sefaria's current default.
+    const data = await Texts.section('Psalms ' + n, { preferOlderEnglish: true });
+    /* Same refusal as everywhere else: no gender-neutral English renders. */
+    const vcheck = window.Versions ? Versions.englishAllowed(data)
+      : { ok: false, reason: 'Translation could not be checked, so it is not shown.' };
+    const segs = Texts.segments(vcheck.ok ? data : Object.assign({}, data, { text: null }));
     if (!segs.length) throw new Error('no text returned');
     const body = $('rbody');
     body.innerHTML = '';
@@ -171,7 +176,7 @@ async function open(n){
       d.children[2].textContent = p.en;
       body.appendChild(d);
     });
-    $('rattr').textContent = Texts.attribution(data);
+    $('rattr').textContent = (vcheck.ok ? '' : vcheck.reason + ' ') + Texts.attribution(data);
     setStatus(segs.length + ' pesukim');
     applyMode();
     // Remember where they were, so the app can offer to resume.

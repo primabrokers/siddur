@@ -431,14 +431,22 @@ async function showPerek(){
   /* Never show an unnamed translation. If English is on, say which one and flag
      it where the version is contested for a traditional reader. */
   if (english && data.englishVersion){
-    const note = window.Versions && Versions.note(data.englishVersion);
-    const contested = window.Versions && Versions.contested(data.englishVersion);
     const banner = document.createElement('div');
-    banner.className = 'vbanner' + (contested ? ' warn' : '');
-    banner.innerHTML = '<b></b><span></span>';
-    banner.querySelector('b').textContent = 'English: ' + data.englishVersion;
-    banner.querySelector('span').textContent = note ||
-      'Freely licensed via Sefaria. Not produced under Orthodox auspices.';
+    if (data.englishBlocked){
+      /* Refused, not merely flagged: the toggle is on and the English is still
+         not here, so the reason has to be visible or it reads as a bug. */
+      banner.className = 'vbanner warn';
+      banner.innerHTML = '<b></b><span></span>';
+      banner.querySelector('b').textContent = 'English not shown — ' + data.englishVersion;
+      banner.querySelector('span').textContent = data.englishBlockedReason;
+    } else {
+      const note = window.Versions && Versions.note(data.englishVersion);
+      banner.className = 'vbanner';
+      banner.innerHTML = '<b></b><span></span>';
+      banner.querySelector('b').textContent = 'English: ' + data.englishVersion;
+      banner.querySelector('span').textContent = note ||
+        'Freely licensed via Sefaria. Not produced under Orthodox auspices.';
+    }
     card.insertBefore(banner, card.firstChild);
   }
 

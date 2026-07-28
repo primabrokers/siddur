@@ -18,6 +18,7 @@
      before deferred scripts run, and it needs CONFIG and Store to exist. -->
 <script src="js/config.js"></script>
 <script src="js/store.js"></script>
+<script src="js/texts.js"></script>
 <script src="js/platform.js" defer></script>
 
 <style>
@@ -295,7 +296,14 @@ async function openSection(i){
       // render, so a failed write is a warning, not a load failure.
       Store.set(key,data).catch(cacheWriteFailed);
     }
-    const ps=pairs(data.he,data.text,[]);
+    /* A blocked translation is dropped before pairing, so the Hebrew renders
+       alone rather than beside something the app will not show. */
+    /* Fails closed. If Versions is somehow unavailable the English is withheld
+       rather than shown unchecked — for a rule like this, an absent guard must
+       not read as permission. */
+    const vcheck=window.Versions?Versions.englishAllowed(data)
+      :{ok:false,reason:'Translation could not be checked, so it is not shown.'};
+    const ps=pairs(data.he, vcheck.ok?data.text:null, []);
     body.innerHTML='';
     if(!ps.length){body.innerHTML='<div class="loading">No text in this section — it may be a container. Try its sub-sections in the contents.</div>';}
     let tr=0;
@@ -317,7 +325,10 @@ async function openSection(i){
     const bits=[];
     if(data.heVersionTitle)bits.push('Hebrew: '+data.heVersionTitle+(data.heLicense?' ('+data.heLicense+')':''));
     if(data.versionTitle)bits.push('English: '+data.versionTitle+(data.license?' ('+data.license+')':''));
-    document.getElementById('r-attr').textContent=(bits.length?bits.join(' · ')+' · ':'')+'via Sefaria';
+    /* When a translation is refused the reader must be told, or the missing
+       English reads as a loading failure. */
+    document.getElementById('r-attr').textContent=
+      (vcheck.ok?'':vcheck.reason+' ')+(bits.length?bits.join(' · ')+' · ':'')+'via Sefaria';
   }catch(e){
     setStatus('err','offline / blocked');
     const cached=await Store.get(key).catch(()=>null);
