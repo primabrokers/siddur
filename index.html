@@ -1,0 +1,1357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Vecker — zmanim, luach, Shabbos clock &amp; siddur</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5.0">
+<meta name="theme-color" content="#1C2440">
+<meta name="color-scheme" content="light">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Vecker">
+<meta name="format-detection" content="telephone=no">
+<script src="js/platform.js" defer></script>
+<!-- Not deferred. The inline script at the foot of the body runs during parsing,
+     before deferred scripts execute, and it guards on `if(!window.Zmanim)return`.
+     With defer that guard always tripped, so zmanim never rendered at all —
+     the Today screen sat on "Loading zmanim…" forever. zmanim.js touches no DOM
+     at load, so evaluating it here is safe. -->
+<script src="js/config.js"></script>
+<script src="js/store.js"></script>
+<script src="js/api.js"></script>
+<script src="js/sync.js"></script>
+<script src="js/texts.js"></script>
+<script src="js/zmanim.js"></script>
+<script src="js/reminders.js" defer></script>
+<script src="js/notify.js" defer></script>
+<script src="js/settings.js" defer></script>
+<script src="js/clock.js" defer></script>
+
+<style>
+  :root{
+    --night:#1C2440; --night-2:#28304F; --ivory:#FBF8F1; --card:#FFFFFF;
+    --ink:#25293B; --ink-2:#6A6E80; --ink-3:#9A9DAC;
+    --gold:#B8811B; --gold-bg:#F5E7C8; --gold-ink:#6E4D0D;
+    --fast:#A63D2F; --fast-bg:#F5DFDB; --fast-ink:#7A2A1F;
+    --minor-bg:#E5E9F5; --minor-ink:#37477E;
+    --line:#E8E2D4; --line-2:#D9D2C0;
+    --serif:'Frank Ruhl Libre','David Libre',Georgia,'Times New Roman',serif;
+    --sans:'Heebo',-apple-system,'Segoe UI',Roboto,Arial,sans-serif;
+  }
+  *{box-sizing:border-box; margin:0; -webkit-tap-highlight-color:transparent;}
+  /* The app fills the viewport everywhere. There is no device frame: a picture
+     of a phone belongs in a pitch deck, not in the product. On a wide screen the
+     column simply centres. */
+  html{height:100%;}
+  body{background:var(--ivory); font-family:var(--sans); color:var(--ink);
+       min-height:100vh; min-height:100dvh; display:block;}
+  .stage{display:block;}
+  .phone{width:100%; max-width:560px; margin:0 auto; background:var(--ivory);
+         min-height:100vh; min-height:100dvh; height:100dvh;
+         overflow:hidden; display:flex; flex-direction:column; position:relative;}
+  /* Spacer for the iOS status bar / notch only. It carried a fake 9:41 and a
+     drawn battery; the real one sits above it. */
+  .statusbar{flex:none; height:env(safe-area-inset-top); min-height:0;
+             padding:0; background:var(--ivory);}
+  .content{flex:1; overflow-y:auto; overflow-x:hidden; padding:0 0 8px;}
+  .screen{display:none; padding:6px 18px 18px; animation:fade .18s ease;}
+  .screen.active{display:block;}
+  @keyframes fade{from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:none;}}
+  @media (prefers-reduced-motion: reduce){ .screen{animation:none;} }
+
+  .apphead{display:flex; justify-content:space-between; align-items:baseline; padding:8px 2px 14px;}
+  .apphead h1{font-family:var(--serif); font-weight:600; font-size:24px; color:var(--night); letter-spacing:.2px;}
+  .apphead .sub{font-size:12px; color:var(--ink-2);}
+
+  .card{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:16px; margin-bottom:14px;}
+  .card h2{font-size:13px; font-weight:600; color:var(--ink-2); text-transform:uppercase; letter-spacing:.06em; margin-bottom:10px;}
+  .pill{display:inline-block; font-size:11px; font-weight:600; padding:3px 10px; border-radius:999px;}
+  .pill.gold{background:var(--gold-bg); color:var(--gold-ink);}
+  .pill.fast{background:var(--fast-bg); color:var(--fast-ink);}
+  .pill.minor{background:var(--minor-bg); color:var(--minor-ink);}
+  .pill.night{background:var(--night); color:#F4E9CF;}
+
+  /* Today */
+  .heb-date{font-family:var(--serif); font-size:26px; color:var(--night); direction:rtl; text-align:left;}
+  .zrow{display:flex; justify-content:space-between; padding:9px 2px; border-top:1px solid var(--line); font-size:14px;}
+  .zrow:first-of-type{border-top:none;}
+  .zrow .zl{color:var(--ink-2);}
+  .zrow .zt{font-variant-numeric:tabular-nums; font-weight:600;}
+  .zrow.next .zl,.zrow.next .zt{color:var(--gold-ink); font-weight:700;}
+  .footnote{font-size:11px; color:var(--ink-3); text-align:center; margin-top:8px;}
+  .footnote a{color:var(--gold-ink);}
+
+  /* Calendar */
+  .cal-nav{display:flex; align-items:center; gap:6px; margin-bottom:10px;}
+  .cal-nav button{border:1px solid var(--line-2); background:var(--card); color:var(--night); width:34px; height:34px; border-radius:10px; font-size:16px; cursor:pointer;}
+  .cal-nav button:hover{background:#F3EEE2;}
+  .cal-nav button:focus-visible, select:focus-visible, .navbtn:focus-visible, .today-btn:focus-visible{outline:2px solid var(--gold); outline-offset:2px;}
+  .cal-title{flex:1; text-align:center;}
+  .cal-title .g{font-family:var(--serif); font-size:19px; font-weight:600; color:var(--night);}
+  .cal-title .h{font-size:12px; color:var(--gold-ink); margin-top:1px;}
+  .cal-jump{display:flex; gap:6px; margin-bottom:12px;}
+  .cal-jump select{flex:1; height:34px; border:1px solid var(--line-2); border-radius:10px; background:var(--card); color:var(--ink); font-size:13px; padding:0 8px; font-family:var(--sans);}
+  .today-btn{height:34px; padding:0 12px; border:1px solid var(--line-2); border-radius:10px; background:var(--card); font-size:13px; font-weight:600; color:var(--gold-ink); cursor:pointer;}
+  .grid{display:grid; grid-template-columns:repeat(7,1fr); gap:3px;}
+  .dowh{font-size:10px; font-weight:700; color:var(--ink-3); text-align:center; text-transform:uppercase; padding:4px 0;}
+  .cell{min-height:52px; border-radius:9px; background:var(--card); border:1px solid var(--line); padding:4px 4px 3px; position:relative; cursor:pointer; display:flex; flex-direction:column;}
+  .cell.blank{background:transparent; border-color:transparent; cursor:default;}
+  .cell .g{font-size:13px; font-weight:600; line-height:1;}
+  .cell .h{font-size:10px; color:var(--ink-3); direction:rtl; line-height:1.2; margin-top:1px;}
+  .cell .bar{margin-top:auto; height:4px; border-radius:2px;}
+  .cell.t-yt{background:var(--gold-bg); border-color:#E2CD9C;} .cell.t-yt .h{color:var(--gold-ink);}
+  .cell.t-ch{background:#FBF3E0; border-color:#E9DCB9;}
+  .cell.t-fast{background:var(--fast-bg); border-color:#E5C4BD;} .cell.t-fast .h{color:var(--fast-ink);}
+  .cell.t-minor{background:var(--minor-bg); border-color:#CBD3EA;} .cell.t-minor .h{color:var(--minor-ink);}
+  .cell.t-rc .g::after{content:''; display:inline-block; width:5px; height:5px; border-radius:50%; background:var(--gold); margin-left:3px; vertical-align:2px;}
+  .cell.today{outline:2px solid var(--night); outline-offset:-1px;}
+  .cell.sel{outline:2px solid var(--gold); outline-offset:-1px;}
+  .legend{display:flex; flex-wrap:wrap; gap:10px; font-size:10.5px; color:var(--ink-2); margin:10px 2px 0;}
+  .legend span::before{content:''; display:inline-block; width:9px; height:9px; border-radius:3px; margin-right:4px; vertical-align:-1px;}
+  .lg-yt::before{background:var(--gold-bg); border:1px solid #E2CD9C;}
+  .lg-fast::before{background:var(--fast-bg); border:1px solid #E5C4BD;}
+  .lg-minor::before{background:var(--minor-bg); border:1px solid #CBD3EA;}
+  .lg-rc::before{background:var(--gold); border-radius:50%;}
+  .daydetail{margin-top:12px;}
+  .daydetail .dd-date{font-size:13px; font-weight:700; color:var(--night);}
+  .daydetail .dd-heb{font-family:var(--serif); font-size:15px; color:var(--gold-ink); direction:rtl; text-align:left; margin:2px 0 6px;}
+  .evlist{margin-top:4px;}
+  .evrow{display:flex; justify-content:space-between; gap:8px; padding:7px 2px; border-top:1px solid var(--line); font-size:13px;}
+  .evrow .ed{color:var(--ink-2); font-variant-numeric:tabular-nums; white-space:nowrap;}
+  .empty{font-size:12.5px; color:var(--ink-3); padding:6px 2px;}
+
+  /* Clock */
+  .bigclock{text-align:center; padding:10px 0 4px;}
+  .bigclock .t{font-family:var(--serif); font-size:58px; font-weight:600; color:var(--night); font-variant-numeric:tabular-nums; line-height:1;}
+  .bigclock .s{font-size:12.5px; color:var(--ink-2); margin-top:6px;}
+  /* ---- Today: hero ---- */
+  /* Night ground so the first card reads as the headline rather than one of a
+     stack of equal cream panels. The gradient is two steps of the same navy —
+     depth without introducing a hue the palette does not already carry. */
+  .hero{background:linear-gradient(165deg,var(--night-2) 0%,var(--night) 62%);
+        border-radius:18px; padding:16px 16px 10px; margin-bottom:14px; color:#F4E9CF;
+        box-shadow:0 6px 20px -8px rgba(28,36,64,.45);}
+  .hero-top{display:flex; justify-content:space-between; align-items:flex-start; gap:10px;}
+  .heb-date.hd{color:#FBF8F1;}
+  .hero-badges{display:flex; flex-wrap:wrap; gap:4px; justify-content:flex-end; max-width:58%;}
+  .hero-badges .pill{background:rgba(251,248,241,.14); color:#F4E9CF;}
+  .hero-badges .pill.gold{background:var(--gold); color:#2A1D04;}
+  .hero-badges .pill.fast{background:var(--fast); color:#FBF0EE;}
+
+  /* Hero figure: the one number the screen leads with. */
+  .hero-fig{text-align:center; padding:14px 0 2px;}
+  .hf-label{font-size:11px; letter-spacing:.09em; text-transform:uppercase;
+            color:rgba(244,233,207,.62); font-weight:600;}
+  .hf-value{font-family:var(--sans); font-size:52px; line-height:1.05; font-weight:700;
+            color:#FFF; font-variant-numeric:tabular-nums; letter-spacing:-.02em; margin:2px 0 1px;}
+  .hf-caption{font-size:13px; color:rgba(244,233,207,.82); font-weight:500;}
+  .hero-foot{font-size:10.5px; color:rgba(244,233,207,.48); text-align:center; padding:2px 0 4px;}
+
+  /* ---- Today: zmanim KPI tiles ---- */
+  .zgrid{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:14px;}
+  .ztile{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:9px 11px;}
+  .ztile .zl{font-size:10.5px; color:var(--ink-2); text-transform:uppercase;
+             letter-spacing:.05em; font-weight:600; display:block; margin-bottom:1px;}
+  .ztile .zt{font-size:17px; font-weight:700; color:var(--ink); font-variant-numeric:tabular-nums;}
+  /* Emphasis, not a new colour: the imminent zman is the point, the rest are context. */
+  .ztile.next{background:var(--gold-bg); border-color:#E8CE97;}
+  .ztile.next .zl{color:var(--gold-ink);}
+  .ztile.next .zt{color:var(--gold-ink);}
+  .ztile.past .zl,.ztile.past .zt{color:var(--ink-3);}
+  .zgrid .footnote{grid-column:1/-1;}
+
+  /* ---- Today: learning rows ---- */
+  .learn{display:flex; align-items:center; gap:11px; padding:10px 2px;
+         border-top:1px solid var(--line); text-decoration:none; color:inherit;}
+  .learn:first-of-type{border-top:none;}
+  .learn-ic{flex:0 0 34px; height:34px; border-radius:10px; background:var(--gold-bg);
+            display:grid; place-items:center;}
+  .learn-ic svg{width:18px; height:18px; fill:none; stroke:var(--gold-ink);
+                stroke-width:1.7; stroke-linecap:round;}
+  .learn-txt{flex:1; min-width:0;}
+  .learn-t{display:block; font-size:14px; font-weight:600; color:var(--ink);}
+  .learn-s{display:block; font-size:12px; color:var(--ink-2);}
+  .learn-go{color:var(--ink-3); font-size:20px; line-height:1;}
+  .sh-count{text-align:center; font-size:12.5px; font-weight:600;
+            color:var(--gold-ink); margin-top:9px;}
+
+  /* ---- settings sheet ---- */
+  .sheet-back{position:fixed; inset:0; background:rgba(20,24,40,.45); z-index:60;
+              display:flex; align-items:flex-end; justify-content:center;}
+  .sheet{background:var(--ivory); width:100%; max-width:560px; border-radius:18px 18px 0 0;
+         max-height:88vh; display:flex; flex-direction:column;
+         padding-bottom:env(safe-area-inset-bottom);}
+  .sheet-head{display:flex; align-items:center; justify-content:space-between; gap:10px;
+              padding:16px 16px 10px; font-family:var(--serif); font-size:18px; color:var(--night);
+              border-bottom:1px solid var(--line);}
+  .sheet-x{border:none; background:transparent; font-size:15px; color:var(--ink-2);
+           cursor:pointer; padding:6px 2px; min-width:32px; min-height:32px;}
+  .sheet-body{overflow-y:auto; padding:14px 16px 6px; flex:1;}
+  .sheet-foot{padding:10px 16px 16px; border-top:1px solid var(--line);}
+  .sg{margin-bottom:18px;}
+  .sg-l{font-size:12px; font-weight:700; color:var(--ink-2); text-transform:uppercase;
+        letter-spacing:.06em; margin-bottom:4px;}
+  .sg-h{font-size:12px; color:var(--ink-2); line-height:1.6; margin-bottom:8px;}
+  .sg-opts{display:flex; flex-direction:column; gap:6px;}
+  .sg-opt{text-align:left; border:1px solid var(--line-2); background:var(--card);
+          border-radius:11px; padding:11px 13px; cursor:pointer; font-family:var(--sans);
+          color:var(--ink); width:100%; min-height:44px;}
+  .sg-opt .t{display:block; font-size:14px; font-weight:600;}
+  .sg-opt .h{display:block; font-size:11.5px; color:var(--ink-2); margin-top:1px;}
+  .sg-opt.on{background:var(--gold-bg); border-color:#E8CE97;}
+  .sg-opt.on .t{color:var(--gold-ink);}
+  .sg-num{display:flex; align-items:center; gap:8px;}
+  .sg-num input{width:88px; border:1px solid var(--line-2); border-radius:10px;
+                padding:10px 12px; font-size:15px; font-family:var(--sans);
+                font-variant-numeric:tabular-nums; min-height:44px;}
+  .sg-num span{font-size:12.5px; color:var(--ink-2);}
+
+  .duo{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .mini{background:#F6F1E4; border-radius:12px; padding:10px 12px;}
+  .mini .l{font-size:11px; color:var(--ink-2);}
+  .mini .v{font-size:17px; font-weight:700; margin-top:2px;}
+  .mini .v small{font-size:11px; font-weight:500; color:var(--ink-2);}
+  .alarm{display:flex; justify-content:space-between; align-items:center; padding:11px 2px; border-top:1px solid var(--line);}
+  .alarm:first-of-type{border-top:none;}
+  .alarm .at{font-size:17px; font-weight:700; font-variant-numeric:tabular-nums;}
+  .alarm .an{font-size:11.5px; color:var(--ink-2);}
+  .lockchip{font-size:11px; color:#2E6B45; background:#DFEEDF; padding:3px 9px; border-radius:999px; font-weight:600;}
+
+  /* Reminders */
+  .rem{display:flex; justify-content:space-between; align-items:center; padding:11px 2px; border-top:1px solid var(--line);}
+  .rem:first-of-type{border-top:none;}
+  .rem .rn{font-size:14.5px; font-weight:600;}
+  .rem .rd{font-size:11.5px; color:var(--ink-2); margin-top:1px;}
+  .toggle{width:40px; height:23px; border-radius:999px; background:#D8D2C2; position:relative; flex:none; cursor:pointer; border:none;}
+  .toggle::after{content:''; position:absolute; top:2.5px; left:3px; width:18px; height:18px; border-radius:50%; background:#fff; transition:transform .15s;}
+  .toggle.on{background:var(--gold);}
+  .toggle.on::after{transform:translateX(16px);}
+  .omer-n{font-family:var(--serif); font-size:52px; font-weight:600; color:var(--night); text-align:center; line-height:1;}
+  .omer-s{text-align:center; font-size:12.5px; color:var(--ink-2); margin-top:4px;}
+  .omer-heb{font-family:var(--serif); font-size:16.5px; line-height:1.7; color:var(--ink); direction:rtl; text-align:center; margin:12px auto 0; max-width:280px;}
+  .cta{display:block; width:100%; margin-top:14px; height:42px; border-radius:12px; border:none; background:var(--night); color:#F4E9CF; font-size:14.5px; font-weight:600; cursor:pointer; font-family:var(--sans);}
+  .cta:hover{background:var(--night-2);}
+
+  /* Menu */
+  .profile{display:flex; align-items:center; gap:12px;}
+  .avatar{width:48px; height:48px; border-radius:50%; background:var(--night); color:#F4E9CF; display:flex; align-items:center; justify-content:center; font-family:var(--serif); font-size:19px; flex:none;}
+  .profile .pn{font-size:16px; font-weight:700;}
+  .profile .pl{font-size:12px; color:var(--ink-2);}
+  .mrow{display:flex; align-items:center; gap:12px; padding:12.5px 2px; border-top:1px solid var(--line); cursor:pointer;}
+  .mrow:first-of-type{border-top:none;}
+  .mrow .mi{width:32px; height:32px; border-radius:9px; background:#F1EBDC; color:var(--night); display:flex; align-items:center; justify-content:center; flex:none;}
+  .mrow .mt{font-size:14.5px; font-weight:600;}
+  .mrow .md{font-size:11.5px; color:var(--ink-2); margin-top:1px;}
+  .mrow .chev{margin-left:auto; color:var(--ink-3); font-size:16px;}
+  .version{text-align:center; font-size:11px; color:var(--ink-3); padding:6px 0 2px;}
+
+  /* Per-day Yom Tov alarms */
+  .pdhead{display:grid; grid-template-columns:1fr 52px 52px; gap:8px; font-size:10.5px; font-weight:700; color:var(--ink-3); text-align:center; text-transform:uppercase; letter-spacing:.04em; padding:2px 0 6px;}
+  .pdhead small{font-weight:500; text-transform:none; letter-spacing:0;}
+  .pdrow{display:grid; grid-template-columns:1fr 52px 52px; gap:8px; align-items:center; padding:10px 0; border-top:1px solid var(--line);}
+  .daychip{width:44px; height:32px; margin:0 auto; border-radius:9px; border:1px solid var(--line-2); background:var(--card); color:transparent; font-size:14px; cursor:pointer;}
+  .daychip.on{background:var(--gold-bg); border-color:#DCC488; color:var(--gold-ink); font-weight:700;}
+  .dur{border:1px solid var(--line-2); border-radius:7px; background:#FCFAF4; color:var(--gold-ink); font-size:11px; font-weight:600; padding:1px 3px; font-family:var(--sans);}
+  .rulebuilder{margin-top:10px; padding-top:10px; border-top:1px dashed var(--line-2);}
+  .rb-row{display:flex; gap:6px; margin-bottom:7px;}
+  .rb-row select,.rb-row input{flex:1; height:34px; border:1px solid var(--line-2); border-radius:10px; background:var(--card); color:var(--ink); font-size:12.5px; padding:0 8px; font-family:var(--sans); min-width:0;}
+  .rb-row input::placeholder{color:var(--ink-3);}
+
+  /* Shabbos mode lock screen */
+  .lockscr{position:absolute; inset:8px; z-index:30; background:#141A30; border-radius:36px; display:none; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:34px 26px;}
+  .lockscr.on{display:flex; animation:fade .25s ease;}
+  .lockscr .shalom{font-family:var(--serif); font-size:28px; color:#F0D896;}
+  .lockscr .lk-heb{font-size:12.5px; color:#8E96B8; margin-top:6px;}
+  .lockscr .lk-time{font-family:var(--serif); font-size:78px; font-weight:600; color:#FBF8F1; line-height:1; margin-top:26px; font-variant-numeric:tabular-nums;}
+  .lockscr .lk-ampm{font-size:14px; color:#8E96B8; font-weight:600; margin-top:6px; letter-spacing:.1em;}
+  .lockscr .lk-next{margin-top:30px; background:#1E2745; border:1px solid #2E3860; border-radius:16px; padding:13px 22px; min-width:230px;}
+  .lockscr .lk-next-l{font-size:10.5px; font-weight:700; color:#8E96B8; text-transform:uppercase; letter-spacing:.08em;}
+  .lockscr .lk-next-v{font-size:22px; font-weight:700; color:#F0D896; margin-top:3px; font-variant-numeric:tabular-nums;}
+  .lockscr .lk-next-d{font-size:11.5px; color:#AEB4CE; margin-top:2px;}
+  .lockscr .lk-times{margin-top:24px; font-size:12px; color:#AEB4CE; display:flex; gap:8px;}
+  .lockscr .lk-dot{color:#4A5478;}
+  .lockscr .lk-note{margin-top:14px; font-size:10.5px; color:#5F6890; line-height:1.7;}
+  .lockscr .lk-exit{margin-top:22px; background:none; border:1px dashed #3A4470; color:#8E96B8; font-size:10.5px; padding:7px 12px; border-radius:999px; cursor:pointer; font-family:var(--sans); max-width:260px; line-height:1.5;}
+  .lockscr .lk-exit:hover{color:#C9CEE4;}
+
+  /* Siddur */
+  .seg{display:flex; gap:4px; background:#EFE9DA; border:1px solid var(--line-2); border-radius:12px; padding:3px; margin-bottom:8px;}
+  .seg.small{margin-bottom:12px;}
+  .segbtn{flex:1; border:none; background:transparent; border-radius:9px; padding:7px 4px; font-size:12px; font-weight:600; color:var(--ink-2); cursor:pointer; font-family:var(--sans);}
+  .segbtn.on{background:var(--card); color:var(--night); box-shadow:0 1px 2px rgba(40,36,20,.1);}
+  .segbtn:focus-visible{outline:2px solid var(--gold); outline-offset:1px;}
+  .reader .rd-title{font-family:var(--serif); font-size:19px; font-weight:600; color:var(--night);}
+  .reader .rd-sub{font-size:11.5px; color:var(--ink-2); margin:2px 0 12px;}
+  .ph{padding:9px 0; border-top:1px solid var(--line);}
+  .ph:first-of-type{border-top:none;}
+  .ph .he{font-family:var(--serif); font-size:19.5px; line-height:1.75; color:var(--ink); direction:rtl; text-align:right;}
+  .ph .he .nus{background:var(--gold-bg); border-radius:4px; padding:0 3px; color:var(--gold-ink);}
+  .ph .en{font-size:12.5px; line-height:1.6; color:var(--ink-2); margin-top:3px;}
+  .reader.m-heb .ph .en{display:none;}
+  .reader.m-heb .ph .he{font-size:21px; line-height:1.9;}
+  .reader.m-side .ph{display:grid; grid-template-columns:1.15fr 1fr; gap:10px; align-items:start;}
+  .reader.m-side .ph .he{font-size:16.5px;}
+  .reader.m-side .ph .en{margin-top:0;}
+  .rd-resp{font-size:10.5px; font-weight:700; color:var(--gold-ink); text-transform:uppercase; letter-spacing:.06em; margin-top:10px;}
+
+
+  /* ===== Installed app / native ===== */
+  /* The layout is already full-bleed; these only add safe-area insets, which a
+     browser tab must not have. */
+  html.app-standalone .nav, html.app-native .nav {
+    padding-bottom:calc(8px + env(safe-area-inset-bottom)); }
+  html.app-standalone .homebar, html.app-native .homebar { display:none; }
+  html.app-standalone .lockscr, html.app-native .lockscr {
+    inset:0; border-radius:0; padding-top:calc(34px + env(safe-area-inset-top));
+    padding-bottom:calc(34px + env(safe-area-inset-bottom)); }
+  /* Small phones */
+  @media (max-width:400px){
+    .screen{padding-left:14px; padding-right:14px;}
+    .cell{min-height:46px;}
+    .bigclock .t{font-size:50px;}
+    .lockscr .lk-time{font-size:64px;}
+    .reader.m-side .ph, .m-side .ph{grid-template-columns:1fr; gap:4px;}
+  }
+  /* Tablets / desktop when installed: centre the column */
+  @media (min-width:700px){
+    html.app-standalone .phone, html.app-native .phone { max-width:520px; margin:0 auto; }
+  }
+  /* Touch targets */
+  .navbtn{min-height:48px;} .toggle{min-width:40px; min-height:24px;}
+  .cal-nav button{min-width:38px; min-height:38px;}
+
+  /* Bottom nav */
+  .nav{flex:none; display:flex; background:var(--night); padding:8px 6px calc(10px + 6px); border-top:1px solid #131828;}
+  .navbtn{flex:1; background:none; border:none; color:#8E96B8; font-size:10px; font-weight:600; font-family:var(--sans); display:flex; flex-direction:column; align-items:center; gap:3px; padding:5px 0 3px; cursor:pointer; border-radius:10px;}
+  .navbtn svg{width:21px; height:21px; stroke:currentColor; fill:none; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round;}
+  .navbtn.active{color:#F0D896;}
+  .homebar{position:absolute; bottom:6px; left:50%; transform:translateX(-50%); width:120px; height:4px; border-radius:2px; background:#3A415E;}
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="phone">
+    <div class="statusbar" aria-hidden="true"></div>
+    <div class="content" id="content">
+
+      <!-- TODAY -->
+      <section class="screen active" id="scr-today">
+        <div class="apphead"><h1>Vecker</h1><div class="sub" id="today-greg"></div></div>
+
+        <!-- Hero. Dark against the cream cards below, so the eye lands here first,
+             and it carries the single number the screen exists to answer: how long
+             until the next zman. -->
+        <div class="hero">
+          <div class="hero-top">
+            <div class="heb-date hd" id="today-heb"></div>
+            <div class="hero-badges" id="today-badges"></div>
+          </div>
+          <div class="hero-fig">
+            <div class="hf-label" id="z-next-label">Next zman</div>
+            <div class="hf-value" id="z-next-in">—</div>
+            <div class="hf-caption" id="z-next-at">Loading zmanim…</div>
+          </div>
+          <div id="sun-arc"></div>
+          <div class="hero-foot" id="z-foot"></div>
+        </div>
+
+        <!-- KPI row: a handful of headline times, as tiles rather than a flat list.
+             The imminent one is emphasised; the rest are context. -->
+        <div class="zgrid" id="z-rows"></div>
+
+        <div class="card">
+          <h2>This Shabbos</h2>
+          <div class="duo">
+            <div class="mini"><div class="l">Candle lighting · Fri</div><div class="v" id="sh-candles">—</div></div>
+            <div class="mini"><div class="l">Havdalah · Motzei</div><div class="v" id="sh-havdalah">—</div></div>
+          </div>
+          <div class="sh-count" id="sh-count"></div>
+          <div class="footnote" id="sh-foot">Loading candle lighting…</div>
+        </div>
+
+        <!-- Learn hub. Every text the app carries, reachable in one tap from the
+             screen people actually open. Tehillim and Chumash carry the day's
+             portion, computed rather than linked to a front page. -->
+        <div class="card">
+          <h2>Learn</h2>
+          <a class="learn" id="learn-chumash" href="chumash.html">
+            <span class="learn-ic" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M12 3v18M5 7h14M5 12h14M5 17h14"/></svg>
+            </span>
+            <span class="learn-txt">
+              <span class="learn-t">Chumash</span>
+              <span class="learn-s" id="learn-chum-sub">Shnayim mikra with Onkelos and Rashi</span>
+            </span>
+            <span class="learn-go" aria-hidden="true">›</span>
+          </a>
+          <a class="learn" id="learn-tehillim" href="tehillim.html">
+            <span class="learn-ic" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5v14z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg>
+            </span>
+            <span class="learn-txt">
+              <span class="learn-t">Tehillim</span>
+              <span class="learn-s" id="learn-teh-sub">—</span>
+            </span>
+            <span class="learn-go" aria-hidden="true">›</span>
+          </a>
+          <a class="learn" id="learn-mishna" href="mishnayos.html">
+            <span class="learn-ic" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M4 6h16M4 10h16M4 14h10M4 18h10"/></svg>
+            </span>
+            <span class="learn-txt">
+              <span class="learn-t">Mishnayos</span>
+              <span class="learn-s">All six sedarim · pick up where you left off</span>
+            </span>
+            <span class="learn-go" aria-hidden="true">›</span>
+          </a>
+          <a class="learn" href="siddur.html">
+            <span class="learn-ic" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5v14z"/><path d="M9 7h7M9 11h7"/></svg>
+            </span>
+            <span class="learn-txt">
+              <span class="learn-t">Siddur</span>
+              <span class="learn-s">Full siddur · Ashkenaz, Sefard, Edot Hamizrach</span>
+            </span>
+            <span class="learn-go" aria-hidden="true">›</span>
+          </a>
+        </div>
+      </section>
+
+      <!-- LUACH / CALENDAR -->
+      <section class="screen" id="scr-cal">
+        <div class="apphead"><h1>Luach</h1><div class="sub">1900 – 2100</div></div>
+        <div class="cal-nav">
+          <button id="prevY" aria-label="Previous year">«</button>
+          <button id="prevM" aria-label="Previous month">‹</button>
+          <div class="cal-title"><div class="g" id="cal-g"></div><div class="h" id="cal-h"></div></div>
+          <button id="nextM" aria-label="Next month">›</button>
+          <button id="nextY" aria-label="Next year">»</button>
+        </div>
+        <div class="cal-jump">
+          <select id="selM" aria-label="Month"></select>
+          <select id="selY" aria-label="Year"></select>
+          <button class="today-btn" id="btnToday">Today</button>
+        </div>
+        <div class="grid" id="grid" role="grid" aria-label="Month calendar with Hebrew dates and holidays"></div>
+        <div class="legend">
+          <span class="lg-yt">Yom Tov / fast d'oraisa</span>
+          <span class="lg-fast">Fast day</span>
+          <span class="lg-minor">Minor holiday</span>
+          <span class="lg-rc">Rosh Chodesh</span>
+        </div>
+        <div class="card daydetail" id="daydetail" hidden>
+          <div class="dd-date" id="dd-date"></div>
+          <div class="dd-heb" id="dd-heb"></div>
+          <div id="dd-ev"></div>
+        </div>
+        <div class="card">
+          <h2 id="ev-title">This month</h2>
+          <div class="evlist" id="evlist"></div>
+        </div>
+      </section>
+
+      <!-- CLOCK -->
+      <section class="screen" id="scr-clock">
+        <div class="apphead"><h1>Clock</h1><div class="sub"><span class="pill night" id="clock-armed">—</span></div></div>
+        <div class="card">
+          <h2>Shabbos &amp; Yom Tov mode</h2>
+          <p style="font-size:12.5px; color:var(--ink-2); line-height:1.6;">At candle lighting the whole app locks into a single clock screen — time, next alarm, nothing to touch. Alarms ring for their set duration and shut off by themselves. The app unlocks on its own after havdalah.</p>
+          <button class="cta" id="btnPreview" style="margin-top:12px;">Preview the locked screen</button>
+        </div>
+        <div class="card">
+          <h2 id="clock-block-title">Next block</h2>
+          <p style="font-size:12.5px; color:var(--ink-2); line-height:1.6; margin-bottom:8px;">Every day of a block is set on its own — Day 1 falling on Shabbos and Day 2 on Sunday usually want different times. Everything is queued before candle lighting, because nothing may be set during the block.</p>
+          <div class="pdhead" id="clock-block-head"></div>
+          <div id="clock-block"></div>
+        </div>
+        <div class="card">
+          <h2>Every Shabbos</h2>
+          <div id="clock-shabbos"></div>
+        </div>
+        <div class="card">
+          <h2>Weekday alarms</h2>
+          <div id="clock-weekday"></div>
+        </div>
+        <div class="card">
+          <h2>Add an alarm</h2>
+          <div class="rulebuilder">
+            <div class="rb-row">
+              <input id="al-time" type="time" aria-label="Alarm time">
+              <select id="al-scope" aria-label="When it applies">
+                <option value="weekday">Weekdays</option>
+                <option value="every_shabbos">Every Shabbos</option>
+                <option value="yomtov_block">Yom Tov block</option>
+              </select>
+            </div>
+            <div class="rb-row">
+              <input id="al-label" type="text" placeholder="Label, e.g. Wake for Shacharis" aria-label="Alarm label">
+              <select id="al-dur" aria-label="Ring duration">
+                <option value="30">30s</option>
+                <option value="60" selected>60s</option>
+                <option value="90">90s</option>
+                <option value="120">2 min</option>
+                <option value="300">5 min</option>
+              </select>
+              <button class="today-btn" id="al-add">Add</button>
+            </div>
+            <div class="footnote" style="text-align:left;">No snooze and no dismiss: each alarm rings for its set duration and stops by itself, so nothing needs touching on Shabbos. Long-press an alarm to remove it.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SIDDUR -->
+      <section class="screen" id="scr-sid">
+        <div class="apphead"><h1>Siddur</h1><div class="sub">Weekday only</div></div>
+        <!-- The full siddur lives in siddur.html (every section, streamed from the
+             shared cache / Sefaria). This tab's own texts below are a few bundled
+             excerpts for instant offline use — they are not the siddur, and the
+             difference must be visible, not discovered. -->
+        <a class="card learn" href="siddur.html" style="display:flex; margin-bottom:14px;">
+          <span class="learn-ic" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5v14z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg>
+          </span>
+          <span class="learn-txt">
+            <span class="learn-t">Open the full Siddur</span>
+            <span class="learn-s">Every section, all three nusachos · Chumash, Tehillim and Mishnayos are on the Today screen</span>
+          </span>
+          <span class="learn-go" aria-hidden="true">›</span>
+        </a>
+        <div class="seg" role="tablist" aria-label="Nusach">
+          <button class="segbtn on" data-nus="ashkenaz">Ashkenaz</button>
+          <button class="segbtn" data-nus="sefard">Sefard</button>
+          <button class="segbtn" data-nus="edot">Edot Hamizrach</button>
+        </div>
+        <div class="seg small" role="tablist" aria-label="Display mode">
+          <button class="segbtn on" data-mode="inter">With English</button>
+          <button class="segbtn" data-mode="heb">Hebrew only</button>
+          <button class="segbtn" data-mode="side">Side by side</button>
+        </div>
+        <div class="card reader" id="sid-reader">
+          <div class="rd-title" id="sid-title"></div>
+          <div class="rd-sub" id="sid-sub"></div>
+          <div id="sid-body"></div>
+          <div class="footnote" id="sid-src"></div>
+        </div>
+        <div class="card">
+          <h2>Weekday davening</h2>
+          <div class="mrow" data-href="siddur.html"><div class="mi">☀</div><div><div class="mt">Shacharis</div><div class="md">Birchos hashachar · Pesukei d'zimra · Shema · Shemoneh Esrei · Tachanun · Aleinu</div></div><span class="chev">›</span></div>
+          <div class="mrow" data-href="siddur.html"><div class="mi">◐</div><div><div class="mt">Mincha</div><div class="md">Ashrei · Shemoneh Esrei · Tachanun · Aleinu</div></div><span class="chev">›</span></div>
+          <div class="mrow" data-href="siddur.html"><div class="mi">☽</div><div><div class="mt">Maariv</div><div class="md">Shema u'birchoseha · Shemoneh Esrei · Aleinu</div></div><span class="chev">›</span></div>
+        </div>
+        <div class="card">
+          <h2>Berachos &amp; tefillos</h2>
+          <div class="mrow" data-href="siddur.html?find=Birkat%20Hamazon"><div class="mi">🍞</div><div><div class="mt">Birkas Hamazon</div><div class="md">Full bentching · with zimun · harachamans per nusach</div></div><span class="chev">›</span></div>
+          <div class="mrow" data-href="siddur.html?find=Al%20Hamichya"><div class="mi">♦</div><div><div class="mt">Al Hamichya · Borei Nefashos</div><div class="md">Berachos acharonos</div></div><span class="chev">›</span></div>
+        </div>
+        <div class="card">
+          <h2>Special tefillos</h2>
+          <div class="mrow" data-href="siddur.html?find=Birkat%20HaGomel"><div class="mi">✦</div><div><div class="mt">Birchas Hagomel</div><div class="md">After travel, illness, danger · with the tzibbur's response</div></div><span class="chev">›</span></div>
+          <div class="mrow" data-href="siddur.html?find=Tefilat%20HaDerech"><div class="mi">➤</div><div><div class="mt">Tefillas Haderech</div><div class="md">Traveler's prayer · GPS prompt when you leave the city</div></div><span class="chev">›</span></div>
+          <div class="mrow" data-href="siddur.html?find=Asher%20Yatzar"><div class="mi">✱</div><div><div class="mt">Asher Yatzar · Krias Shema al Hamita</div><div class="md">Daily berachos</div></div><span class="chev">›</span></div>
+        </div>
+        <div class="footnote" style="padding:0 4px 6px;">Texts stream from the Sefaria API (Siddur Ashkenaz / Sefard / Edot HaMizrach) with parallel English, cached for offline. The bundled berachos below work with no connection at all.</div>
+      </section>
+
+      <!-- MENU -->
+      <section class="screen" id="scr-rem">
+        <div class="apphead"><h1>Reminders</h1><div class="sub">Minyan · Omer · Tefilla</div></div>
+
+        <div class="card hide" id="rem-next" style="background:#F6F1E4; border-color:#E7DFC9;">
+          <div style="font-size:13.5px; font-weight:700; color:var(--gold-ink);" id="rem-next-t"></div>
+          <div style="font-size:12px; color:var(--ink-2); margin-top:2px;" id="rem-next-s"></div>
+        </div>
+
+        <div class="card">
+          <h2>My minyanim</h2>
+          <div id="minyan-list"></div>
+          <div class="rulebuilder">
+            <div class="rb-row">
+              <input id="mn-shul" type="text" placeholder="Shul name" aria-label="Shul name">
+              <select id="mn-tef" aria-label="Tefillah">
+                <option value="shacharis">Shacharis</option>
+                <option value="mincha">Mincha</option>
+                <option value="maariv">Maariv</option>
+              </select>
+            </div>
+            <div class="rb-row">
+              <input id="mn-time" type="time" aria-label="Minyan time">
+              <select id="mn-before" aria-label="Remind before">
+                <option value="10">10 min before</option>
+                <option value="15" selected>15 min before</option>
+                <option value="20">20 min before</option>
+                <option value="30">30 min before</option>
+              </select>
+              <button class="today-btn" id="mn-add">Add</button>
+            </div>
+            <div class="footnote" style="text-align:left;">Long-press a minyan to remove it. Reminders are suppressed on Shabbos and Yom Tov — pre-set alarms are used instead.</div>
+          </div>
+        </div>
+
+        <div class="card hide" id="omer-card">
+          <h2>Sefiras Haomer</h2>
+          <div id="omer-body"></div>
+        </div>
+
+        <div class="card">
+          <h2>Notification rules</h2>
+          <div id="rule-list"></div>
+          <div class="rulebuilder">
+            <div class="rb-row">
+              <select id="rb-off" aria-label="Offset">
+                <option>At</option>
+                <option selected>15 min before</option>
+                <option>30 min before</option>
+                <option>45 min before</option>
+                <option>60 min before</option>
+                <option>15 min after</option>
+                <option>30 min after</option>
+              </select>
+              <select id="rb-anchor" aria-label="Anchor zman">
+                <option>candle lighting</option>
+                <option selected>shkia</option>
+                <option>tzeis</option>
+                <option>alos</option>
+                <option>netz</option>
+                <option>chatzos</option>
+                <option>plag hamincha</option>
+                <option>sof zman shema</option>
+              </select>
+            </div>
+            <div class="rb-row">
+              <input id="rb-msg" type="text" placeholder="Reminder text, e.g. Leave for maariv" aria-label="Reminder text">
+              <button class="today-btn" id="rb-add">Add rule</button>
+            </div>
+            <div class="footnote" style="text-align:left;">Any rule can be anchored to any zman and offset by any amount. Long-press to remove.</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Kiddush levana · <span id="kl-month"></span></h2>
+          <div class="duo">
+            <div class="mini"><div class="l">Molad</div><div class="v" id="kl-molad">—</div></div>
+            <div class="mini"><div class="l">Window opens</div><div class="v" id="kl-opens">—</div></div>
+          </div>
+          <div class="duo" style="margin-top:10px;">
+            <div class="mini"><div class="l">Latest (sof zman)</div><div class="v" id="kl-sof">—</div></div>
+            <div class="mini"><div class="l">Best: Motzei Shabbos</div><div class="v" id="kl-motzei">—</div></div>
+          </div>
+          <div class="sh-count" id="kl-status"></div>
+          <div class="footnote" id="kl-note"></div>
+          <div class="rulebuilder">
+            <div class="rb-row">
+              <select id="kl-minhag" aria-label="Kiddush levana minhag">
+                <option value="3" selected>Wait 3 days after the molad</option>
+                <option value="7">Wait 7 days (Shulchan Aruch)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen" id="scr-menu">
+        <div class="apphead"><h1>Menu</h1><div class="sub">Settings &amp; more</div></div>
+        <div class="card">
+          <div class="profile">
+            <div class="avatar" id="pf-av">?</div>
+            <div><div class="pn" id="pf-name">Not signed in</div><div class="pl" id="pf-line">Everything works on this device · sign in to sync across devices</div></div>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Halacha &amp; location</h2>
+          <div class="mrow" id="row-loc"><div class="mi">◎</div><div><div class="mt">Location</div><div class="md" id="loc-desc">—</div></div><span class="chev">›</span></div>
+          <div class="mrow" id="row-refresh"><div class="mi">↻</div><div><div class="mt">Refresh zmanim</div><div class="md" id="z-src-desc">—</div></div><span class="chev">›</span></div>
+          <div class="mrow"><div class="mi">§</div><div><div class="mt">Zmanim shitos</div><div class="md">Shema: GRA &amp; M"A · Tzeis: 42 min + R"T · Alos: 72 min</div></div><span class="chev">›</span></div>
+          <div class="mrow"><div class="mi">🕮</div><div><div class="mt">Minhag</div><div class="md">Diaspora (2-day Yom Tov) · Ashkenaz · candles 18 min</div></div><span class="chev">›</span></div>
+        </div>
+        <div class="card">
+          <h2>Features</h2>
+          <div class="mrow"><div class="mi">◷</div><div><div class="mt">Shabbos &amp; Yom Tov mode</div><div class="md">Auto-engage at candle lighting · clock stays on</div></div><span class="chev">›</span></div>
+          <div class="mrow"><div class="mi">♪</div><div><div class="mt">Notifications</div><div class="md">Minyan, omer, candle lighting, fast begins/ends</div></div><span class="chev">›</span></div>
+          <div class="mrow"><div class="mi">✦</div><div><div class="mt">Yahrzeits</div><div class="md">3 saved · reminder a week before, Hebrew date</div></div><span class="chev">›</span></div>
+          <div class="mrow"><div class="mi">▦</div><div><div class="mt">Home screen widgets</div><div class="md">Zmanim strip · Hebrew date · omer count</div></div><span class="chev">›</span></div>
+          <div class="mrow"><div class="mi">✈</div><div><div class="mt">Travel mode</div><div class="md">Auto-update zmanim &amp; Yom Tov rules by location</div></div><span class="chev">›</span></div>
+        </div>
+        <div class="card">
+          <h2>About</h2>
+          <div class="mrow"><div class="mi">?</div><div><div class="mt">Help &amp; halachic sources</div><div class="md">How each zman is calculated, with sources</div></div><span class="chev">›</span></div>
+          <div class="mrow" id="row-hard"><div class="mi">↻</div><div><div class="mt">Force update</div><div class="md">Clears the offline cache and reloads from the server</div></div><span class="chev">›</span></div>
+          <div class="mrow"><div class="mi">✉</div><div><div class="mt">Ask a rov / feedback</div><div class="md">Zmanim questions go to your configured rov</div></div><span class="chev">›</span></div>
+        </div>
+        <div class="version">Vecker 1.0 · calendar verified 1900–2100 · zmanim by Hebcal · texts by Sefaria</div>
+      </section>
+    </div>
+
+    <nav class="nav">
+      <button class="navbtn active" data-scr="scr-today"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="4"/><path d="M12 3v3M4.2 7.2l2.1 2.1M2 15h3M19 15h3M17.7 9.3l2.1-2.1M6 21h12"/></svg>Today</button>
+      <button class="navbtn" data-scr="scr-cal"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Luach</button>
+      <button class="navbtn" data-scr="scr-clock"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M5 4 3 6M19 4l2 2"/></svg>Clock</button>
+      <button class="navbtn" data-scr="scr-sid"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5v14z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg>Siddur</button>
+      <button class="navbtn" data-scr="scr-rem"><svg viewBox="0 0 24 24"><path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>Reminders</button>
+      <button class="navbtn" data-scr="scr-menu"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>Menu</button>
+    </nav>
+    <div class="homebar"></div>
+
+    <!-- SHABBOS MODE LOCK SCREEN (full takeover) -->
+    <div class="lockscr" id="lockscr" role="dialog" aria-label="Shabbos mode locked clock">
+      <div class="shalom">שבת שלום</div>
+      <div class="lk-heb" id="lk-heb">Leil Shabbos · Parshas Va'eschanan</div>
+      <div class="lk-time" id="lk-time">8:12</div>
+      <div class="lk-ampm" id="lk-ampm">PM</div>
+      <div class="lk-next">
+        <div class="lk-next-l">Next alarm</div>
+        <div class="lk-next-v" id="lk-next"></div>
+        <div class="lk-next-d" id="lk-next-d"></div>
+      </div>
+      <div class="lk-times">
+        <span>Candles 7:52 PM Fri</span><span class="lk-dot">·</span><span>Havdalah 9:01 PM Motzei</span>
+      </div>
+      <div class="lk-note">Screen stays on · nothing to touch · alarms shut off by themselves<br>App unlocks automatically after havdalah</div>
+      <button class="lk-exit" id="lk-exit">Exit preview — demo only; the real mode unlocks at havdalah</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== Hebrew calendar engine (validated against known dates, roundtrip-tested 1900-2100) =====
+function gregLeap(y){return (y%4===0&&y%100!==0)||y%400===0;}
+function gRD(y,m,d){const py=y-1;return 365*py+Math.floor(py/4)-Math.floor(py/100)+Math.floor(py/400)+Math.floor((367*m-362)/12)+(m<=2?0:(gregLeap(y)?-1:-2))+d;}
+function rdToGreg(rd){let y=Math.floor((rd-1)/366)+1;while(gRD(y+1,1,1)<=rd)y++;let m=1;while(m<12&&gRD(y,m+1,1)<=rd)m++;return [y,m,rd-gRD(y,m,1)+1];}
+const HEB_EPOCH=-1373427;
+function hebLeap(y){return ((7*y+1)%19)<7;}
+function hebMonthsInYear(y){return hebLeap(y)?13:12;}
+function hebElapsedDays(y){const me=Math.floor((235*y-234)/19);const pe=12084+13753*me;let d=me*29+Math.floor(pe/25920);if((3*(d+1))%7<3)d+=1;return d;}
+function hebNewYearDelay(y){const n1=hebElapsedDays(y),n2=hebElapsedDays(y+1);if(n2-n1===356)return 2;const n0=hebElapsedDays(y-1);if(n1-n0===382)return 1;return 0;}
+function hebNewYear(y){return HEB_EPOCH+hebElapsedDays(y)+hebNewYearDelay(y);}
+function hebYearDays(y){return hebNewYear(y+1)-hebNewYear(y);}
+function longCheshvan(y){return hebYearDays(y)%10===5;}
+function shortKislev(y){return hebYearDays(y)%10===3;}
+function hebMonthDays(y,m){if(m===2||m===4||m===6||m===10||m===13)return 29;if(m===12&&!hebLeap(y))return 29;if(m===8&&!longCheshvan(y))return 29;if(m===9&&shortKislev(y))return 29;return 30;}
+function hebToRD(y,m,d){let rd=hebNewYear(y)+d-1;if(m<7){for(let mo=7;mo<=hebMonthsInYear(y);mo++)rd+=hebMonthDays(y,mo);for(let mo=1;mo<m;mo++)rd+=hebMonthDays(y,mo);}else{for(let mo=7;mo<m;mo++)rd+=hebMonthDays(y,mo);}return rd;}
+function rdToHeb(rd){let y=Math.floor((rd-HEB_EPOCH)/366)+1;while(hebNewYear(y+1)<=rd)y++;const order=[];for(let mo=7;mo<=hebMonthsInYear(y);mo++)order.push(mo);for(let mo=1;mo<7;mo++)order.push(mo);let cursor=hebNewYear(y),m=7;for(const mo of order){const len=hebMonthDays(y,mo);if(rd<cursor+len){m=mo;break;}cursor+=len;}return [y,m,rd-cursor+1];}
+function dow(rd){return ((rd%7)+7)%7;}
+
+// ===== Names & gematria =====
+const GMON=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const DOWN=['Sun','Mon','Tue','Wed','Thu','Fri','Shab'];
+function hebMonthName(y,m){const n={1:'Nissan',2:'Iyar',3:'Sivan',4:'Tammuz',5:'Av',6:'Elul',7:'Tishrei',8:'Cheshvan',9:'Kislev',10:'Teves',11:'Shvat',13:'Adar II'};if(m===12)return hebLeap(y)?'Adar I':'Adar';return n[m];}
+function gematriaDay(n){const ones=['','א','ב','ג','ד','ה','ו','ז','ח','ט'];const tens=['','י','כ','ל'];if(n===15)return 'ט״ו';if(n===16)return 'ט״ז';const t=Math.floor(n/10),o=n%10;let s=tens[t]+ones[o];return s.length>1?s.slice(0,-1)+'״'+s.slice(-1):s+'׳';}
+function hebYearStr(y){let n=y%1000;const V=[[400,'ת'],[300,'ש'],[200,'ר'],[100,'ק'],[90,'צ'],[80,'פ'],[70,'ע'],[60,'ס'],[50,'נ'],[40,'מ'],[30,'ל'],[20,'כ'],[10,'י'],[9,'ט'],[8,'ח'],[7,'ז'],[6,'ו'],[5,'ה'],[4,'ד'],[3,'ג'],[2,'ב'],[1,'א']];let s='';for(const[v,c]of V){while(n>=v){s+=c;n-=v;}}s=s.replace('יה','טו').replace('יו','טז');return s.length>1?s.slice(0,-1)+'״'+s.slice(-1):s;}
+const HMON_HE={1:'ניסן',2:'אייר',3:'סיון',4:'תמוז',5:'אב',6:'אלול',7:'תשרי',8:'חשון',9:'כסלו',10:'טבת',11:'שבט',13:'אדר ב׳'};
+function hebMonthHe(y,m){if(m===12)return hebLeap(y)?'אדר א׳':'אדר';return HMON_HE[m];}
+
+// ===== Holidays for a Hebrew year (diaspora) =====
+const holCache={};
+function holidaysForHebYear(hy){
+  if(holCache[hy])return holCache[hy];
+  const map={};
+  const add=(rd,name,type)=>{(map[rd]=map[rd]||[]).push({name,type});};
+  const H=(m,d)=>hebToRD(hy,m,d);
+  add(H(7,1),'Rosh Hashana I','yt'); add(H(7,2),'Rosh Hashana II','yt');
+  let tg=H(7,3); if(dow(tg)===6)tg+=1; add(tg,'Tzom Gedaliah','fast');
+  add(H(7,10),'Yom Kippur','yt');
+  add(H(7,15),'Sukkos I','yt'); add(H(7,16),'Sukkos II','yt');
+  for(let d=17;d<=20;d++)add(H(7,d),'Chol Hamoed Sukkos','ch');
+  add(H(7,21),'Hoshana Rabbah','ch');
+  add(H(7,22),'Shmini Atzeres','yt'); add(H(7,23),'Simchas Torah','yt');
+  const ch0=H(9,25); for(let i=0;i<8;i++)add(ch0+i,'Chanukah '+(i+1),'minor');
+  add(H(10,10),'Asara B\u2019Teves','fast');
+  add(H(11,15),'Tu B\u2019Shvat','minor');
+  const adar=hebLeap(hy)?13:12;
+  if(hebLeap(hy)){add(H(12,14),'Purim Katan','minor');}
+  let te=H(adar,13); if(dow(te)===6)te-=2; add(te,'Taanis Esther','fast');
+  add(H(adar,14),'Purim','minor'); add(H(adar,15),'Shushan Purim','minor');
+  add(H(1,15),'Pesach I','yt'); add(H(1,16),'Pesach II','yt');
+  for(let d=17;d<=20;d++)add(H(1,d),'Chol Hamoed Pesach','ch');
+  add(H(1,21),'Pesach VII','yt'); add(H(1,22),'Pesach VIII','yt');
+  add(H(2,14),'Pesach Sheni','minor'); add(H(2,18),'Lag Ba\u2019omer','minor');
+  add(H(3,6),'Shavuos I','yt'); add(H(3,7),'Shavuos II','yt');
+  let st=H(4,17); if(dow(st)===6)st+=1; add(st,'Shiva Asar B\u2019Tammuz','fast');
+  let ta=H(5,9); if(dow(ta)===6)ta+=1; add(ta,'Tisha B\u2019Av','fast');
+  add(H(5,15),'Tu B\u2019Av','minor');
+  for(let m of (hebLeap(hy)?[7,8,9,10,11,12,13,1,2,3,4,5,6]:[7,8,9,10,11,12,1,2,3,4,5,6])){
+    if(m!==7)add(hebToRD(hy,m,1),'Rosh Chodesh '+hebMonthName(hy,m),'rc');
+  }
+  // 30th day of a 30-day month is also Rosh Chodesh of the next month
+  const seq=hebLeap(hy)?[7,8,9,10,11,12,13,1,2,3,4,5,6]:[7,8,9,10,11,12,1,2,3,4,5,6];
+  for(let i=0;i<seq.length;i++){
+    const m=seq[i];
+    if(hebMonthDays(hy,m)===30){
+      const nextName=(i<seq.length-1)?hebMonthName(hy,seq[i+1]):'Tishrei';
+      if(nextName!=='Tishrei')add(hebToRD(hy,m,30),'Rosh Chodesh '+nextName,'rc');
+    }
+  }
+  holCache[hy]=map; return map;
+}
+function eventsForRD(rd){
+  const [hy]=rdToHeb(rd);
+  const evs=[...(holidaysForHebYear(hy)[rd]||[])];
+  const prev=holidaysForHebYear(hy-1)[rd]; if(prev)evs.push(...prev);
+  const nxt=holidaysForHebYear(hy+1)[rd]; if(nxt)evs.push(...nxt);
+  return evs;
+}
+const TYPE_RANK={yt:0,fast:1,ch:2,minor:3,rc:4};
+
+// ===== Calendar UI =====
+const MIN_Y=1900, MAX_Y=2100;
+let curY=2026, curM=7, selRD=null;
+const todayJS=new Date();
+let todayRD=null;
+if(todayJS.getFullYear()>=MIN_Y&&todayJS.getFullYear()<=MAX_Y){todayRD=gRD(todayJS.getFullYear(),todayJS.getMonth()+1,todayJS.getDate());curY=todayJS.getFullYear();curM=todayJS.getMonth()+1;}
+const $=id=>document.getElementById(id);
+const selM=$('selM'), selY=$('selY');
+GMON.forEach((n,i)=>{const o=document.createElement('option');o.value=i+1;o.textContent=n;selM.appendChild(o);});
+for(let y=MIN_Y;y<=MAX_Y;y++){const o=document.createElement('option');o.value=y;o.textContent=y;selY.appendChild(o);}
+
+function gregMonthDays(y,m){return [31,gregLeap(y)?29:28,31,30,31,30,31,31,30,31,30,31][m-1];}
+
+function render(){
+  selM.value=curM; selY.value=curY;
+  $('cal-g').textContent=GMON[curM-1]+' '+curY;
+  const firstRD=gRD(curY,curM,1), lastRD=gRD(curY,curM,gregMonthDays(curY,curM));
+  const [hy1,hm1]=rdToHeb(firstRD), [hy2,hm2]=rdToHeb(lastRD);
+  let hebSpan=hebMonthName(hy1,hm1);
+  if(hy1===hy2&&hm1!==hm2)hebSpan+=' – '+hebMonthName(hy2,hm2)+' '+hebYearStr(hy1);
+  else if(hy1!==hy2)hebSpan+=' '+hebYearStr(hy1)+' – '+hebMonthName(hy2,hm2)+' '+hebYearStr(hy2);
+  else hebSpan+=' '+hebYearStr(hy1);
+  $('cal-h').textContent=hebSpan+' · '+hebMonthHe(hy1,hm1)+(hy1!==hy2||hm1!==hm2?'–'+hebMonthHe(hy2,hm2):'')+' '+hebYearStr(hy2);
+  const grid=$('grid'); grid.innerHTML='';
+  DOWN.forEach(d=>{const h=document.createElement('div');h.className='dowh';h.textContent=d;grid.appendChild(h);});
+  const startDow=dow(firstRD);
+  for(let i=0;i<startDow;i++){const b=document.createElement('div');b.className='cell blank';grid.appendChild(b);}
+  const monthEvents=[];
+  for(let d=1;d<=gregMonthDays(curY,curM);d++){
+    const rd=firstRD+d-1;
+    const [hy,hm,hd]=rdToHeb(rd);
+    const evs=eventsForRD(rd).sort((a,b)=>TYPE_RANK[a.type]-TYPE_RANK[b.type]);
+    evs.forEach(e=>monthEvents.push({rd,d,e}));
+    const cell=document.createElement('div');
+    cell.className='cell'; cell.setAttribute('role','gridcell'); cell.tabIndex=0;
+    const main=evs.find(e=>e.type!=='rc');
+    if(main)cell.classList.add('t-'+main.type);
+    if(evs.some(e=>e.type==='rc'))cell.classList.add('t-rc');
+    if(rd===todayRD)cell.classList.add('today');
+    if(rd===selRD)cell.classList.add('sel');
+    cell.innerHTML='<span class="g">'+d+'</span><span class="h">'+gematriaDay(hd)+'</span>';
+    const bar=document.createElement('div'); bar.className='bar';
+    if(main)bar.style.background=main.type==='yt'?'#B8811B':main.type==='fast'?'#A63D2F':main.type==='ch'?'#D8B15E':'#5A6DA8';
+    cell.appendChild(bar);
+    const label=GMON[curM-1]+' '+d+', '+hy+' '+hebMonthName(hy,hm)+' '+hd+(evs.length?' — '+evs.map(e=>e.name).join(', '):'');
+    cell.setAttribute('aria-label',label);
+    cell.addEventListener('click',()=>selectDay(rd));
+    cell.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();selectDay(rd);}});
+    grid.appendChild(cell);
+  }
+  // month event list
+  $('ev-title').textContent='In '+GMON[curM-1]+' '+curY;
+  const list=$('evlist'); list.innerHTML='';
+  const seen=new Set(); const rows=[];
+  monthEvents.sort((a,b)=>a.rd-b.rd||TYPE_RANK[a.e.type]-TYPE_RANK[b.e.type]);
+  for(const {rd,d,e} of monthEvents){
+    if(e.type==='rc'&&e.name===rows[rows.length-1]?.name&&rd-rows[rows.length-1]?.rd===1)continue;
+    rows.push({rd,d,name:e.name,type:e.type});
+  }
+  // collapse chanukah + chol hamoed runs
+  const collapsed=[]; 
+  for(const r of rows){
+    const last=collapsed[collapsed.length-1];
+    const base=r.name.replace(/ \d+$/,'');
+    if(last&&last.base===base&&r.rd===last.endRD+1&&(base.startsWith('Chanukah')||base.startsWith('Chol Hamoed'))){last.endRD=r.rd;last.endD=r.d;continue;}
+    collapsed.push({base,name:r.name,type:r.type,startRD:r.rd,endRD:r.rd,startD:r.d,endD:r.d});
+  }
+  if(!collapsed.length){list.innerHTML='<div class="empty">No holidays or fasts this month.</div>';}
+  collapsed.forEach(c=>{
+    const row=document.createElement('div'); row.className='evrow';
+    const nm=c.startRD!==c.endRD?c.base:c.name;
+    const dateTxt=c.startRD!==c.endRD?(GMON[curM-1].slice(0,3)+' '+c.startD+'–'+c.endD):(DOWN[dow(c.startRD)]+', '+GMON[curM-1].slice(0,3)+' '+c.startD);
+    const cls=c.type==='yt'?'gold':c.type==='fast'?'fast':'minor';
+    row.innerHTML='<span><span class="pill '+cls+'" style="margin-right:7px;">'+({yt:'Yom Tov',fast:'Fast',ch:'Chol Hamoed',minor:'Minor',rc:'R"Ch'})[c.type]+'</span>'+nm+'</span><span class="ed">'+dateTxt+'</span>';
+    list.appendChild(row);
+  });
+}
+function selectDay(rd){
+  selRD=rd; render();
+  const [gy,gm,gd]=rdToGreg(rd); const [hy,hm,hd]=rdToHeb(rd);
+  const dd=$('daydetail'); dd.hidden=false;
+  $('dd-date').textContent=DOWN[dow(rd)]+' · '+GMON[gm-1]+' '+gd+', '+gy+' · '+hd+' '+hebMonthName(hy,hm)+' '+hy;
+  $('dd-heb').textContent=gematriaDay(hd)+' '+hebMonthHe(hy,hm)+' '+hebYearStr(hy);
+  const evs=eventsForRD(rd).sort((a,b)=>TYPE_RANK[a.type]-TYPE_RANK[b.type]);
+  $('dd-ev').innerHTML=evs.length?evs.map(e=>{
+    const cls=e.type==='yt'?'gold':e.type==='fast'?'fast':'minor';
+    return '<span class="pill '+cls+'" style="margin:2px 6px 2px 0;">'+e.name+'</span>';
+  }).join(''):'<div class="empty">No holiday — a regular weekday'+(dow(rd)===6?' (Shabbos)':'')+'.</div>';
+  if(dow(rd)===6&&!evs.length)$('dd-ev').innerHTML='<span class="pill night">Shabbos</span>';
+  else if(dow(rd)===6)$('dd-ev').innerHTML='<span class="pill night" style="margin:2px 6px 2px 0;">Shabbos</span>'+$('dd-ev').innerHTML;
+}
+function move(dy,dm){
+  let y=curY+dy, m=curM+dm;
+  if(m<1){m=12;y--;} if(m>12){m=1;y++;}
+  if(y<MIN_Y){y=MIN_Y;m=Math.max(m,1);} if(y>MAX_Y){y=MAX_Y;}
+  if(y===MIN_Y&&m<1)m=1; if(y===MAX_Y&&m>12)m=12;
+  curY=y;curM=m;render();
+}
+$('prevM').onclick=()=>move(0,-1); $('nextM').onclick=()=>move(0,1);
+$('prevY').onclick=()=>move(-1,0); $('nextY').onclick=()=>move(1,0);
+selM.onchange=()=>{curM=+selM.value;render();};
+selY.onchange=()=>{curY=+selY.value;render();};
+$('btnToday').onclick=()=>{if(todayRD){const[y,m]=rdToGreg(todayRD);curY=y;curM=m;selRD=todayRD;render();selectDay(todayRD);}};
+render();
+
+// ===== Today screen live Hebrew date =====
+/* The monthly division of Tehillim (chalukas hatehillim l'fi yemei hachodesh),
+   as printed in the siddur: [firstKapitel, lastKapitel] for days 1–30, with 119
+   split across the 25th and 26th.
+
+   VERIFY AGAINST A PRINTED SIDDUR BEFORE RELEASE. These divisions are standard
+   and widely reproduced, but they are liturgical data, and a wrong day here is
+   the kind of error that should never reach a user. */
+const TEHILLIM_BY_DAY=[
+  null,[1,9],[10,17],[18,22],[23,28],[29,34],[35,38],[39,43],[44,48],[49,54],[55,59],
+  [60,65],[66,68],[69,71],[72,76],[77,78],[79,82],[83,87],[88,89],[90,96],[97,103],
+  [104,105],[106,107],[108,112],[113,118],[119,119],[119,119],[120,134],[135,139],
+  [140,144],[145,150]
+];
+
+function tehillimForDay(hy,hm,hd){
+  const p=TEHILLIM_BY_DAY[hd];
+  if(!p)return null;
+  // The 25th and 26th share kapitel 119, which is too long for one day.
+  if(hd===25)return 'Kapitel 119 · verses 1–96';
+  if(hd===26)return 'Kapitel 119 · verses 97–176';
+  // A 29-day month has no 30th, so the 29th carries both portions.
+  if(hd===29&&hebMonthDays(hy,hm)===29)return 'Kapitel 140–150 (29th and 30th)';
+  return p[0]===p[1]?('Kapitel '+p[0]):('Kapitel '+p[0]+'–'+p[1]);
+}
+
+(function(){
+  const now=new Date();
+  const y=now.getFullYear();
+  if(y<MIN_Y||y>MAX_Y)return;
+  const rd=gRD(y,now.getMonth()+1,now.getDate());
+  const [hy,hm,hd]=rdToHeb(rd);
+  document.getElementById('today-heb').textContent=gematriaDay(hd)+' '+hebMonthHe(hy,hm)+' '+hebYearStr(hy);
+  document.getElementById('today-greg').textContent=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Shabbos'][dow(rd)]+', '+GMON[now.getMonth()]+' '+now.getDate()+', '+y+' · '+hd+' '+hebMonthName(hy,hm)+' '+hy;
+
+  /* Badges come from the same calendar engine the Luach tab uses, so a fast day
+     or Rosh Chodesh is stated here rather than being something the user has to
+     go and look up. Fasts keep the palette's status colour; everything else is
+     neutral so the one that matters stands out. */
+  const badges=document.getElementById('today-badges');
+  if(badges){
+    const evs=eventsForRD(rd).sort((a,b)=>TYPE_RANK[a.type]-TYPE_RANK[b.type]);
+    badges.innerHTML='';
+    evs.slice(0,3).forEach(ev=>{
+      const s=document.createElement('span');
+      s.className='pill '+(ev.type==='fast'?'fast':(ev.type==='yt'?'gold':''));
+      s.textContent=ev.name;
+      badges.appendChild(s);
+    });
+  }
+
+  const teh=document.getElementById('learn-teh-sub');
+  if(teh){
+    const t=tehillimForDay(hy,hm,hd);
+    teh.textContent=t?(t+' · day '+hd):'Daily kapitlach';
+    // The reader has no calendar engine of its own, so the day travels with it.
+    const link=document.getElementById('learn-tehillim');
+    if(link)link.href='tehillim.html?day='+hd;
+  }
+})();
+
+// ===== Siddur =====
+const SID={
+  gomel:{t:'Birchas Hagomel',s:'Said with a minyan, usually at krias haTorah — after travel, illness, or danger',
+    src:'Sefaria: Siddur, Berachot › Birkat HaGomel · English shown from parallel translation',
+    ph:[
+      {he:'בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, הַגּוֹמֵל לְחַיָּבִים טוֹבוֹת, שֶׁגְּמָלַנִי כָּל טוֹב׃',
+       en:'Blessed are You, Hashem our G-d, King of the universe, Who bestows good upon the culpable, Who has bestowed every goodness upon me.'},
+      {resp:'The tzibbur responds',
+       he:'מִי שֶׁגְּמָלְךָ כָּל טוֹב, הוּא יִגְמָלְךָ כָּל טוֹב סֶלָה׃',
+       en:'May He Who has bestowed every goodness upon you continue to bestow every goodness upon you, forever.'}
+    ]},
+  bentch:{t:'Birkas Hamazon',s:'Bentching — first beracha shown; zimun and full text load in the reader',
+    src:'Sefaria: Siddur, Berachot › Birkat Hamazon · harachamans follow your nusach',
+    ph:[
+      {he:'בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, הַזָּן אֶת הָעוֹלָם כֻּלּוֹ בְּטוּבוֹ, בְּחֵן בְּחֶסֶד וּבְרַחֲמִים׃',
+       en:'Blessed are You, Hashem our G-d, King of the universe, Who nourishes the entire world in His goodness — with grace, with kindness, and with mercy.'},
+      {he:'הוּא נוֹתֵן לֶחֶם לְכָל בָּשָׂר, כִּי לְעוֹלָם חַסְדּוֹ׃',
+       en:'He gives bread to all flesh, for His kindness endures forever.'}
+    ]},
+  kaddish:{t:'Kaddish (Maariv)',s:'Watch the highlighted phrase — added in Sefard and Edot Hamizrach, absent in Ashkenaz',
+    src:'Nusach differences are resolved per-paragraph from the matching Sefaria siddur index',
+    ph:[
+      {he:{a:'יִתְגַּדַּל וְיִתְקַדַּשׁ שְׁמֵהּ רַבָּא׃ בְּעָלְמָא דִּי בְרָא כִרְעוּתֵהּ, וְיַמְלִיךְ מַלְכוּתֵהּ׃',
+           s:'יִתְגַּדַּל וְיִתְקַדַּשׁ שְׁמֵהּ רַבָּא׃ בְּעָלְמָא דִּי בְרָא כִרְעוּתֵהּ, וְיַמְלִיךְ מַלְכוּתֵהּ, <span class="nus">וְיַצְמַח פֻּרְקָנֵהּ וִיקָרֵב מְשִׁיחֵהּ</span>׃'},
+       en:{a:'Exalted and sanctified be His great Name, in the world He created by His will; may He give reign to His kingship.',
+           s:'Exalted and sanctified be His great Name, in the world He created by His will; may He give reign to His kingship — and cause His salvation to sprout, and bring His Mashiach near.'}}
+    ]},
+  modeh:{t:'Shacharis — Modeh Ani',s:'Weekday Shacharis opens here; tap through to the full seder hatefillah',
+    src:'Sefaria: Siddur, Weekday › Shacharit · streamed in order, cached offline',
+    ph:[
+      {he:'מוֹדֶה אֲנִי לְפָנֶיךָ מֶלֶךְ חַי וְקַיָּם, שֶׁהֶחֱזַרְתָּ בִּי נִשְׁמָתִי בְּחֶמְלָה, רַבָּה אֱמוּנָתֶךָ׃',
+       en:'I give thanks before You, living and enduring King, for You have returned my soul within me with compassion — abundant is Your faithfulness.'}
+    ]},
+  ashrei:{t:'Mincha — Ashrei',s:'Weekday Mincha opens with Ashrei',
+    src:'Sefaria: Siddur, Weekday › Mincha',
+    ph:[
+      {he:'אַשְׁרֵי יוֹשְׁבֵי בֵיתֶךָ, עוֹד יְהַלְלוּךָ סֶּלָה׃',
+       en:'Fortunate are those who dwell in Your house; may they praise You forever.'},
+      {he:'אַשְׁרֵי הָעָם שֶׁכָּכָה לּוֹ, אַשְׁרֵי הָעָם שֶׁיְיָ אֱלֹהָיו׃',
+       en:'Fortunate is the people for whom it is so; fortunate is the people whose G-d is Hashem.'}
+    ]},
+  alham:{t:'Al Hamichya · Borei Nefashos',s:'Berachos acharonos',
+    src:'Sefaria: Siddur, Berachot',
+    ph:[
+      {he:'בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, עַל הַמִּחְיָה וְעַל הַכַּלְכָּלָה׃',
+       en:'Blessed are You, Hashem our G-d, King of the universe, for the nourishment and the sustenance.'},
+      {he:'בּוֹרֵא נְפָשׁוֹת רַבּוֹת וְחֶסְרוֹנָן, עַל כָּל מַה שֶּׁבָּרָאתָ לְהַחֲיוֹת בָּהֶם נֶפֶשׁ כָּל חָי׃',
+       en:'Who creates numerous souls with their needs, for all that You created with which to sustain the soul of every living being.'}
+    ]},
+  derech:{t:'Tefillas Haderech',s:'The app can prompt this automatically when GPS shows you leaving the city limits',
+    src:'Sefaria: Siddur, Berachot › Tefilat HaDerech',
+    ph:[
+      {he:'יְהִי רָצוֹן מִלְּפָנֶיךָ יְיָ אֱלֹהֵינוּ וֵאלֹהֵי אֲבוֹתֵינוּ, שֶׁתּוֹלִיכֵנוּ לְשָׁלוֹם וְתַצְעִידֵנוּ לְשָׁלוֹם וְתַדְרִיכֵנוּ לְשָׁלוֹם׃',
+       en:'May it be Your will, Hashem our G-d and G-d of our fathers, that You lead us toward peace, direct our steps toward peace, and guide us toward peace.'}
+    ]},
+  asher:{t:'Asher Yatzar',s:'With Krias Shema al Hamita in the same section',
+    src:'Sefaria: Siddur, Berachot',
+    ph:[
+      {he:'אֲשֶׁר יָצַר אֶת הָאָדָם בְּחָכְמָה, וּבָרָא בוֹ נְקָבִים נְקָבִים, חֲלוּלִים חֲלוּלִים׃',
+       en:'Who formed man with wisdom, and created within him openings and openings, hollows and hollows.'}
+    ]}
+};
+let sidNus='a', sidMode='inter', sidCur='gomel';
+function pick(v){return typeof v==='string'?v:(v[sidNus]||v.s||v.a);}
+function renderSid(){
+  const d=SID[sidCur];
+  document.getElementById('sid-title').textContent=d.t;
+  document.getElementById('sid-sub').textContent=d.s;
+  document.getElementById('sid-src').textContent=d.src;
+  const body=document.getElementById('sid-body'); body.innerHTML='';
+  d.ph.forEach(p=>{
+    if(p.resp){const r=document.createElement('div');r.className='rd-resp';r.textContent=p.resp;body.appendChild(r);}
+    const div=document.createElement('div'); div.className='ph';
+    const he=document.createElement('div'); he.className='he'; he.innerHTML=pick(p.he);
+    const en=document.createElement('div'); en.className='en'; en.textContent=pick(p.en);
+    div.appendChild(he); div.appendChild(en); body.appendChild(div);
+  });
+  const rdr=document.getElementById('sid-reader');
+  rdr.className='card reader'+(sidMode==='heb'?' m-heb':sidMode==='side'?' m-side':'');
+}
+document.querySelectorAll('.segbtn[data-nus]').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.segbtn[data-nus]').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on');
+  sidNus={ashkenaz:'a',sefard:'s',edot:'e'}[b.dataset.nus];
+  renderSid();
+}));
+document.querySelectorAll('.segbtn[data-mode]').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.segbtn[data-mode]').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); sidMode=b.dataset.mode; renderSid();
+}));
+document.querySelectorAll('#scr-sid .mrow[data-txt]').forEach(r=>r.addEventListener('click',()=>{
+  sidCur=r.dataset.txt; renderSid();
+  document.getElementById('content').scrollTo({top:0,behavior:'smooth'});
+}));
+// Rows for whole tefillos open the full siddur — the bundled excerpts cannot
+// honestly stand in for Shacharis.
+document.querySelectorAll('#scr-sid .mrow[data-href]').forEach(r=>{
+  r.style.cursor='pointer';
+  r.addEventListener('click',()=>{location.href=r.dataset.href;});
+});
+renderSid();
+
+/* Profile card reflects the real session. There is no account required — the
+   app is fully usable as a guest — so this states which mode you are in rather
+   than inventing a user. */
+(function(){
+  function paint(){
+    const u = window.Auth && Auth.user();
+    const av=document.getElementById('pf-av'), nm=document.getElementById('pf-name'), ln=document.getElementById('pf-line');
+    if(!av||!nm||!ln)return;
+    const loc = window.Zmanim ? Zmanim.getLocation() : null;
+    Promise.resolve(window.Sync ? Sync.profile.get() : null).then(p=>{
+      const bits=[];
+      if(loc) bits.push(loc.city || (loc.lat.toFixed(2)+', '+loc.lng.toFixed(2)));
+      const nus = (p&&p.nusach)||'ashkenaz';
+      bits.push('Nusach '+({ashkenaz:'Ashkenaz',sefard:'Sefard',edot_hamizrach:'Edot Hamizrach'}[nus]||nus));
+      if(u){
+        av.textContent=(u.email||'?').trim().charAt(0).toUpperCase();
+        nm.textContent=u.email||'Signed in';
+        bits.push('syncing');
+      }else{
+        av.textContent='+';
+        nm.textContent='Not signed in';
+        bits.push('this device only');
+      }
+      ln.textContent=bits.join(' · ');
+    });
+  }
+  paint();
+  if(window.Auth&&Auth.onChange)Auth.onChange(paint);
+})();
+
+/* Escape hatch when an install is stuck on an old cached build. */
+(function(){
+  const r=document.getElementById('row-hard');
+  if(r)r.addEventListener('click',()=>{
+    if(window.Luach&&Luach.hardRefresh)Luach.hardRefresh();
+    else location.reload();
+  });
+})();
+
+// ===== Nav =====
+document.querySelectorAll('.navbtn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.navbtn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.scr).classList.add('active');
+    document.getElementById('content').scrollTop=0;
+  });
+});
+// status bar clock
+
+// ===== Shabbos mode lock screen =====
+const SHABBOS_ALARMS=[
+  {h:7,m:0,label:'Shacharis',dur:'rings 60s, shuts off by itself'},
+  {h:16,m:45,label:'Shabbos nap',dur:'rings 30s, gentle chime'},
+  {h:21,m:5,label:'Motzei — app unlocks',dur:'after havdalah'}
+];
+function fmt12(h,m){const ap=h>=12?'PM':'AM';return ((h%12)||12)+':'+String(m).padStart(2,'0')+' '+ap;}
+function tickLock(){
+  const now=new Date();
+  document.getElementById('lk-time').textContent=(now.getHours()%12||12)+':'+String(now.getMinutes()).padStart(2,'0');
+  document.getElementById('lk-ampm').textContent=now.getHours()>=12?'PM':'AM';
+  const mins=now.getHours()*60+now.getMinutes();
+  let next=SHABBOS_ALARMS.find(a=>a.h*60+a.m>mins)||SHABBOS_ALARMS[0];
+  const tomorrow=!(SHABBOS_ALARMS.find(a=>a.h*60+a.m>mins));
+  document.getElementById('lk-next').textContent=fmt12(next.h,next.m)+' · '+next.label;
+  document.getElementById('lk-next-d').textContent=next.dur+(tomorrow?' · tomorrow':'');
+}
+let lockTimer=null;
+const lockscr=document.getElementById('lockscr');
+document.getElementById('btnPreview').addEventListener('click',()=>{
+  tickLock(); lockscr.classList.add('on');
+  lockTimer=setInterval(tickLock,1000);
+});
+document.getElementById('lk-exit').addEventListener('click',()=>{
+  lockscr.classList.remove('on');
+  if(lockTimer){clearInterval(lockTimer);lockTimer=null;}
+});
+
+// ===== Kiddush Levana — live molad computation =====
+function yearSeq(hy){return hebLeap(hy)?[7,8,9,10,11,12,13,1,2,3,4,5,6]:[7,8,9,10,11,12,1,2,3,4,5,6];}
+function moladUTC(hy,hm){
+  const idx=yearSeq(hy).indexOf(hm);
+  const me=Math.floor((235*hy-234)/19)+idx;
+  const pe=12084+13753*me;
+  const days=29*me+Math.floor(pe/25920), parts=pe%25920;
+  const rd=HEB_EPOCH+days;
+  const [gy,gm,gd]=rdToGreg(rd);
+  const t=Date.UTC(gy,gm-1,gd-1,18,0,0)+ (parts/1080)*3600*1000;
+  return {t, chalakim:parts%18};
+}
+function nextHebMonth(hy,hm){const seq=yearSeq(hy);const i=seq.indexOf(hm);return i===seq.length-1?[hy+1,7]:[hy,seq[i+1]];}
+const KL_DOW=['Sun','Mon','Tue','Wed','Thu','Fri','Motzei Shab'];
+function klFmt(ms,withTime){
+  const d=new Date(ms);
+  let s=KL_DOW[d.getUTCDay()]+', '+GMON[d.getUTCMonth()].slice(0,3)+' '+d.getUTCDate();
+  if(withTime){let h=d.getUTCHours(),mi=d.getUTCMinutes();const ap=h>=12?'PM':'AM';s+=' · '+((h%12)||12)+':'+String(mi).padStart(2,'0')+' '+ap;}
+  return s;
+}
+function renderLevana(){
+  const now=new Date();
+  const nowUTC=Date.UTC(now.getFullYear(),now.getMonth(),now.getDate(),now.getHours(),now.getMinutes());
+  if(now.getFullYear()<MIN_Y||now.getFullYear()>MAX_Y)return;
+  const waitDays=+document.getElementById('kl-minhag').value;
+  let [hy,hm]=rdToHeb(gRD(now.getFullYear(),now.getMonth()+1,now.getDate()));
+  let molad,sof;
+  for(let i=0;i<2;i++){
+    molad=moladUTC(hy,hm);
+    sof=molad.t+(14*24+18)*3600*1000+22*60*1000;
+    if(nowUTC<=sof)break;
+    [hy,hm]=nextHebMonth(hy,hm);
+  }
+  let opens=molad.t+waitDays*24*3600*1000;
+  let note='';
+  if(hm===5){
+    let ta=hebToRD(hy,5,9); if(dow(ta)===6)ta+=1;
+    const [ty,tm,td]=rdToGreg(ta);
+    const taEve=Date.UTC(ty,tm-1,td,21,0);
+    if(taEve>opens){opens=taEve; note='Minhag: in Av, first say it Motzei Tisha B\u2019Av ('+GMON[tm-1].slice(0,3)+' '+td+' at night).';}
+  }
+  if(hm===7){
+    const yk=hebToRD(hy,7,10); const [ky,km,kd]=rdToGreg(yk);
+    const ykEve=Date.UTC(ky,km-1,kd,20,0);
+    if(ykEve>opens){opens=ykEve; note='Minhag: in Tishrei, first say it Motzei Yom Kippur ('+GMON[km-1].slice(0,3)+' '+kd+' at night).';}
+  }
+  document.getElementById('kl-month').textContent=hebMonthName(hy,hm);
+  document.getElementById('kl-molad').textContent=klFmt(molad.t,true)+' + '+molad.chalakim+' chal.';
+  document.getElementById('kl-opens').textContent=klFmt(opens,false)+', at night';
+  document.getElementById('kl-sof').textContent=klFmt(sof,true);
+  let motzeiTxt='—';
+  const nu=new Date(nowUTC);
+  for(let rd=gRD(nu.getUTCFullYear(),nu.getUTCMonth()+1,nu.getUTCDate());;rd++){
+    const [gy2,gm2,gd2]=rdToGreg(rd);
+    const nightfall=Date.UTC(gy2,gm2-1,gd2,21,0);
+    if(nightfall>sof)break;
+    if(dow(rd)===6&&nightfall>=opens&&nightfall>=nowUTC){motzeiTxt='Motzei Shab, '+GMON[gm2-1].slice(0,3)+' '+gd2;break;}
+  }
+  document.getElementById('kl-motzei').textContent=motzeiTxt;
+  const st=document.getElementById('kl-status');
+  if(nowUTC<opens){const d=Math.ceil((opens-nowUTC)/86400000);st.textContent='Opens in '+d+(d===1?' night':' nights');st.className='pill minor';}
+  else{const d=Math.max(1,Math.ceil((sof-nowUTC)/86400000));st.textContent='Open now · '+d+(d===1?' night':' nights')+' left';st.className='pill gold';}
+  document.getElementById('kl-note').textContent=(note?note+' ':'')+'Molad shown by the traditional reckoning · needs a visible moon — pair with the clear-sky alert.';
+}
+document.getElementById('kl-minhag').addEventListener('change',renderLevana);
+renderLevana();
+
+// ===== Custom notification rule builder =====
+/* Rule creation lives in js/reminders.js, which persists through Sync. */
+
+// ===== Deep links from PWA shortcuts (#today / #cal / #clock / #rem / #menu / #sid) =====
+(function(){
+  const map={today:'scr-today',cal:'scr-cal',clock:'scr-clock',sid:'scr-sid',rem:'scr-rem',menu:'scr-menu'};
+  function go(h){
+    const id=map[(h||'').replace('#','')]; if(!id)return;
+    const btn=document.querySelector('.navbtn[data-scr="'+id+'"]'); if(btn)btn.click();
+  }
+  go(location.hash);
+  window.addEventListener('hashchange',()=>go(location.hash));
+})();
+
+// ===== Keep the screen awake while the Shabbos clock is showing =====
+(function(){
+  const ls=document.getElementById('lockscr');
+  if(!ls||!window.Luach)return;
+  const obs=new MutationObserver(()=>window.Luach.keepAwake(ls.classList.contains('on')));
+  obs.observe(ls,{attributes:true,attributeFilter:['class']});
+})();
+
+
+// ===== Live zmanim (Hebcal API, cached, with local fallback) =====
+(function(){
+  if(!window.Zmanim)return;
+  const Z=window.Zmanim;
+  function esc(t){const d=document.createElement('div');d.textContent=t;return d.innerHTML;}
+
+  function drawArc(times){
+    const el=document.getElementById('sun-arc'); if(!el)return;
+    const netz=times.sunrise, shkia=times.sunset, chatz=times.chatzot;
+    if(!netz||!shkia){el.innerHTML='';return;}
+    const now=new Date();
+    let f=(now-netz)/(shkia-netz); f=Math.max(0,Math.min(1,f));
+    /* R must exceed half the span, or the arc becomes a semicircle whose apex
+       sits above the viewBox and gets clipped — which is what R=136 across a
+       272px span did, leaving two dashed stubs and an empty middle. At 164 the
+       apex lands near y=20, inside the 0–104 box. */
+    const A={x:24,y:92}, B={x:296,y:92}, R=164;
+    // point at fraction f along the arc from A to B
+    const cxm=(A.x+B.x)/2, half=(B.x-A.x)/2, h=Math.sqrt(R*R-half*half), cy=A.y+h;
+    const a0=Math.atan2(A.y-cy,A.x-cxm), a1=Math.atan2(B.y-cy,B.x-cxm);
+    const ang=a0+(a1-a0)*f;
+    const px=cxm+R*Math.cos(ang), py=cy+R*Math.sin(ang);
+    const day=now>=netz&&now<=shkia;
+    // Drawn on the hero's night ground, so the track and labels are light-on-dark
+    // and the sun carries a surface ring to stay legible where it crosses the arc.
+    const TRACK='rgba(251,248,241,.20)', LABEL='rgba(244,233,207,.62)',
+          SUN='#F0C05A', PATH='#E0A83A';
+    el.innerHTML='<svg viewBox="0 0 320 110" style="width:100%; margin:6px 0 2px;" role="img" aria-label="Sun position between netz and shkia">'
+      +'<path d="M 24 92 A 164 164 0 0 1 296 92" fill="none" stroke="'+TRACK+'" stroke-width="1.6" stroke-dasharray="3 5"/>'
+      +(day?'<path d="M 24 92 A 164 164 0 0 1 '+px.toFixed(1)+' '+py.toFixed(1)+'" fill="none" stroke="'+PATH+'" stroke-width="2.6" stroke-linecap="round"/>':'')
+      +'<circle cx="24" cy="92" r="3" fill="'+TRACK+'"/><circle cx="296" cy="92" r="3" fill="'+TRACK+'"/>'
+      +(day?'<circle cx="'+px.toFixed(1)+'" cy="'+py.toFixed(1)+'" r="8" fill="'+SUN+'" stroke="#1C2440" stroke-width="2"/>':'')
+      +'<text x="24" y="106" font-size="10" fill="'+LABEL+'" font-family="Heebo,Arial">netz '+esc(Z.fmt(netz).replace(/ (AM|PM)/,''))+'</text>'
+      +'<text x="296" y="106" font-size="10" fill="'+LABEL+'" text-anchor="end" font-family="Heebo,Arial">shkia '+esc(Z.fmt(shkia).replace(/ (AM|PM)/,''))+'</text>'
+      +(chatz?'<text x="160" y="16" font-size="10" fill="'+LABEL+'" text-anchor="middle" font-family="Heebo,Arial">chatzos '+esc(Z.fmt(chatz).replace(/ (AM|PM)/,''))+'</text>':'')
+      +'</svg>';
+  }
+
+  function render(){
+    const r=Z.forDate(new Date());
+    const times=r.times, rows=document.getElementById('z-rows');
+    if(!rows)return;
+    if(!Object.keys(times).length){rows.innerHTML='<div class="footnote">Zmanim unavailable — set your location in Menu, then refresh.</div>';return;}
+    const nx=Z.next(times), now=new Date();
+    rows.innerHTML='';
+    Z.rows.forEach(row=>{
+      const d=times[row.key]; if(!d)return;
+      const div=document.createElement('div');
+      // Three states rather than two: what is imminent, what is still ahead, and
+      // what has passed. A time already gone should recede, not read as pending.
+      const state=(nx&&nx.key===row.key)?' next':(d<now?' past':'');
+      div.className='ztile'+state;
+      div.innerHTML='<span class="zl"></span><span class="zt"></span>';
+      div.firstChild.textContent=row.short||row.label;
+      div.lastChild.textContent=Z.fmt(d);
+      // Full name for anyone who needs it without crowding the tile.
+      div.title=row.label;
+      rows.appendChild(div);
+    });
+
+    // Hero figure: the interval is the number, the zman it belongs to is the caption.
+    const inEl=document.getElementById('z-next-in'),
+          atEl=document.getElementById('z-next-at'),
+          lbEl=document.getElementById('z-next-label');
+    if(nx){
+      const u=Z.until(nx.at);
+      lbEl.textContent='Until '+nx.label;
+      inEl.textContent=u||'now';
+      atEl.textContent=Z.fmt(nx.at);
+    }else{
+      lbEl.textContent='Today';
+      inEl.textContent='\u2014';
+      atEl.textContent='All of today\u2019s zmanim have passed';
+    }
+    const loc=Z.getLocation();
+    const srcTxt=r.source==='cache'?'Hebcal (cached)':'computed on device';
+    document.getElementById('z-foot').innerHTML=esc((loc.city||loc.lat.toFixed(3)+', '+loc.lng.toFixed(3))+' \u00b7 GRA / M"A shown \u00b7 '+srcTxt);
+    const sd=document.getElementById('z-src-desc');
+    if(sd)sd.textContent=r.source==='cache'?'From Hebcal, cached for offline use':'Computed on device \u2014 tap to fetch exact times from Hebcal';
+    const ld=document.getElementById('loc-desc');
+    if(ld)ld.textContent=(loc.city||loc.lat.toFixed(4)+', '+loc.lng.toFixed(4))+' \u00b7 '+loc.tz;
+    drawArc(times);
+  }
+
+  function renderShabbos(){
+    const sh=Z.cachedShabbos(); if(!sh)return;
+    const c=document.getElementById('sh-candles'), h=document.getElementById('sh-havdalah'), f=document.getElementById('sh-foot');
+    if(c&&sh.candles)c.innerHTML=esc(Z.fmt(new Date(sh.candles)).replace(' ','&nbsp;'));
+    if(h&&sh.havdalah)h.innerHTML=esc(Z.fmt(new Date(sh.havdalah)).replace(' ','&nbsp;'));
+    if(f)f.textContent=(sh.parsha?sh.parsha+' \u00b7 ':'')+(sh.holidays.length?sh.holidays.join(', ')+' \u00b7 ':'')+'candle lighting and havdalah from Hebcal';
+    /* How long until licht is the question this card is really asked, so answer
+       it rather than leaving two bare times to be subtracted mentally. */
+    const cnt=document.getElementById('sh-count');
+    if(cnt&&sh.candles){
+      const at=new Date(sh.candles), u=Z.until(at);
+      cnt.textContent=u?('Candle lighting in '+u):'';
+    }
+    // lock screen mirrors the same values
+    const lt=document.querySelector('#lockscr .lk-times');
+    if(lt&&sh.candles&&sh.havdalah)lt.innerHTML='<span>Candles '+esc(Z.fmt(new Date(sh.candles)))+'</span><span class="lk-dot">\u00b7</span><span>Havdalah '+esc(Z.fmt(new Date(sh.havdalah)))+'</span>';
+  }
+
+  render(); renderShabbos();
+  Z.init().then(()=>{render();renderShabbos();}).catch(()=>{});
+  setInterval(render,60000);
+
+  const rr=document.getElementById('row-refresh');
+  if(rr)rr.addEventListener('click',async()=>{
+    const d=document.getElementById('z-src-desc'); if(d)d.textContent='Fetching from Hebcal\u2026';
+    try{await Z.prefetch(); await Z.shabbos(); render(); renderShabbos();}
+    catch(e){if(d)d.textContent='Couldn\u2019t reach Hebcal \u2014 using cached or computed times';}
+  });
+  const rl=document.getElementById('row-loc');
+  if(rl)rl.addEventListener('click',async()=>{
+    const d=document.getElementById('loc-desc'); if(d)d.textContent='Finding your location\u2026';
+    try{await Z.detectLocation(); await Z.prefetch(); await Z.shabbos();}catch(e){}
+    render(); renderShabbos();
+  });
+})();
+
+</script>
+</body>
+</html>
