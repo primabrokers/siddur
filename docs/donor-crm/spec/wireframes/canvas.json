@@ -1,0 +1,18 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html",         "title": "A1 · Action Stream — Today",       "x": 0,    "y": 0,    "w": 1440, "h": 900 },
+    { "file": "DonorProfile.dc.html", "title": "A2 · Donor Profile",               "x": 1560, "y": 0,    "w": 1440, "h": 980 },
+    { "file": "QuickCapture.dc.html", "title": "A3 · Quick Capture — the 30-second log", "x": 3120, "y": 0, "w": 1440, "h": 920 },
+    { "file": "MobileToday.dc.html",  "title": "A4 · Mobile Today",                "x": 4680, "y": 0,    "w": 390,  "h": 844 },
+    { "file": "Pipeline.dc.html",     "title": "A5 · Pipeline — Active Asks",      "x": 0,    "y": 1140, "w": 1440, "h": 700 },
+    { "file": "SmartList.dc.html",    "title": "A6 · Smart List — LYBUNT",         "x": 1560, "y": 1140, "w": 1440, "h": 900 },
+    { "file": "GiftAid.dc.html",      "title": "A7 · Gift Aid Workspace",          "x": 3120, "y": 1140, "w": 1440, "h": 900 },
+    { "file": "Reports.dc.html",      "title": "A8 · Reports",                     "x": 4680, "y": 1140, "w": 1440, "h": 900 }
+  ],
+  "annotations": [
+    { "id": "about", "x": 0, "y": -200, "w": 560, "text": "Yeshiva Donor CRM — wireframes for the written spec (docs/donor-crm/spec/ on GitHub).\nTop row: the daily loop (A1–A4, Phase 1). Bottom row: fundraising management (A5–A8, mostly Phase 2).\nAll names and numbers are invented demo data. Spec text is the source of truth; these frames illustrate it." },
+    { "id": "row-daily", "x": 660, "y": -110, "w": 420, "text": "THE DAILY LOOP — open in the morning (A1/A4), know who needs you; after every call, log it in under 30 seconds (A3); before any call, understand the whole relationship in one screen (A2)." },
+    { "id": "row-manage", "x": 660, "y": 1030, "w": 420, "text": "MANAGING THE MONEY — asks move through stages and visibly rot when neglected (A5); lists are work queues (A6); Gift Aid claims build themselves (A7); every report ends in a list of people (A8)." }
+  ],
+  "launch": { "view": "canvas" }
+}

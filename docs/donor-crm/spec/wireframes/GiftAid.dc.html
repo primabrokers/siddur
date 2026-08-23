@@ -1,0 +1,104 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700&display=swap">
+  <style>
+    body { margin: 0; font-family: 'Albert Sans', system-ui, sans-serif; color: #1F2933; }
+    a { color: #0E6E6B; } a:hover { color: #0A5451; }
+    td, th { border-bottom: 1px solid #EEF1F4; padding: 9px 12px; text-align: left; font-size: 12.5px; }
+    th { font-size: 11px; letter-spacing: .06em; color: #6B7686; font-weight: 700; }
+  </style>
+</helmet>
+<div style="display: flex; flex-direction: column; gap: 16px; width: 1440px; height: 900px; background: #F6F7F9; padding: 20px 24px; box-sizing: border-box; overflow: hidden">
+
+  <div style="display: flex; align-items: baseline; gap: 12px">
+    <span style="font-size: 18px; font-weight: 700">Gift Aid</span>
+    <span style="font-size: 13px; color: #6B7686">HMRC ref: XR•••• · claims via Charities Online</span>
+  </div>
+
+  <div style="display: flex; gap: 16px; flex-grow: 1; min-height: 0">
+    <!-- Left: rolling claim + history -->
+    <div style="display: flex; flex-direction: column; gap: 16px; width: 560px; flex-shrink: 0">
+      <!-- Rolling claim hero -->
+      <div style="background: #fff; border: 1px solid #E3E6EA; border-top: 3px solid #A97F24; border-radius: 12px; padding: 18px 20px; display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; align-items: center; justify-content: space-between">
+          <span style="font-size: 13px; font-weight: 700; letter-spacing: .05em; color: #6B7686">CURRENT CLAIM — ROLLING</span>
+          <span style="background: #F3F0E8; color: #6B5A26; border-radius: 999px; padding: 3px 10px; font-size: 11.5px; font-weight: 700">building since 1 Jul</span>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; font-variant-numeric: tabular-nums">
+          <div><div style="font-size: 11.5px; color: #6B7686; font-weight: 600">ELIGIBLE GIFTS</div><div style="font-size: 24px; font-weight: 700">142</div></div>
+          <div><div style="font-size: 11.5px; color: #6B7686; font-weight: 600">DONATIONS</div><div style="font-size: 24px; font-weight: 700">£48,200</div></div>
+          <div><div style="font-size: 11.5px; color: #6B7686; font-weight: 600">CLAIMABLE +25%</div><div style="font-size: 24px; font-weight: 700; color: #A97F24">£12,050</div></div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px; font-size: 12.5px; color: #6B7686">
+          <span>GASDS (small cash): <b style="color: #1F2933">£310</b></span>
+          <span>· every new eligible gift joins automatically</span>
+        </div>
+        <div style="display: flex; gap: 10px">
+          <span style="background: #0E6E6B; color: #fff; border-radius: 9px; padding: 9px 16px; font-size: 13px; font-weight: 700">Review &amp; export HMRC CSV</span>
+          <span style="border: 1px solid #E3E6EA; color: #4B5563; border-radius: 9px; padding: 9px 16px; font-size: 13px; font-weight: 600">Validation: 2 rows need a postcode</span>
+        </div>
+      </div>
+
+      <!-- History -->
+      <div style="background: #fff; border: 1px solid #E3E6EA; border-radius: 12px; padding: 14px 0 4px 0; display: flex; flex-direction: column; min-height: 0">
+        <div style="font-size: 12px; font-weight: 700; letter-spacing: .06em; color: #6B7686; padding: 0 20px 8px 20px">CLAIM HISTORY</div>
+        <table style="width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums">
+          <tr><th style="padding-left: 20px">Submitted</th><th>Gifts</th><th>Claimed</th><th>Status</th><th>HMRC ref</th></tr>
+          <tr><td style="padding-left: 20px">30 Jun 2026</td><td>168</td><td style="color: #A97F24; font-weight: 600">£13,904</td><td><span style="background: #EDF7F1; color: #2E7D46; border-radius: 999px; padding: 2px 9px; font-size: 11px; font-weight: 700">PAID 21 Jul</span></td><td style="color: #6B7686">CO-88214</td></tr>
+          <tr><td style="padding-left: 20px">31 Mar 2026</td><td>203</td><td style="color: #A97F24; font-weight: 600">£17,551</td><td><span style="background: #EDF7F1; color: #2E7D46; border-radius: 999px; padding: 2px 9px; font-size: 11px; font-weight: 700">PAID 24 Apr</span></td><td style="color: #6B7686">CO-79552</td></tr>
+          <tr><td style="padding-left: 20px">31 Dec 2025</td><td>187</td><td style="color: #A97F24; font-weight: 600">£15,210</td><td><span style="background: #EDF7F1; color: #2E7D46; border-radius: 999px; padding: 2px 9px; font-size: 11px; font-weight: 700">PAID</span></td><td style="color: #6B7686">CO-71308</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- Right: declarations -->
+    <div style="display: flex; flex-direction: column; gap: 16px; flex-grow: 1; min-width: 0">
+      <!-- Missing declarations queue -->
+      <div style="background: #fff; border: 1px solid #E3E6EA; border-radius: 12px; padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; flex-grow: 1; min-height: 0">
+        <div style="display: flex; align-items: baseline; justify-content: space-between">
+          <span style="font-size: 13px; font-weight: 700; letter-spacing: .05em; color: #6B7686">MISSING DECLARATIONS — FOUND MONEY</span>
+          <span style="font-size: 13px; color: #A97F24; font-weight: 700; font-variant-numeric: tabular-nums">£1,240 recoverable from 8 donors</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px; overflow: hidden">
+          <div style="display: flex; align-items: center; gap: 12px; border: 1px solid #EEF1F4; border-radius: 10px; padding: 10px 12px">
+            <div style="flex-grow: 1"><div style="font-weight: 600; font-size: 13px">Aron Berger</div><div style="font-size: 12px; color: #6B7686">£1,800 in eligible gifts over 2 years · <b style="color: #A97F24">£450 recoverable</b></div></div>
+            <span style="border: 1px solid #0E6E6B; color: #0E6E6B; border-radius: 8px; padding: 5px 11px; font-size: 12px; font-weight: 600">Draft request</span>
+            <span style="border: 1px solid #E3E6EA; color: #4B5563; border-radius: 8px; padding: 5px 11px; font-size: 12px; font-weight: 600">Took it orally</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 12px; border: 1px solid #EEF1F4; border-radius: 10px; padding: 10px 12px">
+            <div style="flex-grow: 1"><div style="font-weight: 600; font-size: 13px">Y. &amp; M. Gross</div><div style="font-size: 12px; color: #6B7686">£1,200 eligible · <b style="color: #A97F24">£300 recoverable</b></div></div>
+            <span style="border: 1px solid #0E6E6B; color: #0E6E6B; border-radius: 8px; padding: 5px 11px; font-size: 12px; font-weight: 600">Draft request</span>
+            <span style="border: 1px solid #E3E6EA; color: #4B5563; border-radius: 8px; padding: 5px 11px; font-size: 12px; font-weight: 600">Took it orally</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 12px; border: 1px solid #EEF1F4; border-radius: 10px; padding: 10px 12px">
+            <div style="flex-grow: 1"><div style="font-weight: 600; font-size: 13px">S. Hoffman</div><div style="font-size: 12px; color: #6B7686">£600 eligible · <b style="color: #A97F24">£150 recoverable</b></div></div>
+            <span style="border: 1px solid #0E6E6B; color: #0E6E6B; border-radius: 8px; padding: 5px 11px; font-size: 12px; font-weight: 600">Draft request</span>
+            <span style="border: 1px solid #E3E6EA; color: #4B5563; border-radius: 8px; padding: 5px 11px; font-size: 12px; font-weight: 600">Took it orally</span>
+          </div>
+        </div>
+        <div style="font-size: 12px; color: #9AA3AD">Requests are drafted for you — you send them. Oral declarations queue the required written confirmation automatically.</div>
+      </div>
+
+      <!-- Recent declarations -->
+      <div style="background: #fff; border: 1px solid #E3E6EA; border-radius: 12px; padding: 14px 0 4px 0">
+        <div style="font-size: 12px; font-weight: 700; letter-spacing: .06em; color: #6B7686; padding: 0 20px 8px 20px">RECENT DECLARATIONS</div>
+        <table style="width: 100%; border-collapse: collapse">
+          <tr><th style="padding-left: 20px">Donor</th><th>Date</th><th>Method</th><th>Covers</th></tr>
+          <tr><td style="padding-left: 20px"><b>Dovid Cohen</b></td><td>12 Mar 2026</td><td>online</td><td>future + 4 back-years</td></tr>
+          <tr><td style="padding-left: 20px"><b>Klein Family</b></td><td>17 Aug 2026</td><td>written</td><td>future gifts</td></tr>
+          <tr><td style="padding-left: 20px"><b>Mrs. D. Frankel</b></td><td>2 Aug 2026</td><td>oral <span style="background: #FFF4E3; color: #B4650F; border-radius: 999px; padding: 1px 8px; font-size: 10.5px; font-weight: 700">confirmation pending</span></td><td>future + back-years</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

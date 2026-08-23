@@ -30,7 +30,7 @@ This folder is the **execution-layer specification** for the custom donor CRM. I
 | 11 | [PERMISSIONS-NFR](./11-PERMISSIONS-NFR.md) | Roles/RLS, GDPR, audit, performance, offline, backups |
 | 12 | [BUILD-SEQUENCE](./12-BUILD-SEQUENCE.md) | Milestones, acceptance tests, dependency graph, deferrals |
 | 13 | [INSPIRATION-INDEX](./13-INSPIRATION-INDEX.md) | Every borrowed idea → product → disposition → spec section |
-| — | [wireframes/](./wireframes/) | Artboard exports + map to spec sections |
+| — | [wireframes/](./wireframes/) | Artboard sources + PNG exports + [interactive canvas](https://claude.ai/code/artifact/58504c9e-aa3a-48f0-b276-11c4ba5734f6) |
 
 ## Conventions
 
