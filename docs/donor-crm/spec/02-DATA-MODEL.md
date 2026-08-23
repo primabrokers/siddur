@@ -234,6 +234,8 @@ Auto-naming recomputes when members change unless overridden ▸ NPSP.
 
 `lookup_options` (as v1 — every dropdown; see §6) · `automation_rules` (as v1 — every rule's switch + params; full catalogue in 08 §7) · `audit_log` (as v1; trigger-fed; scope in 11 §4) · **`saved_views`** (D14): **name**, **entity** (contacts · donations · tasks · opportunities), `filters` jsonb, `sort` jsonb, `layout` (table · kanban · calendar), `columns` text[], `group_by`, `owner_id`, `is_shared`, `icon`. Seeded set in 06 §1.
 
+**`signals`** (the nudge rail's storage — 04 §1, 08 §3): **contact_id**, **rule_key**, **reason** (the "why am I seeing this" string), `state` (open · snoozed · dismissed · acted), `snoozed_until`, `dedupe_key` (rule + underlying condition — a dismissed signal never re-fires until the condition resets), `created_at`, `resolved_at`.
+
 ## 4. The derived layer (computed, never stored — I-9)
 
 ### 4.1 `contact_stats` view (v2)

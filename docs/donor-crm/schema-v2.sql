@@ -479,6 +479,22 @@ create table documents (                             -- 02 §3.12
   check (url is not null or storage_path is not null)
 );
 
+create table signals (                               -- nudge rail storage (02 §3.18; 08 §3)
+  id            uuid primary key default gen_random_uuid(),
+  contact_id    uuid not null references contacts (id),
+  rule_key      text not null,
+  reason        text not null,                       -- "why am I seeing this"
+  state         text not null default 'open'
+                  check (state in ('open','snoozed','dismissed','acted')),
+  snoozed_until date,
+  dedupe_key    text not null,                       -- never re-fire a dismissed condition
+  created_at    timestamptz not null default now(),
+  resolved_at   timestamptz,
+  unique (dedupe_key)
+);
+
+create index signals_open_idx on signals (contact_id) where state = 'open';
+
 create table audit_log (                             -- 11 §4
   id          bigint generated always as identity primary key,
   table_name  text not null,
