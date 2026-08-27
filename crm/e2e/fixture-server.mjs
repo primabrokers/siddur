@@ -1,0 +1,405 @@
+#!/usr/bin/env node
+/**
+ * Offline fixture server — a **development harness**, never shipped.
+ *
+ * Speaks just enough PostgREST + GoTrue for the app to render the M1 surfaces
+ * without a database: it answers `/auth/v1/token` with a fake session and
+ * `/rest/v1/<table>` with the A2 wireframe's data (Dovid Cohen and the
+ * SmartList rows). Used to check the real-browser layout while the live
+ * project is still being provisioned; the live check uses
+ * `e2e/supabase-relay.mjs` against Supabase instead.
+ *
+ *   node e2e/fixture-server.mjs --port 5434
+ *   VITE_SUPABASE_URL=http://127.0.0.1:5434 npm run dev
+ */
+
+import { createServer } from 'node:http'
+
+const arg = (name, fallback) => {
+  const index = process.argv.indexOf(`--${name}`)
+  return index > -1 ? process.argv[index + 1] : fallback
+}
+const PORT = Number(arg('port', 5434))
+
+const today = new Date()
+const iso = (d) => d.toISOString().slice(0, 10)
+const daysFromNow = (n) => iso(new Date(today.getTime() + n * 86_400_000))
+
+const BRAUN = '11111111-1111-1111-1111-111111111111'
+const DOVID = 'aaaaaaaa-0000-0000-0000-000000000001'
+const RIVKY = 'aaaaaaaa-0000-0000-0000-000000000002'
+const WEISS = 'aaaaaaaa-0000-0000-0000-000000000003'
+const HOUSE = 'bbbbbbbb-0000-0000-0000-000000000001'
+
+const contactBase = {
+  title: null,
+  hebrew_name: null,
+  organization: null,
+  position: null,
+  industry: null,
+  contact_kind: 'individual',
+  is_organisation_self: false,
+  photo_url: null,
+  household_id: null,
+  email: null,
+  phone: null,
+  whatsapp: null,
+  preferred_language: 'en',
+  preferred_channel: null,
+  best_time_to_contact: null,
+  assistant_name: null,
+  assistant_contact: null,
+  linkedin_url: null,
+  website_url: null,
+  address_line1: null,
+  address_line2: null,
+  city: null,
+  postcode: null,
+  country: 'United Kingdom',
+  source: null,
+  introduced_by_id: null,
+  introduced_by_note: null,
+  relationship_owner_id: BRAUN,
+  relationship_strength: null,
+  known_since: null,
+  mutual_connections: null,
+  birthday: null,
+  spouse_name: null,
+  family_notes: null,
+  things_to_remember: null,
+  stage: 'keep_in_touch',
+  priority: 'medium',
+  tier: null,
+  estimated_capacity: null,
+  contact_frequency_days: null,
+  kit_paused_until: null,
+  engagement_score: null,
+  engagement_tier: 'unknown',
+  pinned_note_id: null,
+  is_archived: false,
+  merged_into_id: null,
+}
+
+const statsBase = {
+  lifetime_giving: null,
+  this_year_giving: null,
+  last_year_giving: null,
+  soft_credit_lifetime: null,
+  soft_credit_this_year: null,
+  gift_count: 0,
+  largest_gift: null,
+  average_gift: null,
+  first_gift_on: null,
+  first_gift_amount: null,
+  last_gift_on: null,
+  last_gift_amount: null,
+  is_lybunt: false,
+  is_sybunt: false,
+  pledge_balance: null,
+  last_contact_at: null,
+  last_contact_kind: null,
+  days_since_contact: null,
+  kit_due_on: null,
+  open_task_count: 0,
+  next_action_id: null,
+  next_action_title: null,
+  next_action_due_on: null,
+  next_action_type: null,
+  flag: 'none',
+  donor_status: 'prospect',
+  has_ga_declaration: false,
+}
+
+const DB = {
+  team_members: [{ id: BRAUN, full_name: "R' Braun", role: 'admin', email: 'admin@demo.test' }],
+
+  lookup_options: [
+    ...['prospect|Prospect', 'cultivation|Cultivation', 'in_discussion|In discussion', 'active_donor|Active donor', 'stewardship|Stewardship', 'keep_in_touch|Keep in touch'].map(
+      (v, i) => ({ list_name: 'stage', value: v.split('|')[0], label: v.split('|')[1], sort_order: i, color: null, meta: {}, is_active: true }),
+    ),
+    ...['call|Call', 'whatsapp|WhatsApp', 'email|Email', 'meeting|Meeting', 'event|Event', 'letter|Letter'].map((v, i) => ({
+      list_name: 'interaction_kind', value: v.split('|')[0], label: v.split('|')[1], sort_order: i, color: null, meta: {}, is_active: true,
+    })),
+    ...['call|Call', 'whatsapp|WhatsApp', 'send_email|Send email', 'arrange_meeting|Arrange meeting', 'thank_you|Thank you', 'keep_in_touch|Keep in touch'].map((v, i) => ({
+      list_name: 'action_type', value: v.split('|')[0], label: v.split('|')[1], sort_order: i, color: null, meta: {}, is_active: true,
+    })),
+    ...['high|High', 'medium|Medium', 'low|Low'].map((v, i) => ({ list_name: 'priority', value: v.split('|')[0], label: v.split('|')[1], sort_order: i, color: null, meta: {}, is_active: true })),
+    ...['general|General', 'personal|Personal', 'family|Family', 'giving|Giving'].map((v, i) => ({ list_name: 'note_category', value: v.split('|')[0], label: v.split('|')[1], sort_order: i, color: null, meta: {}, is_active: true })),
+    ...['proposal|Proposal', 'letter|Letter', 'photo|Photo'].map((v, i) => ({ list_name: 'document_kind', value: v.split('|')[0], label: v.split('|')[1], sort_order: i, color: null, meta: {}, is_active: true })),
+  ],
+
+  households: [
+    {
+      id: HOUSE,
+      name: 'Cohen Family',
+      name_is_override: false,
+      formal_greeting: 'Rabbi & Mrs. Cohen',
+      informal_greeting: 'Dovid & Rivky',
+      hebrew_greeting: null,
+      greeting_is_override: false,
+      primary_contact_id: DOVID,
+    },
+  ],
+
+  contacts: [
+    {
+      ...contactBase,
+      id: DOVID,
+      first_name: 'Dovid',
+      last_name: 'Cohen',
+      hebrew_name: 'דוד הכהן',
+      household_id: HOUSE,
+      email: 'dovid.cohen@example.com',
+      phone: '+447700900123',
+      whatsapp: '+447700900123',
+      preferred_channel: 'call',
+      best_time_to_contact: 'after 8pm',
+      position: 'Director',
+      organization: 'Cohen & Partner',
+      industry: 'Property',
+      city: 'Golders Green',
+      postcode: 'NW11 8AA',
+      address_line1: '12 The Drive',
+      introduced_by_id: WEISS,
+      relationship_strength: 9,
+      mutual_connections: "R' Weiss, the Feld brothers",
+      birthday: '1975-11-14',
+      spouse_name: 'Rivky',
+      family_notes: '5 children, eldest in Gateshead yeshiva',
+      things_to_remember: 'Never solicit at shul',
+      stage: 'in_discussion',
+      priority: 'high',
+      tier: 'A',
+      contact_frequency_days: 60,
+      engagement_score: 92,
+      engagement_tier: 'hot',
+      pinned_note_id: 'note-1',
+    },
+    { ...contactBase, id: RIVKY, first_name: 'Rivky', last_name: 'Cohen', household_id: HOUSE, city: 'Golders Green' },
+    { ...contactBase, id: WEISS, first_name: 'Yaakov', last_name: 'Weiss', title: "R'", city: 'Hendon' },
+    { ...contactBase, id: 'aaaaaaaa-0000-0000-0000-000000000004', first_name: 'Aron', last_name: 'Berger', city: 'Hendon', stage: 'keep_in_touch' },
+    { ...contactBase, id: 'aaaaaaaa-0000-0000-0000-000000000005', first_name: 'Chaim', last_name: 'Lax', city: 'Manchester', stage: 'active_donor' },
+    { ...contactBase, id: 'aaaaaaaa-0000-0000-0000-000000000006', first_name: 'Devorah', last_name: 'Frankel', title: 'Mrs', city: 'Golders Green', stage: 'stewardship' },
+    {
+      ...contactBase,
+      id: 'aaaaaaaa-0000-0000-0000-000000000007',
+      first_name: 'Feld Brothers',
+      last_name: 'Ltd',
+      organization: 'Feld Brothers Ltd',
+      contact_kind: 'business',
+      city: 'London',
+      stage: 'cultivation',
+    },
+  ],
+
+  contact_stats: [
+    {
+      ...statsBase,
+      contact_id: DOVID,
+      lifetime_giving: 65000,
+      this_year_giving: 15000,
+      last_year_giving: 20000,
+      soft_credit_lifetime: 6500,
+      soft_credit_this_year: 0,
+      gift_count: 7,
+      largest_gift: 20000,
+      average_gift: 9286,
+      first_gift_on: '2019-05-02',
+      first_gift_amount: 1000,
+      last_gift_on: '2026-03-12',
+      last_gift_amount: 15000,
+      pledge_balance: 15000,
+      last_contact_at: `${daysFromNow(-12)}T10:00:00Z`,
+      last_contact_kind: 'meeting',
+      days_since_contact: 12,
+      kit_due_on: daysFromNow(48),
+      open_task_count: 1,
+      next_action_id: 'task-1',
+      next_action_title: 'Call re proposal',
+      next_action_due_on: daysFromNow(-4),
+      next_action_type: 'call',
+      flag: 'overdue',
+      donor_status: 'active',
+      has_ga_declaration: true,
+    },
+    { ...statsBase, contact_id: RIVKY, lifetime_giving: 6500, this_year_giving: 0, gift_count: 2, days_since_contact: 40, flag: 'future', donor_status: 'lapsed', next_action_title: 'Send the newsletter', next_action_due_on: daysFromNow(12), next_action_type: 'send_email' },
+    { ...statsBase, contact_id: WEISS, lifetime_giving: 3000, days_since_contact: 20, flag: 'waiting', donor_status: 'active', next_action_title: 'Awaiting his introduction', next_action_due_on: daysFromNow(3) },
+    { ...statsBase, contact_id: 'aaaaaaaa-0000-0000-0000-000000000004', lifetime_giving: 1800, last_year_giving: 1800, is_lybunt: true, days_since_contact: 104, flag: 'none', donor_status: 'pre_lapsed' },
+    { ...statsBase, contact_id: 'aaaaaaaa-0000-0000-0000-000000000005', lifetime_giving: 3600, this_year_giving: 3600, days_since_contact: 71, flag: 'future', donor_status: 'active', next_action_title: 'Dinner invite', next_action_due_on: daysFromNow(6), next_action_type: 'invite_event' },
+    { ...statsBase, contact_id: 'aaaaaaaa-0000-0000-0000-000000000006', lifetime_giving: 950, this_year_giving: 950, days_since_contact: 58, flag: 'today', donor_status: 'active', next_action_title: 'Call', next_action_due_on: daysFromNow(0), next_action_type: 'call' },
+    { ...statsBase, contact_id: 'aaaaaaaa-0000-0000-0000-000000000007', lifetime_giving: 5000, last_year_giving: 5000, is_lybunt: true, days_since_contact: 96, flag: 'none', donor_status: 'pre_lapsed' },
+  ],
+
+  funds: [{ id: 'f1', name: 'Scholarships' }, { id: 'f2', name: 'Building' }],
+  campaigns: [{ id: 'c1', name: 'Building campaign' }],
+  appeals: [{ id: 'a1', name: 'Purim appeal' }],
+
+  interactions: [
+    {
+      id: 'int-1', contact_id: DOVID, occurred_at: `${daysFromNow(-12)}T10:00:00Z`, kind: 'meeting', status: 'logged',
+      team_member_id: BRAUN, summary: 'Met in London. Very warm. Strong interest in the building project.',
+      outcome: 'wants to see the naming opportunities → next: call after Sukkos', is_meaningful: true,
+      location: null, attendees: null, purpose: null, ask_amount: 20000, source: 'quick_capture_ai',
+    },
+    {
+      id: 'int-2', contact_id: DOVID, occurred_at: '2026-06-15T09:00:00Z', kind: 'whatsapp', status: 'logged',
+      team_member_id: BRAUN, summary: 'Sent Shavuos wishes; he replied warmly, mentioned a business trip to Antwerp.',
+      outcome: null, is_meaningful: true, location: null, attendees: null, purpose: null, ask_amount: null, source: 'manual',
+    },
+    {
+      id: 'int-3', contact_id: DOVID, occurred_at: `${daysFromNow(21)}T14:00:00Z`, kind: 'meeting', status: 'scheduled',
+      team_member_id: BRAUN, summary: 'Naming opportunities walkthrough', outcome: null, is_meaningful: false,
+      location: 'His office', purpose: 'Naming opportunities', attendees: null, ask_amount: null, source: 'manual',
+    },
+  ],
+
+  donations: [
+    {
+      id: 'don-1', contact_id: DOVID, donated_on: '2026-03-12', amount: 15000, currency: 'GBP', amount_gbp: 15000,
+      fund_id: 'f1', campaign_id: null, appeal_id: 'a1', payment_method: 'bank_transfer', status: 'received',
+      pledge_id: null, installment_id: null, recurring_agreement_id: null, receipt_status: 'sent',
+      receipt_pref: null, thank_you_status: 'done', gift_aid_status: 'claimed', gift_aid_claim_id: null, is_gasds: false, notes: null,
+    },
+    {
+      id: 'don-2', contact_id: DOVID, donated_on: '2025-11-20', amount: 10000, currency: 'GBP', amount_gbp: 10000,
+      fund_id: 'f2', campaign_id: 'c1', appeal_id: null, payment_method: 'bank_transfer', status: 'received',
+      pledge_id: 'pl-1', installment_id: null, recurring_agreement_id: null, receipt_status: 'sent',
+      receipt_pref: null, thank_you_status: 'done', gift_aid_status: 'claimed', gift_aid_claim_id: null, is_gasds: false, notes: null,
+    },
+  ],
+
+  pledges: [
+    {
+      id: 'pl-1', contact_id: DOVID, total_amount: 25000, currency: 'GBP', amount_gbp: 25000, fund_id: 'f2',
+      campaign_id: 'c1', appeal_id: null, pledged_on: '2025-10-01', status: 'open', write_off_amount: null, notes: null,
+    },
+  ],
+  pledge_installments: [
+    { id: 'ins-1', pledge_id: 'pl-1', due_on: '2025-11-15', amount: 5000, status: 'paid' },
+    { id: 'ins-2', pledge_id: 'pl-1', due_on: '2025-12-15', amount: 5000, status: 'paid' },
+    { id: 'ins-3', pledge_id: 'pl-1', due_on: daysFromNow(19), amount: 5000, status: 'expected' },
+  ],
+  recurring_agreements: [],
+
+  gift_aid_declarations: [
+    {
+      id: 'ga-1', contact_id: DOVID, declared_on: '2026-03-12', method: 'online', wording_version: 'v2',
+      covers_past: true, covers_future: true, covers_from: null, oral_confirmation_sent_on: null,
+      cancelled_on: null, evidence_url: null,
+    },
+  ],
+
+  notes: [
+    {
+      id: 'note-1', contact_id: DOVID, category: 'personal',
+      body: "prefers calls after 8pm · ask about his son's chabura in Gateshead · never solicit at shul",
+      is_private: false, is_pinned: true, created_by: BRAUN, created_at: '2026-05-02T09:00:00Z',
+    },
+    {
+      id: 'note-2', contact_id: DOVID, category: 'giving',
+      body: 'Gives around Purim and before the dinner; dislikes being asked twice in a season.',
+      is_private: false, is_pinned: false, created_by: BRAUN, created_at: '2026-04-11T09:00:00Z',
+    },
+  ],
+
+  tasks: [
+    {
+      id: 'task-0', contact_id: DOVID, title: 'Send the building proposal', action_type: 'send_proposal', details: null,
+      assigned_to: BRAUN, due_on: daysFromNow(-30), priority: 'high', status: 'done', waiting_for: null,
+      completed_at: `${daysFromNow(-28)}T12:00:00Z`, origin: 'manual',
+    },
+    {
+      id: 'task-1', contact_id: DOVID, title: 'Call re proposal', action_type: 'call', details: null,
+      assigned_to: BRAUN, due_on: daysFromNow(-4), priority: 'high', status: 'todo', waiting_for: null,
+      completed_at: null, origin: 'manual',
+    },
+  ],
+
+  tags: [
+    { id: 'tag-1', name: 'Building project', category: 'interest', color: null },
+    { id: 'tag-2', name: 'Education', category: 'cause', color: null },
+    { id: 'tag-3', name: 'Golders Green', category: 'community', color: null },
+  ],
+  taggings: [
+    { id: 'tg-1', tag_id: 'tag-1', contact_id: DOVID, is_excluded: false, note: null },
+    { id: 'tg-2', tag_id: 'tag-2', contact_id: DOVID, is_excluded: false, note: null },
+    { id: 'tg-3', tag_id: 'tag-3', contact_id: DOVID, is_excluded: false, note: null },
+  ],
+
+  documents: [
+    { id: 'doc-1', contact_id: DOVID, title: 'Building proposal (June 2026)', kind: 'proposal', url: 'https://example.com/proposal', storage_path: null, created_at: '2026-06-02T09:00:00Z' },
+  ],
+}
+
+const CORS = {
+  'access-control-allow-origin': '*',
+  'access-control-allow-methods': 'GET,POST,PATCH,PUT,DELETE,OPTIONS,HEAD',
+  'access-control-allow-headers': '*',
+  'access-control-expose-headers': 'content-range',
+}
+
+const SESSION = {
+  access_token: 'fixture-access-token',
+  token_type: 'bearer',
+  expires_in: 3600,
+  expires_at: Math.floor(Date.now() / 1000) + 3600,
+  refresh_token: 'fixture-refresh-token',
+  user: {
+    id: BRAUN,
+    aud: 'authenticated',
+    role: 'authenticated',
+    email: 'admin@demo.test',
+    app_metadata: {},
+    user_metadata: {},
+    created_at: new Date().toISOString(),
+  },
+}
+
+/** Apply just the filters the app sends: eq / in on one column. */
+function applyFilters(rows, url) {
+  let out = rows
+  for (const [key, raw] of url.searchParams.entries()) {
+    if (['select', 'order', 'limit', 'offset'].includes(key)) continue
+    const [op, ...rest] = raw.split('.')
+    const value = rest.join('.')
+    if (op === 'eq') out = out.filter((r) => String(r[key]) === value)
+    else if (op === 'in') {
+      const list = value.replace(/^\(|\)$/g, '').split(',').map((v) => v.replace(/^"|"$/g, ''))
+      out = out.filter((r) => list.includes(String(r[key])))
+    } else if (op === 'is') out = out.filter((r) => (value === 'null' ? r[key] == null : r[key] != null))
+  }
+  return out
+}
+
+const server = createServer(async (req, res) => {
+  const url = new URL(req.url, `http://127.0.0.1:${PORT}`)
+  const send = (status, body, extra = {}) => {
+    res.writeHead(status, { ...CORS, 'content-type': 'application/json', ...extra })
+    res.end(body === undefined ? '' : JSON.stringify(body))
+  }
+
+  if (req.method === 'OPTIONS') return send(204)
+
+  if (url.pathname.startsWith('/auth/v1/token')) return send(200, SESSION)
+  if (url.pathname === '/auth/v1/user') return send(200, SESSION.user)
+  if (url.pathname === '/auth/v1/logout') return send(204)
+  if (url.pathname.startsWith('/auth/v1/')) return send(200, {})
+
+  if (url.pathname.startsWith('/rest/v1/')) {
+    const table = url.pathname.slice('/rest/v1/'.length)
+    const rows = DB[table]
+    if (!rows) {
+      return send(404, { code: 'PGRST205', message: `Could not find the table 'public.${table}'` })
+    }
+    const filtered = applyFilters(rows, url)
+    const single = (req.headers.accept ?? '').includes('vnd.pgrst.object')
+    if (single) return send(200, filtered[0] ?? null)
+    return send(200, filtered, { 'content-range': `0-${Math.max(filtered.length - 1, 0)}/${filtered.length}` })
+  }
+
+  send(404, { message: 'not a fixture route' })
+})
+
+server.listen(PORT, '127.0.0.1', () => {
+  console.log(`[fixtures] 127.0.0.1:${PORT} — offline PostgREST/GoTrue stand-in`)
+})

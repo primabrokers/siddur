@@ -25,6 +25,33 @@ export const qk = {
     stats: (id: string) => ['contacts', 'stats', id] as const,
     timeline: (id: string) => ['contacts', 'timeline', id] as const,
     search: (term: string) => ['contacts', 'search', term] as const,
+    /** Gifts + pledges + recurring agreements for the profile's Giving tab. */
+    giving: (id: string) => ['contacts', 'giving', id] as const,
+    notes: (id: string) => ['contacts', 'notes', id] as const,
+    documents: (id: string) => ['contacts', 'documents', id] as const,
+    tags: (id: string) => ['contacts', 'tags', id] as const,
+    /** Gift Aid declarations on file for one contact. */
+    declarations: (id: string) => ['contacts', 'declarations', id] as const,
+    /** Create-time duplicate check (02 §6) — keyed by the normalised signals. */
+    duplicates: (signals?: Filters) => ['contacts', 'duplicates', signals ?? {}] as const,
+  },
+
+  households: {
+    all: ['households'] as const,
+    detail: (id: string) => ['households', 'detail', id] as const,
+    /** Members + their combined rollups (04 §5.5). */
+    members: (id: string) => ['households', 'members', id] as const,
+  },
+
+  team: {
+    all: ['team'] as const,
+    list: () => ['team', 'list'] as const,
+  },
+
+  /** Tiny reference tables joined client-side (funds · campaigns · appeals). */
+  refs: {
+    all: ['refs'] as const,
+    giving: () => ['refs', 'giving'] as const,
   },
 
   tasks: {

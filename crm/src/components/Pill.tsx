@@ -9,11 +9,21 @@ import { cn } from '../lib/cn'
  *   read-only, with a lock glyph on hover so the difference is legible.
  */
 export type PillVariant = 'manual' | 'computed'
-export type PillTone = 'neutral' | 'accent' | 'waiting' | 'gold' | 'good' | 'overdue' | 'today'
+export type PillTone =
+  | 'neutral'
+  | 'accent'
+  /** Solid accent — the filled stage pill in `DonorProfile.dc.html`. */
+  | 'accentSolid'
+  | 'waiting'
+  | 'gold'
+  | 'good'
+  | 'overdue'
+  | 'today'
 
 const manualTones: Record<PillTone, string> = {
   neutral: 'bg-row text-nav',
   accent: 'bg-accent-soft text-accent-dark',
+  accentSolid: 'bg-accent text-surface',
   waiting: 'bg-flag-waiting-bg text-flag-waiting',
   gold: 'bg-[#F7F1E2] text-gold',
   good: 'bg-good-bg text-good',
@@ -24,6 +34,7 @@ const manualTones: Record<PillTone, string> = {
 const computedTones: Record<PillTone, string> = {
   neutral: 'border border-chip-border text-muted',
   accent: 'border border-accent text-accent-dark',
+  accentSolid: 'border border-accent bg-accent-soft text-accent-dark',
   waiting: 'border border-flag-waiting text-flag-waiting',
   gold: 'border border-[#C9BC96] text-gold',
   good: 'border border-good text-good',

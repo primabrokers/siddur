@@ -1,7 +1,7 @@
 import { cn } from '../lib/cn'
 import { initialsOf } from '../lib/format'
 
-export type AvatarSize = 'sm' | 'md' | 'lg'
+export type AvatarSize = 'sm' | 'md' | 'lg' | 'xl'
 export type AvatarTone = 'neutral' | 'accent'
 
 export interface AvatarProps {
@@ -19,6 +19,8 @@ const sizes: Record<AvatarSize, string> = {
   sm: 'w-[26px] h-[26px] text-[10.5px]',
   md: 'w-[30px] h-[30px] text-[11.5px]',
   lg: 'w-[34px] h-[34px] text-[12px]',
+  // The 52px circle in the donor-profile header (`DonorProfile.dc.html`).
+  xl: 'w-[52px] h-[52px] text-[18px]',
 }
 
 const tones: Record<AvatarTone, string> = {
