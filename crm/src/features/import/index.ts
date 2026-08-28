@@ -51,12 +51,14 @@ export {
   describeUndo,
   fillBlanksPatch,
   matchFund,
+  IMPORT_SETTLE_MS,
   planBatchUndo,
   summarySentence,
   undoAvailable,
+  undoCutoff,
   UNDO_WINDOW_DAYS,
   UNTOUCHED_MS,
 } from './plan'
-export type { PlanInput, UndoCandidate, UndoPlan } from './plan'
+export type { PlanInput, UndoCandidate, UndoChild, UndoPlan } from './plan'
 
 export type * from './types'

@@ -167,14 +167,32 @@ export interface UndoCandidate {
   created_at: string
   updated_at: string
   merged_into_id: string | null
-  /** Rows this contact has gained that the batch did not create. */
+  /**
+   * Rows this contact has gained **since the batch finished writing** — see
+   * `IMPORT_SETTLE_MS`. Children created during the run itself are the
+   * import's own echo, not somebody's work.
+   */
   foreignChildren: number
+}
+
+/** A trigger-made row that has to be cleared before its contact can go. */
+export interface UndoChild {
+  id: string
+  contact_id: string
 }
 
 export interface UndoPlan {
   batchId: string
   deleteContactIds: string[]
   deleteDonationIds: string[]
+  /**
+   * Automation rows the import itself provoked, on contacts that are being
+   * removed. They must go first: `tasks.contact_id` and `signals.contact_id`
+   * are `on delete no action`, so a contact still carrying its auto-generated
+   * thank-you task cannot be deleted at all.
+   */
+  deleteTaskIds: string[]
+  deleteSignalIds: string[]
   kept: Array<{ id: string; reason: string }>
 }
 
@@ -184,6 +202,44 @@ export interface UndoPlan {
  * so exact equality would keep every row.
  */
 export const UNTOUCHED_MS = 2000
+
+/**
+ * How long after a batch finishes writing its side effects still count as the
+ * import's own.
+ *
+ * This exists because **the database answers an import back**. Inserting a
+ * gift fires `donations_after_write` (08 §7), which creates an `auto:thank_you`
+ * task against the brand-new contact and, for a first or major gift, a
+ * `signals` row too. Those rows are indistinguishable by shape from a
+ * fundraiser's own work — they are tasks on a contact — so a naive "has any
+ * children?" test concludes that every imported donor has been worked on and
+ * refuses to remove a single one. That is not a hypothetical: the first live
+ * run of this wizard reported *"0 contacts and 1 gifts removed, 1 kept because
+ * they have been used since"*.
+ *
+ * The honest discriminator is time, not shape: anything that appeared while
+ * the batch was still running (or in the seconds after it, since the triggers
+ * fire asynchronously to the client's own clock) belongs to the import. A
+ * generous window is the safe direction to err in only because the *other*
+ * guards still hold — the contact must still be batch-stamped, unmerged and
+ * unedited — so a window that is slightly too wide cannot delete a record
+ * somebody has actually touched.
+ */
+export const IMPORT_SETTLE_MS = 60_000
+
+/**
+ * The instant after which a child row counts as somebody's own work.
+ *
+ * `completed_at` is written by the commit when it finishes; a batch from before
+ * that column existed falls back to `created_at`, which is the start of the run
+ * rather than its end — so the settle window absorbs the difference either way.
+ */
+export function undoCutoff(batch: Pick<ImportBatchRow, 'created_at' | 'completed_at'>): number {
+  const finished = Date.parse(batch.completed_at ?? '')
+  const started = Date.parse(batch.created_at)
+  const base = Number.isFinite(finished) ? finished : Number.isFinite(started) ? started : Date.now()
+  return base + IMPORT_SETTLE_MS
+}
 
 /**
  * What a batch undo may delete.
@@ -196,11 +252,16 @@ export const UNTOUCHED_MS = 2000
  * Gifts the batch created are always removed; they are stamped with the batch,
  * they carry no independent history, and leaving them behind would double-count
  * the donor's lifetime giving on the re-import.
+ *
+ * `automation` carries the trigger-made tasks and signals; the ones belonging
+ * to contacts that survive the filter are returned for deletion, and the rest
+ * are left exactly where they are.
  */
 export function planBatchUndo(
   batchId: string,
   contacts: UndoCandidate[],
   donationIds: string[],
+  automation: { tasks?: UndoChild[]; signals?: UndoChild[] } = {},
 ): UndoPlan {
   const deleteContactIds: string[] = []
   const kept: UndoPlan['kept'] = []
@@ -227,7 +288,18 @@ export function planBatchUndo(
     deleteContactIds.push(contact.id)
   }
 
-  return { batchId, deleteContactIds, deleteDonationIds: [...donationIds], kept }
+  const going = new Set(deleteContactIds)
+  const owned = (rows: UndoChild[] | undefined): string[] =>
+    (rows ?? []).filter((row) => going.has(row.contact_id)).map((row) => row.id)
+
+  return {
+    batchId,
+    deleteContactIds,
+    deleteDonationIds: [...donationIds],
+    deleteTaskIds: owned(automation.tasks),
+    deleteSignalIds: owned(automation.signals),
+    kept,
+  }
 }
 
 /** The done screen's sentence for what undo will actually do. */

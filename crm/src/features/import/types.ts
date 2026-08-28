@@ -190,6 +190,13 @@ export interface ImportBatchRow {
   contact_count: number
   donation_count: number
   status: 'committed' | 'undone'
+  /**
+   * When the run finished writing. Undo measures "has anyone used this since?"
+   * from here, so the automation the import itself provoked (08 §7's
+   * thank-you tasks and signals) is not mistaken for somebody's work. Null on
+   * batches written before the column existed — `undoCutoff` falls back.
+   */
+  completed_at: string | null
   undone_at: string | null
 }
 

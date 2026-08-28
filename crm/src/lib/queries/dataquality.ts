@@ -199,15 +199,18 @@ export function useMergeContacts() {
 
       for (const child of CHILD_TABLES) {
         if (child.uniqueWith) {
-          // Drop the loser's rows that would collide, then move the rest.
+          // Drop the loser's rows that would collide, then move the rest. The
+          // key is composite (see `ChildTable.uniqueWith`), so rows are keyed
+          // on the joined tuple rather than a single column.
+          const keyOf = (row: Record<string, unknown>): string =>
+            (child.uniqueWith as string[]).map((column) => String(row[column] ?? '')).join(' ')
+
           const [winnerRows, loserRows] = await Promise.all([
             selectRows<Record<string, unknown>>(child.table, (q) => q.eq(child.column, plan.winnerId)),
             selectRows<Record<string, unknown>>(child.table, (q) => q.eq(child.column, plan.loserId)),
           ])
-          const held = new Set(winnerRows.map((row) => String(row[child.uniqueWith as string])))
-          const collisions = loserRows
-            .filter((row) => held.has(String(row[child.uniqueWith as string])))
-            .map((row) => String(row.id))
+          const held = new Set(winnerRows.map(keyOf))
+          const collisions = loserRows.filter((row) => held.has(keyOf(row))).map((row) => String(row.id))
           if (collisions.length > 0) {
             const { error } = await supabase.from(child.table).delete().in('id', collisions)
             if (error) problems.push(`Duplicate ${child.label} could not be tidied: ${(error as Failed).message}`)

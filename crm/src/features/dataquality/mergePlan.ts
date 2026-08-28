@@ -27,36 +27,54 @@ export interface ChildTable {
   column: string
   label: string
   /**
-   * A unique constraint that a naive re-parent would violate: `taggings` is
-   * unique on (tag_id, contact_id), so a tag both records carry must be
-   * de-duplicated rather than moved.
+   * The *rest* of a unique constraint that also contains `contact_id`, which a
+   * naive re-parent would violate. `taggings` is unique on (tag_id,
+   * contact_id), so a tag both records carry must be de-duplicated rather than
+   * moved; `soft_credits` is unique on (donation_id, contact_id, role), so two
+   * duplicates soft-credited on the same gift in the same role collide too —
+   * which is not hypothetical, since `crm_sync_household_soft_credits` credits
+   * every member of a household on the same donation.
+   *
+   * The executor treats these columns as a composite key: a loser row whose
+   * key already exists on the winner is dropped instead of moved.
    */
-  uniqueWith?: string
+  uniqueWith?: string[]
 }
 
 /**
  * Every table hanging off a contact (schema 02 §3). Order matters only for
  * legibility — the executor runs them sequentially so a failure stops at a
  * known point rather than half-moving a donor's history.
+ *
+ * The list is checked against the live schema rather than remembered: every
+ * table in `information_schema` with a `contact_id` appears here, because one
+ * that does not is a table whose rows silently keep pointing at a tombstone.
  */
 export const CHILD_TABLES: ChildTable[] = [
   { table: 'interactions', column: 'contact_id', label: 'conversations' },
   { table: 'donations', column: 'contact_id', label: 'gifts' },
   { table: 'pledges', column: 'contact_id', label: 'pledges' },
   { table: 'recurring_agreements', column: 'contact_id', label: 'recurring gifts' },
-  { table: 'soft_credits', column: 'contact_id', label: 'soft credits' },
+  { table: 'soft_credits', column: 'contact_id', label: 'soft credits', uniqueWith: ['donation_id', 'role'] },
   { table: 'gift_aid_declarations', column: 'contact_id', label: 'Gift Aid declarations' },
   { table: 'opportunities', column: 'contact_id', label: 'opportunities' },
   { table: 'tasks', column: 'contact_id', label: 'tasks' },
   { table: 'notes', column: 'contact_id', label: 'notes' },
   { table: 'documents', column: 'contact_id', label: 'documents' },
-  { table: 'taggings', column: 'contact_id', label: 'tags', uniqueWith: 'tag_id' },
+  { table: 'taggings', column: 'contact_id', label: 'tags', uniqueWith: ['tag_id'] },
+  // Automation output. Both hang off the contact and both would otherwise be
+  // stranded on the tombstone — the nudge rail (08 §7) would go on rendering
+  // cards for a record that no longer appears anywhere else in the app.
+  { table: 'signals', column: 'contact_id', label: 'nudges' },
+  { table: 'journey_enrollments', column: 'contact_id', label: 'journey enrolments' },
 ]
 
-/** Contacts pointing *at* the loser, which would otherwise dangle. */
+/** Rows pointing *at* the loser, which would otherwise dangle at a tombstone. */
 export const REFERRING_COLUMNS: ChildTable[] = [
   { table: 'contacts', column: 'introduced_by_id', label: 'introductions' },
   { table: 'households', column: 'primary_contact_id', label: 'household head' },
+  { table: 'tributes', column: 'honoree_contact_id', label: 'tributes honoured' },
+  { table: 'tributes', column: 'acknowledgee_contact_id', label: 'tribute acknowledgements' },
 ]
 
 /* ------------------------------------------------------------ completeness */

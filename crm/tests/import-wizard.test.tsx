@@ -235,6 +235,109 @@ describe('import wizard', () => {
     expect((world.tables.import_batches as Row[])[0].status).toBe('undone')
   })
 
+  /*
+   * The regression the first live run found.
+   *
+   * `donations_after_write` (08 §7) answers every gift insert with an
+   * `auto:thank_you` task against the contact — including a contact the import
+   * created two milliseconds earlier. The stand-in has no triggers, so these
+   * two tests plant the rows the trigger would have planted and then ask undo
+   * the question the live database asked: is a task on this contact evidence
+   * that somebody has used the record, or is it just the import's own echo?
+   *
+   * The answer is *when*, not *what*. Both tests import the same sheet; only
+   * the timestamp on the task differs.
+   */
+  async function commitThen(
+    user: ReturnType<typeof userEvent.setup>,
+    world: ReturnType<typeof installWorld>,
+    plant: (batchId: unknown, contactIds: string[]) => void,
+  ) {
+    await renderApp('/import')
+    await uploadSheet(user)
+    await next(user)
+    await next(user)
+    await screen.findByTestId('dedupe-row-3', {}, { timeout: 5000 })
+    await next(user)
+    await user.click(await screen.findByTestId('import-commit'))
+    await screen.findByTestId('import-done', {}, { timeout: 5000 })
+
+    const batchId = (world.tables.import_batches as Row[])[0].id
+    const imported = (world.tables.contacts as Row[])
+      .filter((row) => row.import_batch === batchId)
+      .map((row) => String(row.id))
+    plant(batchId, imported)
+
+    await user.click(screen.getByTestId('import-undo'))
+    await user.click(await screen.findByRole('button', { name: 'Undo the import' }))
+    await screen.findByTestId('import-undone', {}, { timeout: 5000 })
+  }
+
+  it('undoes contacts whose only history is the thank-you task the gift fired', async () => {
+    const world = installWorld({ tables: importWorld() })
+    const user = userEvent.setup()
+
+    const before = (world.tables.contacts as Row[]).length
+    await commitThen(user, world, (_batchId, contactIds) => {
+      for (const contactId of contactIds) {
+        ;(world.tables.tasks as Row[]).push({
+          id: `auto-thanks-${contactId}`,
+          contact_id: contactId,
+          title: 'Thank you for £500',
+          origin: 'auto:thank_you',
+          status: 'todo',
+          // The trigger fires inside the same commit the wizard just made.
+          created_at: MONDAY.toISOString(),
+        })
+        ;(world.tables.signals as Row[]).push({
+          id: `auto-signal-${contactId}`,
+          contact_id: contactId,
+          rule_key: 'first_gift_call',
+          created_at: MONDAY.toISOString(),
+        })
+      }
+    })
+
+    // Both imported contacts go, and so do the rows the import provoked —
+    // the FK from tasks is `no action`, so leaving them would block the delete.
+    // The book is back to the size it was before the file was opened.
+    await waitFor(() => {
+      expect((world.tables.contacts as Row[]).length).toBe(before)
+    })
+    expect((world.tables.tasks as Row[]).some((row) => String(row.id).startsWith('auto-thanks-'))).toBe(false)
+    expect((world.tables.signals as Row[]).some((row) => String(row.id).startsWith('auto-signal-'))).toBe(false)
+    expect(screen.getByTestId('import-undone').textContent).toContain('2 contacts')
+  })
+
+  it('keeps a contact somebody logged a real task against afterwards', async () => {
+    const world = installWorld({ tables: importWorld() })
+    const user = userEvent.setup()
+
+    const before = (world.tables.contacts as Row[]).length
+    let worked = ''
+    await commitThen(user, world, (_batchId, contactIds) => {
+      worked = contactIds[0]
+      ;(world.tables.tasks as Row[]).push({
+        id: 'human-task',
+        contact_id: worked,
+        title: 'Coffee with Shloimy',
+        origin: 'manual',
+        status: 'todo',
+        // Two days later: a fundraiser's own work, not the import's echo.
+        created_at: new Date(MONDAY.getTime() + 2 * 24 * 60 * 60 * 1000).toISOString(),
+      })
+    })
+
+    // Two came in, one goes back out: the worked-on one stays.
+    await waitFor(() => {
+      expect((world.tables.contacts as Row[]).length).toBe(before + 1)
+    })
+    expect((world.tables.contacts as Row[]).some((row) => row.id === worked)).toBe(true)
+    // …and the task that saved it is still there.
+    expect((world.tables.tasks as Row[]).some((row) => row.id === 'human-task')).toBe(true)
+    expect(screen.getByTestId('import-undone').textContent).toContain('1 kept')
+  })
+
   it('offers a fundraiser the wizard but not the undo (11 §1)', async () => {
     installWorld({ tables: importWorld('fundraiser') })
     const user = userEvent.setup()

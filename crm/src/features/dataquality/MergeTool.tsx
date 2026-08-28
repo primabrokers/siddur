@@ -213,8 +213,8 @@ export function MergeTool({ open, onClose, a, b, onMerged }: MergeToolProps) {
 
             <p className="text-[12px] leading-[1.5] text-muted">
               Everything hanging off the duplicate — conversations, gifts, pledges, recurring gifts, soft
-              credits, Gift Aid declarations, opportunities, tasks, notes, documents and tags — moves to the
-              survivor. A note recording the merge is added to the survivor's timeline (11 §4).
+              credits, Gift Aid declarations, opportunities, tasks, notes, documents, tags and nudges —
+              moves to the survivor. A note recording the merge is added to the survivor's timeline (11 §4).
             </p>
 
             {merge.error ? (

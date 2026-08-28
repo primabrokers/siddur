@@ -109,8 +109,17 @@ export interface BulkTaskInput {
  * One task per selected contact — I-2's rule holds even in bulk: a task
  * without a `contact_id` cannot exist, so this creates N tasks rather than one
  * task about N people.
+ *
+ * **A task with no date is a queued one, not an undated one.** The database
+ * says so outright — `check (status = 'queued' or due_on is not null)` — and
+ * so does the rest of the app (`TaskSheet`: `status: queueIt ? 'queued' :
+ * 'todo'`, and 03 §2's dashed flag for a queued action). The bulk sheet offers
+ * no date field, so forty tasks created here land in the QUEUED column where
+ * they are visible and can be given a date one at a time, rather than being
+ * stamped with a deadline nobody chose.
  */
 export async function createTaskEach(ids: string[], input: BulkTaskInput): Promise<BulkOutcome> {
+  const dueOn = input.dueOn?.trim() ? input.dueOn : null
   let changed = 0
   let failed = 0
   for (const part of chunk(ids)) {
@@ -118,10 +127,10 @@ export async function createTaskEach(ids: string[], input: BulkTaskInput): Promi
       part.map((contact_id) => ({
         contact_id,
         title: input.title.trim(),
-        due_on: input.dueOn,
+        due_on: dueOn,
         action_type: input.actionType,
         assigned_to: input.assignedTo,
-        status: 'open',
+        status: dueOn === null ? 'queued' : 'todo',
         priority: 'medium',
         origin: 'bulk',
       })),
@@ -187,7 +196,10 @@ export function describeBulk(verb: BulkVerb, count: number, detail: string): str
     case 'priority':
       return `Sets priority to ${detail} on ${countPhrase(count)}.`
     case 'task':
-      return `Creates one task ("${detail}") for each of ${countPhrase(count)} — ${count} tasks in all.`
+      return (
+        `Creates one task ("${detail}") for each of ${countPhrase(count)} — ${count} tasks in all, ` +
+        'queued rather than dated, so each can be given a day of its own.'
+      )
     case 'export':
       return `Downloads ${countPhrase(count)} as a CSV, including any amounts visible to you.`
     default:

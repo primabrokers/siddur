@@ -140,22 +140,34 @@ describe('the re-parent plan', () => {
 
   it('names every table that hangs off a contact', () => {
     const tables = CHILD_TABLES.map((child) => child.table)
+    // Every table in the live schema carrying a `contact_id`. A table missing
+    // from this list is one whose rows keep pointing at the tombstone.
     for (const table of [
       'interactions', 'donations', 'pledges', 'recurring_agreements', 'soft_credits',
       'gift_aid_declarations', 'opportunities', 'tasks', 'notes', 'documents', 'taggings',
+      'signals', 'journey_enrollments',
     ]) {
       expect(tables).toContain(table)
     }
   })
 
   it('flags taggings as needing conflict handling, since (tag, contact) is unique', () => {
-    expect(CHILD_TABLES.find((child) => child.table === 'taggings')?.uniqueWith).toBe('tag_id')
+    expect(CHILD_TABLES.find((child) => child.table === 'taggings')?.uniqueWith).toEqual(['tag_id'])
+  })
+
+  it('flags soft credits too — (donation, contact, role) is unique, and households collide', () => {
+    expect(CHILD_TABLES.find((child) => child.table === 'soft_credits')?.uniqueWith).toEqual([
+      'donation_id',
+      'role',
+    ])
   })
 
   it('repoints the links that point back at a contact', () => {
     expect(REFERRING_COLUMNS.map((ref) => `${ref.table}.${ref.column}`)).toEqual([
       'contacts.introduced_by_id',
       'households.primary_contact_id',
+      'tributes.honoree_contact_id',
+      'tributes.acknowledgee_contact_id',
     ])
   })
 

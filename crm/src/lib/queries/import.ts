@@ -25,8 +25,10 @@ import {
   fillBlanksPatch,
   matchFund,
   planBatchUndo,
+  undoCutoff,
   type PlanInput,
   type UndoCandidate,
+  type UndoChild,
   type UndoPlan,
 } from '../../features/import/plan'
 import type { CommitPlan, FundRow, ImportBatchRow, NormalisedRow } from '../../features/import/types'
@@ -280,9 +282,17 @@ export function useCommitImport() {
 
       const contactsCreated = createdIds.filter(Boolean).length
 
+      // `completed_at` closes the run. Everything the database writes back
+      // *after* this instant is somebody's own work; everything before it is
+      // the import's own echo (the 08 §7 thank-you tasks a gift insert fires).
+      // The undo rule reads it — see `undoCutoff`.
       const { data: finalBatch } = await supabase
         .from('import_batches')
-        .update({ contact_count: contactsCreated, donation_count: giftsCreated })
+        .update({
+          contact_count: contactsCreated,
+          donation_count: giftsCreated,
+          completed_at: new Date().toISOString(),
+        })
         .eq('id', batch.id)
         .select('*')
         .single()
@@ -311,8 +321,22 @@ export function useCommitImport() {
 
 /* ------------------------------------------------------------------- undo */
 
-/** Read back what a batch created and decide what is still safe to remove. */
+/**
+ * Read back what a batch created and decide what is still safe to remove.
+ *
+ * The subtlety is that a child row on an imported contact is not by itself
+ * evidence that somebody has used the record: the gift inserts fire 08 §7's
+ * automation, which writes a thank-you task and sometimes a signal against the
+ * contact the import has only just created. So children are judged **by when
+ * they appeared**, against the batch's own finish time (`undoCutoff`) — before
+ * it, the import's own echo; after it, somebody's work. The automation rows
+ * are then handed back for deletion, because the FKs from `tasks` and
+ * `signals` are `no action` and would otherwise block the contact delete.
+ */
 export async function fetchUndoPlan(batchId: string): Promise<UndoPlan> {
+  const batches = await selectRows<ImportBatchRow>('import_batches', (q) => q.eq('id', batchId).limit(1))
+  const batch = batches[0] ?? null
+
   const contacts = await selectRows<ContactRow & { created_at: string; updated_at: string }>(
     'contacts',
     (q) => q.eq('import_batch', batchId),
@@ -320,25 +344,61 @@ export async function fetchUndoPlan(batchId: string): Promise<UndoPlan> {
   const donations = await selectRows<{ id: string }>('donations', (q) => q.eq('import_batch', batchId))
   const contactIds = contacts.map((c) => c.id)
 
-  // "Used since" = anything hanging off the contact that this batch did not
-  // create. Counted per table because a contact with one logged call is no
-  // longer a spreadsheet row (11 §7).
+  const cutoff = batch
+    ? undoCutoff(batch)
+    : // No batch row to measure from: fall back to the newest contact the batch
+      // created, which is the last thing it is known to have written.
+      Math.max(
+        ...contacts.map((c) => Date.parse(c.created_at)).filter((t) => Number.isFinite(t)),
+        Date.now(),
+      )
+
+  const since = (value: string | null | undefined): boolean => {
+    const at = Date.parse(value ?? '')
+    return Number.isFinite(at) && at > cutoff
+  }
+
+  // "Used since" = anything hanging off the contact that appeared after the
+  // batch settled. A contact with one logged call is no longer a spreadsheet
+  // row (11 §7); a contact with only its own auto-generated thank-you still is.
   const foreign = new Map<string, number>()
   const bump = (id: string) => foreign.set(id, (foreign.get(id) ?? 0) + 1)
 
+  const autoTasks: UndoChild[] = []
+  const autoSignals: UndoChild[] = []
+
   if (contactIds.length > 0) {
     for (const part of chunk(contactIds)) {
-      const [interactions, tasks, notes, otherGifts] = await Promise.all([
-        selectRows<{ contact_id: string }>('interactions', (q) => q.in('contact_id', part)),
-        selectRows<{ contact_id: string }>('tasks', (q) => q.in('contact_id', part)),
-        selectRows<{ contact_id: string }>('notes', (q) => q.in('contact_id', part)),
+      const [interactions, tasks, notes, signals, otherGifts] = await Promise.all([
+        selectRows<{ contact_id: string; created_at: string }>('interactions', (q) =>
+          q.in('contact_id', part),
+        ),
+        selectRows<{ id: string; contact_id: string; created_at: string }>('tasks', (q) =>
+          q.in('contact_id', part),
+        ),
+        selectRows<{ contact_id: string; created_at: string }>('notes', (q) => q.in('contact_id', part)),
+        selectRows<{ id: string; contact_id: string; created_at: string }>('signals', (q) =>
+          q.in('contact_id', part),
+        ),
         selectRows<{ contact_id: string; import_batch: string | null }>('donations', (q) =>
           q.in('contact_id', part),
         ),
       ])
-      for (const row of interactions) bump(row.contact_id)
-      for (const row of tasks) bump(row.contact_id)
-      for (const row of notes) bump(row.contact_id)
+
+      for (const row of interactions) if (since(row.created_at)) bump(row.contact_id)
+      for (const row of notes) if (since(row.created_at)) bump(row.contact_id)
+
+      for (const row of tasks) {
+        if (since(row.created_at)) bump(row.contact_id)
+        else autoTasks.push({ id: row.id, contact_id: row.contact_id })
+      }
+      for (const row of signals) {
+        if (since(row.created_at)) bump(row.contact_id)
+        else autoSignals.push({ id: row.id, contact_id: row.contact_id })
+      }
+
+      // Money is judged by stamp rather than by clock: a gift this batch did
+      // not create is somebody else's record whenever it arrived.
       for (const row of otherGifts) if (row.import_batch !== batchId) bump(row.contact_id)
     }
   }
@@ -352,7 +412,12 @@ export async function fetchUndoPlan(batchId: string): Promise<UndoPlan> {
     foreignChildren: foreign.get(c.id) ?? 0,
   }))
 
-  return planBatchUndo(batchId, candidates, donations.map((d) => d.id))
+  return planBatchUndo(
+    batchId,
+    candidates,
+    donations.map((d) => d.id),
+    { tasks: autoTasks, signals: autoSignals },
+  )
 }
 
 export function useUndoPlan(batchId: string | null): UseQueryResult<UndoPlan> {
@@ -373,9 +438,12 @@ export interface UndoResult {
 /**
  * Undo a whole batch (06 §5's "one-click undo of the whole batch").
  *
- * Gifts go first — a contact with a gift still attached cannot be deleted, and
- * deleting the gift first is also the honest order: the money row is the one
- * the import invented, the person may since have become real.
+ * The order is forced by the foreign keys, all of which are `no action`:
+ * nothing may still point at a contact when it is deleted. So gifts first (the
+ * money row is the one the import invented), then the automation the import
+ * provoked, then the contacts themselves. Deleting the gift before the task it
+ * caused is also the honest order — the thank-you exists only because of a
+ * gift that is about to stop existing.
  */
 export function useUndoBatch() {
   const client = useQueryClient()
@@ -390,6 +458,19 @@ export function useUndoBatch() {
         const { error } = await supabase.from('donations').delete().in('id', part)
         if (error) problems.push(`Some gifts could not be removed: ${(error as Failed).message}`)
         else giftsDeleted += part.length
+      }
+
+      // The 08 §7 rows the import's own writes fired, on contacts that are
+      // going. Not counted in the result: they are the import's shadow, and
+      // reporting "5 contacts, 4 gifts and 6 tasks removed" would invite the
+      // reader to think the wizard had deleted somebody's work.
+      for (const part of chunk(plan.deleteTaskIds)) {
+        const { error } = await supabase.from('tasks').delete().in('id', part)
+        if (error) problems.push(`Some auto-created tasks could not be removed: ${(error as Failed).message}`)
+      }
+      for (const part of chunk(plan.deleteSignalIds)) {
+        const { error } = await supabase.from('signals').delete().in('id', part)
+        if (error) problems.push(`Some nudges could not be removed: ${(error as Failed).message}`)
       }
 
       for (const part of chunk(plan.deleteContactIds)) {

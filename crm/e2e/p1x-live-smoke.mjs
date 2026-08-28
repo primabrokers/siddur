@@ -15,6 +15,10 @@
  *
  * The five rows use names no real donor would carry, so a failure part-way
  * through leaves something obvious to find rather than something plausible.
+ * They are also deliberately unalike *each other*: an earlier version gave all
+ * five the same first name, and the within-file dedupe pass — correctly — held
+ * four of them for review, so the run only ever committed one row and the undo
+ * it was meant to exercise barely had anything to undo.
  */
 
 import { chromium } from 'playwright-core'
@@ -30,11 +34,11 @@ const PASSWORD = process.env.E2E_PASSWORD ?? 'YeshivaCrm-demo1'
 
 const SHEET = [
   'First Name,Surname,E-mail Address,Mobile,Town,Amount,Date Given,Fund',
-  'Zzsmoke,Alphatest,zz.alpha@import-smoke.invalid,07700 900801,Hendon,120,04/03/2024,General',
-  'Zzsmoke,Betatest,zz.beta@import-smoke.invalid,07700 900802,Edgware,240,05/03/2024,General',
-  'Zzsmoke,Gammatest,zz.gamma@import-smoke.invalid,07700 900803,Manchester,,,',
-  'Zzsmoke,Deltatest,zz.delta@import-smoke.invalid,07700 900804,London,60,06/03/2024,General',
-  'Zzsmoke,Epsilontest,zz.epsilon@import-smoke.invalid,07700 900805,Leeds,90,07/03/2024,General',
+  'Qwixby,Alphatest,zz.alpha@import-smoke.invalid,07700 900801,Hendon,120,04/03/2024,General',
+  'Vurnok,Betatest,zz.beta@import-smoke.invalid,07700 900802,Edgware,240,05/03/2024,General',
+  'Jandrel,Gammatest,zz.gamma@import-smoke.invalid,07700 900803,Manchester,,,',
+  'Pilquist,Deltatest,zz.delta@import-smoke.invalid,07700 900804,London,60,06/03/2024,General',
+  'Zorbeth,Epsilontest,zz.epsilon@import-smoke.invalid,07700 900805,Leeds,90,07/03/2024,General',
 ].join('\n')
 
 const log = (...args) => console.log('[p1x-live]', ...args)

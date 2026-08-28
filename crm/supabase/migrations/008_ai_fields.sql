@@ -5,13 +5,17 @@
 -- `send-digest`) need on the database side. Additive only: no existing column,
 -- policy, view or trigger is altered.
 --
--- Three things land here:
+-- Four things land here:
 --   1. contacts.holding_line / holding_line_at — the "Where we're holding" line
 --      (04 §5.8), maintained by donor-brief.
 --   2. ai_briefs — the per-viewer brief cache (09 §3 "cached until a new
 --      interaction lands"), invalidated by a trigger, not by a client.
 --   3. digest_log — what the morning digest actually said and how it left the
---      building (08 §6), plus the hourly pg_cron tick that fires it.
+--      building (08 §6), plus the hourly tick that fires it.
+--   4. The 005_function_hardening pass over everything §1–§3 creates. Postgres
+--      grants EXECUTE on new functions to PUBLIC, and this project's default
+--      ACL hands anon/authenticated EXECUTE on every new `public` function, so
+--      each function created here is revoked explicitly (lints 0028/0029).
 -- ============================================================================
 
 
@@ -37,6 +41,10 @@
 -- the "Drafted with AI" chip until a human accepts it, at which point the chip
 -- becomes "Reviewed". Acceptance is recorded in `ai_activity_log`, not here,
 -- so the column stays a plain value with no review state to keep in sync.
+--
+-- No new policy is needed: `contacts_upd` already restricts writes to
+-- admin/fundraiser, so a viewer's brief simply cannot rewrite the line — which
+-- is the correct outcome, not a bug to work around.
 
 alter table public.contacts
   add column if not exists holding_line     text,
@@ -189,7 +197,9 @@ create policy digest_log_sel on public.digest_log
   using (public.crm_is_member() and (team_member_id = auth.uid() or public.crm_role() = 'admin'));
 
 revoke all on public.digest_log from anon;
+revoke insert, update, delete on public.digest_log from authenticated;
 grant select on public.digest_log to authenticated;
+grant select, insert, update, delete on public.digest_log to service_role;
 
 
 -- ---------------------------------------------------------------------------
@@ -217,7 +227,8 @@ grant select on public.digest_log to authenticated;
 -- Edge Functions → send-digest → Schedules with the cron expression `0 * * * *`,
 -- which invokes the function over HTTPS with a platform-managed token and needs
 -- neither pg_net nor the Vault secrets above. Nothing here fakes a schedule:
--- `crm_digest_tick()` raises a notice and returns when it cannot actually POST.
+-- `crm_digest_tick()` raises a notice and returns `no_pg_net` / `no_secrets`
+-- when it cannot actually POST, and that string is what the cron run records.
 
 do $$
 begin
@@ -284,3 +295,29 @@ exception when others then
   raise notice '[008] could not schedule crm-digest (%): use the dashboard schedule instead.', sqlerrm;
 end;
 $$;
+
+
+-- ---------------------------------------------------------------------------
+-- 5. Function hardening (the 005_function_hardening pattern)
+-- ---------------------------------------------------------------------------
+-- PostgREST exposes every `public` function as /rest/v1/rpc/<name>, and this
+-- project's default ACL grants EXECUTE on new functions to anon, authenticated
+-- and service_role. Neither function created above is part of any caller's
+-- surface:
+--
+--   ai_briefs_mark_stale()  is a trigger function. A trigger's privilege check
+--                           happens when the trigger is created, not when it
+--                           fires, so revoking EXECUTE costs nothing and closes
+--                           an RPC that would let any signed-in user stale
+--                           every cached brief in the database.
+--   crm_digest_tick()       is called by pg_cron as `postgres` (the owner, which
+--                           needs no grant). Left executable it would be an
+--                           unauthenticated-ish "send everyone's digest now"
+--                           button, and it reads Vault secrets under SECURITY
+--                           DEFINER — precisely the shape 005 exists to close.
+--
+-- Nothing here is granted back to service_role: the send-digest function calls
+-- the REST API, not this RPC.
+
+revoke all on function public.ai_briefs_mark_stale() from public, anon, authenticated, service_role;
+revoke all on function public.crm_digest_tick()      from public, anon, authenticated, service_role;

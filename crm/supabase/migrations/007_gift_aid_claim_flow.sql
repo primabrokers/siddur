@@ -16,9 +16,65 @@
 --                              (I-8/I-9)
 --   * `ga_missing_declarations` the found-money queue and the 4-year back-claim
 --                              figure, per donor
+--   * `donations.ga_excluded_at`  the Review & export "exclude this gift" fix
+--   * `gift_aid_claims.paid_on`   when HMRC actually paid (the history's PAID pill)
 --
--- Everything here is additive: no existing table, trigger or policy changes.
+-- Everything here is additive: no existing table, trigger, view or policy is
+-- redefined. The two new donations columns arrive with a *second* BEFORE
+-- trigger (`trg_ga_exclusion_before`) rather than an edit to
+-- `donations_before_write`; Postgres fires row triggers of the same event in
+-- name order, and `trg_ga_exclusion_before` sorts after `trg_donations_before`,
+-- so it gets the last word on `gift_aid_claim_id` without touching M4's code.
 -- ============================================================================
+
+-- --------------------------------------------------------------------------
+-- Two fields spec 02 §3.7 does not name but 05 §5 needs (deviation, declared):
+--
+--   * `donations.ga_excluded_at` — the Review & export validation list offers
+--     "exclude this gift" as a one-click fix for a row that cannot be claimed
+--     (non-GBP, a donor who will never declare). Without a stored flag the
+--     rolling-claim trigger simply re-attaches the gift on the next write.
+--   * `gift_aid_claims.paid_on` — the claim history's "PAID 21 Jul" pill in the
+--     A7 wireframe. `status = 'paid'` alone cannot render the date.
+-- --------------------------------------------------------------------------
+
+alter table public.donations
+  add column if not exists ga_excluded_at   timestamptz,
+  add column if not exists ga_exclude_reason text;
+
+comment on column public.donations.ga_excluded_at is
+  'Held back from Gift Aid claiming by a human (05 §5 Review & export). Detaches the gift from the rolling claim until cleared.';
+
+alter table public.gift_aid_claims
+  add column if not exists paid_on date;
+
+comment on column public.gift_aid_claims.paid_on is
+  'Date HMRC paid the claim — the claim history''s PAID pill (05 §5, artboard A7).';
+
+create or replace function public.ga_exclusion_before_write()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  -- Runs after donations_before_write (name order). A held-back gift leaves the
+  -- rolling claim; a claim already filed is never disturbed.
+  if new.ga_excluded_at is not null and new.gift_aid_status is distinct from 'claimed' then
+    if new.gift_aid_claim_id is not null and exists (
+      select 1 from public.gift_aid_claims c
+      where c.id = new.gift_aid_claim_id and c.status in ('draft-rolling', 'ready')
+    ) then
+      new.gift_aid_claim_id := null;
+    end if;
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists trg_ga_exclusion_before on public.donations;
+create trigger trg_ga_exclusion_before
+  before insert or update on public.donations
+  for each row execute function public.ga_exclusion_before_write();
 
 -- --------------------------------------------------------------------------
 -- HMRC "House name or number" (05 §5 CSV column 4).
@@ -107,7 +163,9 @@ as $$
   with lines as (
     select
       d.id, d.contact_id, d.donated_on, d.amount_gbp, d.currency,
-      btrim(concat_ws(' ', c.title, c.first_name, nullif(c.last_name, '')))          as donor_name,
+      coalesce(
+        nullif(btrim(concat_ws(' ', c.title, c.first_name, nullif(c.last_name, ''))), ''),
+        c.organization)                                                              as donor_name,
       c.contact_kind, c.postcode,
       public.ga_house_number(c.ga_house_no, c.address_line1)                         as house_no
     from public.donations d
@@ -205,6 +263,7 @@ begin
      and d.status = 'received'
      and upper(coalesce(d.currency, 'GBP')) = 'GBP'
      and d.gift_aid_claim_id is null
+     and d.ga_excluded_at is null
      and d.donated_on > v_period_start
      and d.donated_on <= current_date;
 
@@ -259,6 +318,7 @@ select
   c.status,
   c.created_at::date                        as building_since,
   c.submitted_on,
+  c.paid_on,
   c.hmrc_reference,
   coalesce(
     case when c.status in ('submitted', 'paid') then c.total_donations end,
@@ -281,6 +341,7 @@ select
     + (select coalesce(sum(d.amount_gbp), 0) from public.donations d
         where d.gift_aid_claim_id is null and d.status = 'received'
           and coalesce(d.is_gasds, false)
+          and d.ga_excluded_at is null
           and upper(coalesce(d.currency, 'GBP')) = 'GBP'
           and d.donated_on <= current_date
           and d.donated_on > coalesce(
@@ -319,6 +380,7 @@ select
 from public.donations d
 where d.gift_aid_status = 'pending_declaration'
   and d.status = 'received'
+  and d.ga_excluded_at is null
   and upper(coalesce(d.currency, 'GBP')) = 'GBP'
 group by d.contact_id;
 

@@ -246,7 +246,10 @@ $fn$;
 comment on function public.run_rfm(boolean) is
   'RFM quintiles -> the six persona tags in category rfm_auto (02 §4.5). Replace-on-recompute, idempotent; previous counts parked in automation_rules(rfm_state).';
 
-revoke all on function public.run_rfm(boolean) from public, anon;
+-- Hardened exactly like `run_nightly()` (005_function_hardening): a signed-in
+-- user must not be able to fire a job that rewrites the tag graph. pg_cron runs
+-- it as `postgres`; a human runs it with the service role.
+revoke all on function public.run_rfm(boolean) from public, anon, authenticated;
 grant execute on function public.run_rfm(boolean) to service_role;
 
 -- The rule row the function reads, and the benchmark figures the retention
@@ -516,7 +519,10 @@ returns table (
   donors_with_declaration int, donor_count int,
   eligible_gift_count int, pending_gift_count int)
 language sql stable security definer set search_path = public, pg_temp as $$
-  with claimed as (
+  -- CTE names deliberately differ from the OUT parameter names (`claimed`,
+  -- `recoverable`): a SQL function body can reference either, and a collision
+  -- resolves to whichever Postgres finds first.
+  with ga_claimed as (
     select coalesce(sum(c.total_claimed), 0)::numeric(14,2) as amount
     from public.gift_aid_claims c
     where c.status in ('submitted', 'paid')
@@ -542,12 +548,12 @@ language sql stable security definer set search_path = public, pg_temp as $$
     where d.status = 'received' and d.currency = 'GBP' and c.contact_kind = 'individual'
   )
   select
-    claimed.amount,
+    ga_claimed.amount,
     round(outstanding.eligible_amount * 0.25, 2),
     case when cover.donors > 0 then round(cover.declared::numeric * 100 / cover.donors, 1) end,
     cover.declared, cover.donors,
     outstanding.eligible_gifts, outstanding.pending_gifts
-  from claimed, outstanding, cover;
+  from ga_claimed, outstanding, cover;
 $$;
 
 -- --------------------------------------------------------------------------

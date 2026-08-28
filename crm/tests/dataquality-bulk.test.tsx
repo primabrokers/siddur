@@ -125,7 +125,8 @@ describe('describeBulk', () => {
   it('says what will happen, in the plural the count needs', () => {
     expect(describeBulk('tag', 40, 'VIP')).toBe('Adds the tag "VIP" to 40 contacts.')
     expect(describeBulk('task', 1, 'Call before Yom Tov')).toBe(
-      'Creates one task ("Call before Yom Tov") for each of 1 contact — 1 tasks in all.',
+      'Creates one task ("Call before Yom Tov") for each of 1 contact — 1 tasks in all, ' +
+        'queued rather than dated, so each can be given a day of its own.',
     )
     expect(describeBulk('priority', 3, 'high')).toBe('Sets priority to high on 3 contacts.')
   })
@@ -216,6 +217,20 @@ describe('the contacts list', () => {
       expect(created).toHaveLength(2)
       // Every task carries its own contact — never one task about two people.
       expect(new Set(created.map((t) => t.contact_id)).size).toBe(2)
+      /*
+       * …and every one of them satisfies the two check constraints on `tasks`,
+       * which the in-memory stand-in does not enforce and the live database
+       * very much does:
+       *
+       *   check (status in ('todo','in_progress','waiting','queued','done','cancelled'))
+       *   check (status = 'queued' or due_on is not null)
+       *
+       * The sheet has no date field, so a dateless task must be a queued one.
+       */
+      for (const task of created) {
+        expect(task.status).toBe('queued')
+        expect(task.due_on ?? null).toBeNull()
+      }
     })
   })
 

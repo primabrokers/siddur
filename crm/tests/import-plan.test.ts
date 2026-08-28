@@ -12,10 +12,12 @@ import {
   buildCommitPlan,
   describeUndo,
   fillBlanksPatch,
+  IMPORT_SETTLE_MS,
   matchFund,
   planBatchUndo,
   summarySentence,
   undoAvailable,
+  undoCutoff,
   UNTOUCHED_MS,
 } from '../src/features/import/plan'
 import { normalisePreview } from '../src/features/import/normalisePreview'
@@ -280,6 +282,77 @@ describe('planBatchUndo', () => {
     )
     expect(describeUndo(plan)).toBe('Removes 1 contact and 1 gift; 1 kept because they have been used since.')
   })
+
+  /*
+   * The regression this whole mechanism exists for. Importing a gift fires
+   * 08 §7's `donations_after_write`, which writes an `auto:thank_you` task
+   * against the contact the import has just created. The first live run read
+   * that back as "activity since the import" and undid nothing at all.
+   */
+  it('hands back the automation rows on contacts that are going', () => {
+    const plan = planBatchUndo(
+      'batch-1',
+      [candidate({ id: 'a' }), candidate({ id: 'b' })],
+      ['g1'],
+      {
+        tasks: [
+          { id: 'thank-a', contact_id: 'a' },
+          { id: 'thank-b', contact_id: 'b' },
+        ],
+        signals: [{ id: 'first-gift-a', contact_id: 'a' }],
+      },
+    )
+    expect(plan.deleteContactIds).toEqual(['a', 'b'])
+    expect(plan.deleteTaskIds).toEqual(['thank-a', 'thank-b'])
+    expect(plan.deleteSignalIds).toEqual(['first-gift-a'])
+  })
+
+  it('leaves the automation rows of a contact it is keeping exactly where they are', () => {
+    const plan = planBatchUndo(
+      'batch-1',
+      [candidate({ id: 'a' }), candidate({ id: 'kept', foreignChildren: 1 })],
+      [],
+      {
+        tasks: [
+          { id: 'thank-a', contact_id: 'a' },
+          { id: 'thank-kept', contact_id: 'kept' },
+        ],
+        signals: [{ id: 'sig-kept', contact_id: 'kept' }],
+      },
+    )
+    expect(plan.deleteContactIds).toEqual(['a'])
+    expect(plan.deleteTaskIds).toEqual(['thank-a'])
+    expect(plan.deleteSignalIds).toEqual([])
+  })
+
+  it('defaults the automation lists to empty when none are passed', () => {
+    const plan = planBatchUndo('batch-1', [candidate({ id: 'a' })], [])
+    expect(plan.deleteTaskIds).toEqual([])
+    expect(plan.deleteSignalIds).toEqual([])
+  })
+})
+
+describe('undoCutoff', () => {
+  const at = (iso: string) => Date.parse(iso)
+
+  it('measures from when the run finished, plus the settle window', () => {
+    expect(
+      undoCutoff({ created_at: '2026-08-01T10:00:00Z', completed_at: '2026-08-01T10:04:00Z' }),
+    ).toBe(at('2026-08-01T10:04:00Z') + IMPORT_SETTLE_MS)
+  })
+
+  it('falls back to the start of the run for a batch written before the column existed', () => {
+    expect(undoCutoff({ created_at: '2026-08-01T10:00:00Z', completed_at: null })).toBe(
+      at('2026-08-01T10:00:00Z') + IMPORT_SETTLE_MS,
+    )
+  })
+
+  it('puts a thank-you task fired seconds after the commit on the import’s side of the line', () => {
+    const cutoff = undoCutoff({ created_at: '2026-08-01T10:00:00Z', completed_at: '2026-08-01T10:00:02Z' })
+    expect(at('2026-08-01T10:00:03Z')).toBeLessThan(cutoff)
+    // …while a call logged the next morning is plainly somebody's own work.
+    expect(at('2026-08-02T09:00:00Z')).toBeGreaterThan(cutoff)
+  })
 })
 
 describe('undoAvailable', () => {
@@ -291,6 +364,7 @@ describe('undoAvailable', () => {
     contact_count: 5,
     donation_count: 0,
     status: 'committed',
+    completed_at: null,
     undone_at: null,
     ...over,
   })

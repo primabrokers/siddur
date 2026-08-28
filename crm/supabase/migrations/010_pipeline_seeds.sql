@@ -13,8 +13,10 @@
 --    (Deviation from 02 §3.9, declared here per CLAUDE.md.)
 -- 2. `opportunity_stage.meta.rot_days` — the per-stage idle threshold the board
 --    shades cards by (06 §2 "Rotting", ▸ Pipedrive). The exit-criteria half of
---    the same meta was seeded in 004; this re-asserts it (jsonb merge, so an
---    admin's edited wording survives) and adds the rot threshold beside it.
+--    the same meta was seeded in 004; this adds the rot threshold beside it.
+--    Both keys are admin-editable inline on the column header (I-6), so the
+--    merge is written seed-first / stored-last: a replay fills in a key that is
+--    missing and leaves every value an admin has since changed alone.
 --    Values follow Pipeline.dc.html: qualified 30d · cultivating 45d ·
 --    solicited 14d. Pledged and stewarding carry none — a pledge being paid
 --    down is not idle — and the header simply omits the "· rot Nd" clause.
@@ -35,7 +37,8 @@ comment on column public.opportunities.lost_reason is
 
 -- --------------------------------------------------------------------------
 -- 2. Per-stage exit criteria + rot thresholds
---    `meta || new` keeps any key an admin added; the two keys below win.
+--    `new || stored` keeps every key an admin added *and* every value they
+--    edited; the seeds below only fill the gaps.
 -- --------------------------------------------------------------------------
 
 with stage_meta (value, label, sort_order, exit_criteria, rot_days) as (
@@ -58,7 +61,7 @@ select
   )
 from stage_meta s
 on conflict (list_name, value) do update
-  set meta = coalesce(public.lookup_options.meta, '{}'::jsonb) || excluded.meta;
+  set meta = excluded.meta || coalesce(lookup_options.meta, '{}'::jsonb);
 
 -- --------------------------------------------------------------------------
 -- 3. Lost reasons (06 §2 → the win/loss half of the conversion report)
