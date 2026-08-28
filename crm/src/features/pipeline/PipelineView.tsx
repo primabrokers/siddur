@@ -22,6 +22,7 @@ import { OpportunitySheet } from './OpportunitySheet'
 import { OutcomeZones, type OutcomeZone } from './OutcomeZones'
 import { StageColumn } from './StageColumn'
 import { StalePanel } from './StalePanel'
+import { WonDialog } from './WonDialog'
 import {
   buildCards,
   filterByScope,
@@ -418,12 +419,4 @@ export function PipelineView() {
       />
     </div>
   )
-}
-
-/* The won prompt is imported lazily-shaped this way purely to keep the main
-   component's import list readable; it is an ordinary component. */
-import { WonDialog } from './WonDialog'
-
-function WonDialogHost(props: Parameters<typeof WonDialog>[0]) {
-  return <WonDialog {...props} />
 }
