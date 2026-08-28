@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { Link } from 'react-router'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useSearchParams } from 'react-router'
 import {
   Button,
   EmptyState,
@@ -99,6 +99,20 @@ export function GivingView() {
   const [cancelPledge, setCancelPledge] = useState<PledgeRow | null>(null)
   const [cancelRecurring, setCancelRecurring] = useState<RecurringAgreementRow | null>(null)
   const [exportOpen, setExportOpen] = useState(false)
+
+  // Entry points from the command palette / deep links: /giving?tab=…&new=gift|pledge
+  const [searchParams, setSearchParams] = useSearchParams()
+  useEffect(() => {
+    const tabParam = searchParams.get('tab')
+    const newParam = searchParams.get('new')
+    if (!tabParam && !newParam) return
+    if (tabParam && ['gifts', 'thanks', 'receipts', 'pledges', 'recurring'].includes(tabParam)) {
+      setTab(tabParam as GivingTab)
+    }
+    if (newParam === 'gift') setGiftOpen(true)
+    if (newParam === 'pledge') setPledgeOpen(true)
+    setSearchParams({}, { replace: true })
+  }, [searchParams, setSearchParams])
 
   const data = board.data ?? EMPTY_BOARD
   const readOnly = member.data?.role === 'viewer'
