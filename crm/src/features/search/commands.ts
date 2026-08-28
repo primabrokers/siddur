@@ -127,6 +127,20 @@ export const COMMANDS: Command[] = [
     run: (ctx) => ctx.navigate('/tasks'),
   },
   {
+    id: 'go.giftaid',
+    label: 'Go to Gift Aid',
+    group: 'navigate',
+    keywords: ['declarations', 'hmrc', 'claim', 'ga'],
+    run: (ctx) => ctx.navigate('/gift-aid'),
+  },
+  {
+    id: 'go.import',
+    label: 'Import contacts',
+    group: 'navigate',
+    keywords: ['csv', 'spreadsheet', 'upload', 'migrate'],
+    run: (ctx) => ctx.navigate('/import'),
+  },
+  {
     id: 'go.settings',
     label: 'Go to Settings',
     group: 'navigate',

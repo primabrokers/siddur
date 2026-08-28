@@ -10,6 +10,8 @@ import { ContactDetailRoute } from './routes/ContactDetail'
 import { ContactsRoute } from './routes/Contacts'
 import { GivingRoute } from './routes/Giving'
 import { NotFoundRoute } from './routes/NotFound'
+import { GiftAidRoute } from './routes/GiftAid'
+import { ImportRoute } from './routes/Import'
 import { PipelineRoute } from './routes/Pipeline'
 import { ReportsRoute } from './routes/Reports'
 import { SettingsRoute } from './routes/Settings'
@@ -49,6 +51,8 @@ export function AppRoutes() {
         <Route path="contacts/:id" element={<ContactDetailRoute />} />
         <Route path="giving" element={<GivingRoute />} />
         <Route path="pipeline" element={<PipelineRoute />} />
+        <Route path="gift-aid" element={<GiftAidRoute />} />
+        <Route path="import" element={<ImportRoute />} />
         <Route path="reports" element={<ReportsRoute />} />
         <Route path="settings" element={<SettingsRoute />} />
         <Route path="*" element={<NotFoundRoute />} />
