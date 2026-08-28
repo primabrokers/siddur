@@ -1,5 +1,7 @@
-import { SectionLabel } from '../../components'
+import { useState } from 'react'
+import { Button, SectionLabel } from '../../components'
 import { cn } from '../../lib/cn'
+import { AI_NOTICE, useDigestPreview, type AiCallError } from '../../lib/queries/ai'
 import {
   AI_FEATURES_KEY,
   readAiFeatures,
@@ -55,6 +57,8 @@ const AI_FUNCTIONS = [
 export function AiTab({ readOnly }: AiTabProps) {
   const rules = useAutomationRules()
   const update = useUpdateAutomationRule()
+  const [previewing, setPreviewing] = useState(false)
+  const digest = useDigestPreview(previewing)
 
   const stored = readAiFeatures(rules.data)
   const hasRow = (rules.data ?? []).some((rule) => rule.rule_key === AI_FEATURES_KEY)
@@ -126,6 +130,36 @@ export function AiTab({ readOnly }: AiTabProps) {
           they could not open for themselves (11 §2). <code>send-digest</code> is the exception and runs as
           the scheduler, which is why it carries no amounts at all.
         </p>
+
+        {/* A preview writes nothing and sends nothing — it must not consume the
+            member's once-a-day digest slot (08 §6). */}
+        <Button variant="outline" size="sm" className="self-start" onClick={() => setPreviewing(true)}>
+          Preview today’s digest
+        </Button>
+        {previewing ? (
+          <div className="rounded-card border border-border bg-surface px-4 py-3 text-[12.5px]">
+            {digest.isFetching ? <p className="text-muted">Composing…</p> : null}
+            {digest.error ? (
+              <p role="alert" className="text-muted">
+                {AI_NOTICE[(digest.error as AiCallError).failure]}
+              </p>
+            ) : null}
+            {digest.data ? (
+              <>
+                <p className="font-semibold">{digest.data.subject}</p>
+                {digest.data.narrative_available ? null : (
+                  <p className="mt-1 text-faint">
+                    No model key, so the digest goes out without its opening sentence — the numbers below are
+                    the database’s.
+                  </p>
+                )}
+                <pre className="mt-2 max-h-[220px] overflow-auto text-[11.5px] leading-[1.5] whitespace-pre-wrap text-nav">
+                  {digest.data.body_text}
+                </pre>
+              </>
+            ) : null}
+          </div>
+        ) : null}
       </section>
 
       <section className="flex flex-col gap-2">
