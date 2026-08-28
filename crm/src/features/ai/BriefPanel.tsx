@@ -39,7 +39,13 @@ export interface BriefPanelProps {
 export function BriefPanel({ contactId, contactName, timelineCount }: BriefPanelProps) {
   const featureOn = useAiFeature('daily_brief')
   const [asked, setAsked] = useState(false)
-  const [label, setLabel] = useState<AiLabelState>('ai')
+  /**
+   * `null` = nobody has said anything *in this session*, so the ledger's answer
+   * stands. Once a person acts here, their verdict wins — otherwise a
+   * regenerate would be re-labelled "Reviewed" by a resolution that belongs to
+   * the previous words.
+   */
+  const [label, setLabel] = useState<AiLabelState | null>(null)
 
   const brief = useDonorBrief({ contactId, enabled: asked && featureOn })
   const regenerate = useRegenerateBrief()
@@ -54,10 +60,10 @@ export function BriefPanel({ contactId, contactName, timelineCount }: BriefPanel
 
   // A brief already accepted in an earlier session opens as Reviewed; the state
   // machine takes over from there.
-  const state: AiLabelState = label === 'ai' && review.data?.reviewed ? 'reviewed' : label
+  const state: AiLabelState = label ?? (review.data?.reviewed ? 'reviewed' : 'ai')
 
   function verdict(event: 'accept' | 'reject') {
-    setLabel((current) => nextLabel(current, event))
+    setLabel(nextLabel(state, event))
     resolve.mutate({ aiActivityId: data?.ai_activity_id ?? null, event })
   }
 
@@ -109,7 +115,7 @@ export function BriefPanel({ contactId, contactName, timelineCount }: BriefPanel
       {data ? (
         <>
           {data.thin_file ? (
-            <p className="rounded-input bg-flag-today-bg px-[10px] py-[6px] text-[12px] text-flag-today-ink">
+            <p className="rounded-input bg-[#FCF0E3] px-[10px] py-[6px] text-[12px] text-flag-today-ink">
               Thin file — the brief says what little is on record rather than filling the gaps.
             </p>
           ) : null}
@@ -147,7 +153,7 @@ export function BriefPanel({ contactId, contactName, timelineCount }: BriefPanel
               variant="ghost"
               disabled={busy}
               onClick={() => {
-                setLabel((current) => nextLabel(current, 'regenerate'))
+                setLabel(nextLabel(state, 'regenerate'))
                 regenerate.mutate({ contactId })
               }}
             >

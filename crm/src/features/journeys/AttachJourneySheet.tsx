@@ -133,7 +133,7 @@ export function AttachJourneySheet({
                   key={row.step.id}
                   className="flex items-baseline gap-3 rounded-input bg-row px-[10px] py-2"
                 >
-                  <span className="w-[68px] shrink-0 text-[12px] font-semibold text-nav tabular-nums">
+                  <span className="w-[84px] shrink-0 text-[12px] font-semibold whitespace-nowrap text-nav tabular-nums">
                     {formatDate(row.dateISO)}
                   </span>
                   <span className="min-w-0 grow text-[13px] text-ink">

@@ -69,7 +69,7 @@ export function GiftAidCard({ giftAid, amountsHidden, onDrill }: GiftAidCardProp
         <DrillNumber
           label="Missing declarations"
           value={formatNumber(giftAid.pending_gift_count)}
-          title={`${formatNumber(giftAid.pending_gift_count)} received gifts are waiting on a declaration — open the donors to chase`}
+          title={`Missing declarations: ${formatNumber(giftAid.pending_gift_count)} received gifts are waiting on one — open the donors to chase`}
           onClick={() =>
             onDrill({ key: 'gift_aid_pending', title: 'Waiting on a declaration', year: null })
           }
@@ -77,7 +77,7 @@ export function GiftAidCard({ giftAid, amountsHidden, onDrill }: GiftAidCardProp
         <DrillNumber
           label="Eligible, unclaimed"
           value={formatNumber(giftAid.eligible_gift_count)}
-          title={`${formatNumber(giftAid.eligible_gift_count)} eligible gifts are not yet on a claim — open the donors`}
+          title={`Eligible, unclaimed: ${formatNumber(giftAid.eligible_gift_count)} gifts are not yet on a claim — open the donors`}
           onClick={() =>
             onDrill({ key: 'gift_aid_eligible', title: 'Eligible, not yet claimed', year: null })
           }

@@ -41,7 +41,7 @@ export function StageColumn({
   return (
     <section
       aria-label={`${stage.label} — ${cards.length} ${cards.length === 1 ? 'ask' : 'asks'}`}
-      className="flex w-[240px] shrink-0 flex-col gap-[10px]"
+      className="flex w-[228px] shrink-0 flex-col gap-[10px]"
     >
       <header className="flex flex-col gap-[2px] px-[2px]">
         <div className="flex items-baseline justify-between gap-2">

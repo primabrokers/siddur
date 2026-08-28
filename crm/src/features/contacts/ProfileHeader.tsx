@@ -24,6 +24,11 @@ export interface ProfileHeaderProps {
   introducedBy?: { id: string; name: string } | null
   tags?: TagRow[]
   giftAid?: GiftAidState | null
+  /**
+   * Opens the declaration sheet for this donor (05 §5 / 02 §3.7). Omitted for
+   * roles that may not record one, which hides the affordance entirely.
+   */
+  onNewDeclaration?: () => void
   /** `lookup_options` list `stage` — the pill edits in place (I-7 manual). */
   stageOptions?: LookupOption[]
   onStageChange?: (value: string) => void
@@ -79,6 +84,7 @@ export function ProfileHeader({
   introducedBy,
   tags = [],
   giftAid,
+  onNewDeclaration,
   stageOptions,
   onStageChange,
   actions,
@@ -240,12 +246,22 @@ export function ProfileHeader({
 
         <div className="hidden gap-[6px] lg:flex">
           <dt>Gift Aid</dt>
-          <dd>
+          <dd className="flex items-center gap-2">
             {gaOnFile ? (
               <b className="text-good">✓ {giftAid?.enduring ? 'enduring' : 'on file'}</b>
             ) : (
               <b className="text-muted">✗ none</b>
             )}
+            {/* Recording a declaration is the +25% moment (05 §5, M7). */}
+            {onNewDeclaration ? (
+              <button
+                type="button"
+                onClick={onNewDeclaration}
+                className="text-[12px] font-semibold text-accent hover:text-accent-dark"
+              >
+                New declaration
+              </button>
+            ) : null}
           </dd>
         </div>
 

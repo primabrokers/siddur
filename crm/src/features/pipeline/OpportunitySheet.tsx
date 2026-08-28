@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react'
 import { Button, Field, FieldGroup, Select, Sheet, TextArea, TextInput } from '../../components'
 import { formatMoney } from '../../lib/format'
 import { useGivingSelects } from '../../lib/queries/giving'
-import { ContactPicker } from '../tasks'
+// Deep imports on purpose: the barrels behind these two would drag the whole
+// tasks board into the sheet's module graph for one picker.
+import { ContactPicker } from '../tasks/ContactPicker'
 import { displayName } from '../contacts/normalise'
-import { defaultExpected, movePatch, num, STATUS_LABEL } from './logic'
-import { parseAmount } from '../giving/logic'
+import { defaultExpected, movePatch, num, parseAmount, STATUS_LABEL } from './logic'
 import type { ContactRow, OpportunityDraft, OpportunityRow, OpportunityStatus, PipelineStage } from './types'
 
 export interface OpportunitySheetProps {

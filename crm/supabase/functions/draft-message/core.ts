@@ -1,6 +1,6 @@
 // GENERATED MIRROR — do not edit.
-// Source: crm/src/features/ai/core.ts. The edge runtime cannot reach into src/,
-// so each function carries a byte-identical copy below the two header lines.
+// Source: crm/src/features/ai/core.ts. The Deno edge runtime cannot reach into
+// src/, so each function carries a byte-identical copy under this header.
 // tests/ai-core-mirror.test.ts fails the build the moment one drifts.
 /**
  * The pure core of M9a — the parts of the AI features that must be *decided*

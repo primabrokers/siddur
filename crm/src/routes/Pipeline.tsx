@@ -1,20 +1,21 @@
-import { EmptyState } from '../components'
-import { PageHeader } from '../features/shell/PageHeader'
+import { Suspense, lazy } from 'react'
 
 /**
- * Pipeline `[P2]` — moves management over `opportunities` (02 §3.9).
+ * Pipeline `[P2]` — moves management over `opportunities` (06 §2 · 02 §3.9).
+ * The screen itself lives in `features/pipeline`; this is the route seam.
  *
- * TODO(pipeline): kanban by stage with flagged cards, days-in-stage, stale
- * detection from `last_moved_forward_at`, and drag between stages.
+ * Loaded on demand: the board is a whole feature (columns, drag, four dialogs)
+ * that the daily loop never touches, and every other screen was paying for its
+ * module graph at import time.
  */
+const PipelineView = lazy(() =>
+  import('../features/pipeline/PipelineView').then((module) => ({ default: module.PipelineView })),
+)
+
 export function PipelineRoute() {
   return (
-    <>
-      <PageHeader title="Pipeline" subtitle="Moves management · phase 2" />
-      <EmptyState
-        title="The opportunity pipeline lands here"
-        hint="Asks as cards in stage columns, each carrying its flag, days in stage and projection — with stale prospects surfaced from last_moved_forward_at rather than enforced."
-      />
-    </>
+    <Suspense fallback={<p className="py-10 text-center text-[13px] text-muted">Loading the board…</p>}>
+      <PipelineView />
+    </Suspense>
   )
 }

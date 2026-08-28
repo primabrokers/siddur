@@ -17,10 +17,16 @@ import {
   useTeamMembers,
   useUpdateContact,
 } from '../../lib/queries/contacts'
+import { useCreateDeclaration, useDeleteDeclaration } from '../../lib/queries/giftaid'
 import { canEdit, useTeamMember } from '../auth/useTeamMember'
+import { BriefPanel, HoldingLine } from '../ai'
 import { useCapture } from '../capture/QuickCapture'
 import { MergeFromProfile } from '../dataquality'
 import { JourneysPanel } from '../journeys'
+// Deep import, not the barrel: the profile needs one sheet, not the whole board.
+import { NewOpportunityFromProfile } from '../pipeline/NewOpportunityFromProfile'
+import { DeclarationSheet } from '../giftaid/DeclarationSheet'
+import { declarationState } from '../giftaid/logic'
 import { ContactSheet } from './ContactSheet'
 import { DetailsTab } from './DetailsTab'
 import { GivingTab } from './GivingTab'
@@ -61,6 +67,9 @@ export function ContactProfile({ id }: { id: string }) {
   const [meetOpen, setMeetOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [mergeOpen, setMergeOpen] = useState(false)
+  const [opportunityOpen, setOpportunityOpen] = useState(false)
+  /** The +25% moment: record a Gift Aid declaration for this donor (05 §5). */
+  const [declarationOpen, setDeclarationOpen] = useState(false)
 
   const { openCapture } = useCapture()
   const teamMember = useTeamMember()
@@ -82,6 +91,8 @@ export function ContactProfile({ id }: { id: string }) {
   const update = useUpdateContact()
   const setPinned = useSetPinnedNote()
   const setArchived = useSetArchived()
+  const createDeclaration = useCreateDeclaration()
+  const deleteDeclaration = useDeleteDeclaration()
 
   if (detail.isLoading) {
     return <p className="py-10 text-center text-[13px] text-muted">Loading the profile…</p>
@@ -104,7 +115,10 @@ export function ContactProfile({ id }: { id: string }) {
   const { contact, stats, statsError, introducedBy } = detail.data
   const name = displayName(contact) || contact.organization || 'Unnamed contact'
   const pinnedNote = (notes.data ?? []).find((note) => note.is_pinned) ?? null
-  const currentDeclaration = (declarations.data ?? []).find((d) => !d.cancelled_on) ?? null
+  // An oral declaration covers nothing until its written confirmation is sent
+  // (02 §3.7), so the header's "Gift Aid ✓" must not count one (05 §5).
+  const currentDeclaration =
+    (declarations.data ?? []).find((d) => declarationState(d) === 'active') ?? null
   const ownerName = contact.relationship_owner_id
     ? ((team.data ?? []).find((m) => m.id === contact.relationship_owner_id)?.full_name ?? null)
     : null
@@ -174,6 +188,7 @@ export function ContactProfile({ id }: { id: string }) {
               ? { onFile: false, enduring: false }
               : null
         }
+        onNewDeclaration={canEdit(teamMember.data) ? () => setDeclarationOpen(true) : undefined}
         stageOptions={stages.data}
         onStageChange={(stage) => patch({ stage })}
         actions={
@@ -187,8 +202,19 @@ export function ContactProfile({ id }: { id: string }) {
             onArchive={() => void archive()}
             onMerge={() => setMergeOpen(true)}
             canMerge={teamMember.data?.role === 'admin'}
+            // The pipeline's door into a donor record (06 §2).
+            onNewOpportunity={canEdit(teamMember.data) ? () => setOpportunityOpen(true) : undefined}
           />
         }
+      />
+
+      {/* "Where we're holding" sits directly under the header (04 §5.8), above
+          the tabs, because it is the one line you read before anything else. */}
+      <HoldingLine
+        contactId={contact.id}
+        line={contact.holding_line ?? null}
+        at={contact.holding_line_at ?? null}
+        readOnly={!canEdit(teamMember.data)}
       />
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
@@ -258,6 +284,13 @@ export function ContactProfile({ id }: { id: string }) {
         </div>
 
         <aside className="flex w-full shrink-0 flex-col gap-3 lg:w-[330px]">
+          {/* "Brief me" (09 §3) leads the rail: it is the thing you press on the
+              way to the phone. It renders nothing when the feature is off. */}
+          <BriefPanel
+            contactId={contact.id}
+            contactName={name}
+            timelineCount={(timeline.data?.past ?? []).length}
+          />
           <BeforeYouCall contact={contact} tags={tags.data ?? []} />
           <HouseholdPanel household={household.data} currentContactId={contact.id} />
           <CadencePanel
@@ -300,6 +333,41 @@ export function ContactProfile({ id }: { id: string }) {
           toast.push('Records merged', { tone: 'good' })
           // The loser is now a tombstone; land on whichever record survived.
           if (winnerId !== contact.id) navigate(`/contacts/${winnerId}`)
+        }}
+      />
+      {opportunityOpen ? (
+        <NewOpportunityFromProfile open onClose={() => setOpportunityOpen(false)} contact={contact} />
+      ) : null}
+
+      {/* Gift Aid declaration (02 §3.7 / 05 §5) — the profile's +25% action. */}
+      <DeclarationSheet
+        open={declarationOpen}
+        onClose={() => setDeclarationOpen(false)}
+        contactId={contact.id}
+        contactName={name}
+        pending={createDeclaration.isPending}
+        onSave={async (draft) => {
+          setDeclarationOpen(false)
+          await withUndo({
+            message: 'Gift Aid declaration recorded',
+            tone: 'good',
+            perform: () =>
+              createDeclaration.mutateAsync({
+                contact_id: contact.id,
+                declared_on: draft.declared_on,
+                method: draft.method,
+                covers_future: draft.covers_future,
+                covers_past: draft.covers_past,
+                covers_from: draft.covers_from || null,
+                evidence_url: draft.evidence_url || null,
+              }),
+            undo: (result) =>
+              deleteDeclaration.mutateAsync({
+                id: result.declaration.id,
+                contactId: contact.id,
+                taskId: result.taskId,
+              }),
+          })
         }}
       />
     </div>

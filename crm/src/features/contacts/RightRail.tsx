@@ -73,7 +73,9 @@ export function BeforeYouCall({ contact, tags }: BeforeYouCallProps) {
           {contact.things_to_remember}
         </p>
       ) : null}
-      {/* TODO(M9/P2): "✦ Brief me" — the AI pre-meeting brief (09 §3). */}
+      {/* "✦ Brief me" (09 §3) is its own panel above this one —
+          `features/ai/BriefPanel`, mounted by ContactProfile. It stays separate
+          because this block must keep working with the AI switched off. */}
     </Panel>
   )
 }

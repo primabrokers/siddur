@@ -55,7 +55,12 @@ export function OutcomeZones({ visible, over, onDragOver, onDragLeave, onDrop }:
   if (!visible) return null
 
   return (
-    <div className="dc-fade-enter flex gap-3 pt-3" aria-label="Outcome drop zones" role="group">
+    // Sticky, so a long board cannot leave the outcomes out of reach mid-drag.
+    <div
+      className="dc-fade-enter sticky bottom-0 z-10 flex gap-3 bg-ground pt-3 pb-1"
+      aria-label="Outcome drop zones"
+      role="group"
+    >
       {ZONES.map((zone) => (
         <div
           key={zone.id}

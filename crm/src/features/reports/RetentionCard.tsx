@@ -64,6 +64,7 @@ export function RetentionCard({ retention, onDrill }: RetentionCardProps) {
                 onDrill({ key: 'retention_repeat', title: `Retained donors · ${year}`, year })
               }
               title={`${retention.retained} of ${retention.gave_prior} ${year - 1} donors gave again in ${year}`}
+              aria-label={`Donor retention ${formatPercent(retention.rate)} — ${retention.retained} of ${retention.gave_prior} ${year - 1} donors gave again in ${year}. Open the list.`}
               className="tabular rounded-[6px] text-[34px] leading-none font-bold hover:text-accent-dark"
             >
               {formatPercent(retention.rate)}

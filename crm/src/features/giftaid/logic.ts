@@ -38,7 +38,7 @@ export const BACK_YEARS = 4
  * (02 §3.7 `wording_version` ▸ Beacon). Bump only when HMRC's model
  * declaration changes — old declarations keep the version they were made under.
  */
-export const GA_WORDING_VERSION = 'HMRC model declaration 2024-04'
+export const GA_WORDING_VERSION = 'HMRC 2024-04'
 
 /** Round to pence — money arithmetic never leaves a float tail on screen. */
 export const toPence = (value: number): number => Math.round(value * 100) / 100
@@ -109,13 +109,14 @@ export const coveringDeclaration = (
   date: string,
 ): DeclarationRow | null => (declarations ?? []).find((d) => declarationCovers(d, date)) ?? null
 
-/** `future + 4 back-years` — the wireframe's "Covers" column. */
+/** The wireframe's "Covers" column: `future + 4 back-years` · `future gifts`. */
 export function coversLabel(declaration: DeclarationRow, backYears: number = BACK_YEARS): string {
-  const parts: string[] = []
-  if (declaration.covers_future) parts.push('future gifts')
-  if (declaration.covers_past) parts.push(`${backYears} back-years`)
-  if (parts.length === 0) return 'this gift only'
-  return parts.join(' + ')
+  const future = declaration.covers_future === true
+  const past = declaration.covers_past === true
+  if (future && past) return `future + ${backYears} back-years`
+  if (future) return 'future gifts'
+  if (past) return `${backYears} back-years`
+  return 'this gift only'
 }
 
 /* ------------------------------------------------------- missing-declaration queue */
@@ -253,26 +254,34 @@ export interface ValidationSummary {
   groups: ValidationGroup[]
   /** How many *gifts* are blocked, not how many failures they carry. */
   giftCount: number
-  /** `{ missing_postcode: 2, … }` — the hero chip's wording. */
+  /**
+   * `{ missing_postcode: 2, … }` — how many *gifts* each blocker holds up, not
+   * how many failure rows it produced. The chip counts rows the reviewer will
+   * have to touch, and one gift missing two fields is still one row.
+   */
   byCode: Record<string, number>
   ready: boolean
 }
 
-const CODE_LABEL: Record<string, string> = {
-  missing_postcode: 'need a postcode',
-  missing_house_no: 'need a house name or number',
-  not_gbp: 'are not in sterling',
-  not_individual: 'are not from an individual',
-  no_declaration: 'have no covering declaration',
+/** `[one, many]` — the chip reads as a sentence either way. */
+const CODE_LABEL: Record<string, [string, string]> = {
+  missing_postcode: ['needs a postcode', 'need a postcode'],
+  missing_house_no: ['needs a house name or number', 'need a house name or number'],
+  not_gbp: ['is not in sterling', 'are not in sterling'],
+  not_individual: ['is not from an individual', 'are not from an individual'],
+  no_declaration: ['has no covering declaration', 'have no covering declaration'],
 }
 
 /** Group the per-failure rows by gift, so one row shows one gift's problems. */
 export function summariseValidation(failures: ValidationFailure[]): ValidationSummary {
   const groups = new Map<string, ValidationGroup>()
-  const byCode: Record<string, number> = {}
+  const giftsPerCode = new Map<string, Set<string>>()
 
   for (const failure of failures) {
-    byCode[failure.code] = (byCode[failure.code] ?? 0) + 1
+    const seen = giftsPerCode.get(failure.code) ?? new Set<string>()
+    seen.add(failure.donation_id)
+    giftsPerCode.set(failure.code, seen)
+
     const existing = groups.get(failure.donation_id)
     if (existing) {
       existing.failures.push(failure)
@@ -287,6 +296,9 @@ export function summariseValidation(failures: ValidationFailure[]): ValidationSu
       failures: [failure],
     })
   }
+
+  const byCode: Record<string, number> = {}
+  for (const [code, gifts] of giftsPerCode) byCode[code] = gifts.size
 
   return {
     groups: [...groups.values()],
@@ -303,7 +315,8 @@ export function validationChip(summary: ValidationSummary): string {
   if (!worst) return 'Validation: every row is claimable'
   const [code, count] = worst
   const rest = summary.giftCount - count
-  const head = `Validation: ${count} row${count === 1 ? '' : 's'} ${CODE_LABEL[code] ?? 'need attention'}`
+  const label = CODE_LABEL[code] ?? ['needs attention', 'need attention']
+  const head = `Validation: ${count} row${count === 1 ? '' : 's'} ${count === 1 ? label[0] : label[1]}`
   return rest > 0 ? `${head} · ${rest} more blocked` : head
 }
 
@@ -355,6 +368,22 @@ export const CLAIM_STATUS_LABEL: Record<string, string> = {
   ready: 'Ready',
   submitted: 'Submitted',
   paid: 'Paid',
+}
+
+/** Why a gift was held back — stored as the validation code, read as English. */
+const EXCLUDE_REASON_LABEL: Record<string, string> = {
+  missing_postcode: 'no postcode',
+  missing_house_no: 'no house name or number',
+  not_gbp: 'not sterling',
+  not_individual: 'not an individual',
+  no_declaration: 'no declaration',
+}
+
+export function excludeReasonLabel(reason: string | null | undefined): string | null {
+  const raw = (reason ?? '').trim()
+  if (raw === '') return null
+  const parts = raw.split(',').map((code) => EXCLUDE_REASON_LABEL[code.trim()] ?? code.trim())
+  return parts.join(' · ')
 }
 
 export const METHOD_LABEL: Record<string, string> = {

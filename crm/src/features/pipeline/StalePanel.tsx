@@ -32,7 +32,7 @@ export function StalePanel({
   return (
     <aside
       aria-label="Stale prospects"
-      className="flex w-full shrink-0 flex-col gap-[10px] lg:w-[236px]"
+      className="flex w-full shrink-0 flex-col gap-[10px] lg:w-[216px]"
     >
       <h2 className="px-[2px] text-[13px] font-bold">Stale — advance or decide</h2>
 

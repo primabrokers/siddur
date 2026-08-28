@@ -1,11 +1,9 @@
-import { EmptyState } from '../components'
+import { GiftAidView } from '../features/giftaid'
 
-/** Gift Aid workspace — spec 05 §5. Replaced by features/giftaid (M7). */
+/**
+ * The Gift Aid workspace (05 §5, artboard A7): the rolling claim, the
+ * missing-declaration queue, the claim history and the Review & export flow.
+ */
 export function GiftAidRoute() {
-  return (
-    <EmptyState
-      title="Gift Aid"
-      hint="The rolling claim, declaration chasing and the HMRC export land here (spec 05 §5)."
-    />
-  )
+  return <GiftAidView />
 }

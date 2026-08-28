@@ -58,12 +58,12 @@ export function RecentDeclarationsTable({
           <table className="w-full border-collapse text-[12.5px]">
             <thead>
               <tr className="text-[11px] font-bold tracking-[0.06em] text-muted uppercase">
-                <th className="border-b border-row px-3 py-[9px] pl-5 text-left font-bold">Donor</th>
-                <th className="border-b border-row px-3 py-[9px] text-left font-bold">Date</th>
-                <th className="border-b border-row px-3 py-[9px] text-left font-bold">Method</th>
-                <th className="border-b border-row px-3 py-[9px] text-left font-bold">Covers</th>
-                <th className="border-b border-row px-3 py-[9px] text-left font-bold">Wording</th>
-                {canEdit ? <th className="border-b border-row px-3 py-[9px] text-left font-bold" /> : null}
+                <th className="border-b border-row px-[10px] py-[9px] pl-5 text-left font-bold">Donor</th>
+                <th className="border-b border-row px-[10px] py-[9px] text-left font-bold">Date</th>
+                <th className="border-b border-row px-[10px] py-[9px] text-left font-bold">Method</th>
+                <th className="border-b border-row px-[10px] py-[9px] text-left font-bold">Covers</th>
+                <th className="border-b border-row px-[10px] py-[9px] text-left font-bold">Wording</th>
+                {canEdit ? <th className="border-b border-row px-[10px] py-[9px] text-left font-bold" /> : null}
               </tr>
             </thead>
             <tbody>
@@ -72,13 +72,15 @@ export function RecentDeclarationsTable({
                 const pending = awaitsWrittenConfirmation(declaration)
                 return (
                   <tr key={declaration.id} className={declaration.cancelled_on ? 'text-muted' : undefined}>
-                    <td className="border-b border-row px-3 py-[9px] pl-5">
+                    <td className="border-b border-row px-[10px] py-[9px] pl-5 whitespace-nowrap">
                       <Link to={`/contacts/${declaration.contact_id}`} className="font-bold text-ink hover:text-accent">
                         {displayName(contact) || 'Unknown donor'}
                       </Link>
                     </td>
-                    <td className="border-b border-row px-3 py-[9px]">{formatDate(declaration.declared_on)}</td>
-                    <td className="border-b border-row px-3 py-[9px]">
+                    <td className="border-b border-row px-[10px] py-[9px] whitespace-nowrap">
+                      {formatDate(declaration.declared_on)}
+                    </td>
+                    <td className="border-b border-row px-[10px] py-[9px]">
                       {METHOD_LABEL[declaration.method] ?? declaration.method}
                       {pending ? (
                         <span className="ml-[6px] rounded-pill bg-[#FFF4E3] px-2 py-[1px] text-[10.5px] font-bold text-[#B4650F]">
@@ -91,17 +93,17 @@ export function RecentDeclarationsTable({
                         </span>
                       ) : null}
                     </td>
-                    <td className="border-b border-row px-3 py-[9px]">
+                    <td className="border-b border-row px-[10px] py-[9px]">
                       {coversLabel(declaration)}
                       {declaration.covers_from ? (
                         <span className="text-muted"> from {formatDate(declaration.covers_from)}</span>
                       ) : null}
                     </td>
-                    <td className="border-b border-row px-3 py-[9px] text-muted">
+                    <td className="border-b border-row px-[10px] py-[9px] whitespace-nowrap text-muted">
                       {declaration.wording_version ?? '—'}
                     </td>
                     {canEdit ? (
-                      <td className="border-b border-row px-3 py-[9px]">
+                      <td className="border-b border-row px-[10px] py-[9px]">
                         <div className="flex justify-end gap-2">
                           {pending ? (
                             <Button variant="accentOutline" size="sm" onClick={() => onConfirm(declaration)}>

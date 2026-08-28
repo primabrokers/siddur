@@ -41,6 +41,14 @@ export function num(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null
 }
 
+/**
+ * What someone typed into a money field: `£40,000` → `40000`.
+ * (The same rule as `giving/logic.parseAmount`, restated rather than imported —
+ * the sheet should not pull the whole giving module in for four lines.)
+ */
+export const parseAmount = (value: string | number | null | undefined): number | null =>
+  num(typeof value === 'string' ? value.replace(/[£,\s]/g, '') : value)
+
 /* ------------------------------------------------------------------ stages */
 
 /** `lookup_options('opportunity_stage')` → the board's columns, in order. */

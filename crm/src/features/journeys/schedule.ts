@@ -112,14 +112,16 @@ export function scheduleSteps(
     }
 
     const previous = index > 0 ? out[index - 1] : null
-    const waits =
-      tailBlocked ||
-      (step.depends_on_previous && step.step_no > 1 && previous?.state !== 'done')
+    const dependent = step.depends_on_previous && step.step_no > 1
+    const waits = tailBlocked || (dependent && previous?.state !== 'done')
 
-    // The earliest a step could land: its own offset, never before today, and
-    // never before the step ahead of it (materialisation is sequential).
+    // The earliest a step could land: its own offset, never before the step
+    // ahead of it (materialisation is sequential) — and, for a step that had
+    // to wait for the one before it, never before today. That last clause is
+    // the SQL's `if v_due < current_date then v_due := current_date`: a step
+    // that waited is never born already overdue.
     let dateISO = offsetDate < floor ? floor : offsetDate
-    if (waits && dateISO < todayISO) dateISO = todayISO
+    if (dependent && dateISO < todayISO) dateISO = todayISO
     floor = dateISO
 
     if (waits) {

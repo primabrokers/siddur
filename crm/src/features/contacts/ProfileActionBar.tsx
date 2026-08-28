@@ -47,6 +47,8 @@ export interface ProfileActionBarProps {
   onMerge?: () => void
   /** Merge is admin + confirm (11 §1); the item stays visible but disabled. */
   canMerge?: boolean
+  /** Starts an ask against this donor on the pipeline board (06 §2 · 07 §9.1). */
+  onNewOpportunity?: () => void
   className?: string
 }
 
@@ -63,6 +65,7 @@ export function ProfileActionBar({
   onArchive,
   onMerge,
   canMerge = false,
+  onNewOpportunity,
   className,
 }: ProfileActionBarProps) {
   const phone = normalisePhone(contact.phone)
@@ -99,6 +102,14 @@ export function ProfileActionBar({
             label: 'Record gift — M4',
             onSelect: () => undefined,
             disabled: true,
+          },
+          {
+            id: 'opportunity',
+            // The pipeline's own door (06 §2): an ask starts from the donor,
+            // not from the board.
+            label: 'New opportunity…',
+            onSelect: () => onNewOpportunity?.(),
+            disabled: !onNewOpportunity || Boolean(contact.is_organisation_self),
           },
           {
             id: 'merge',

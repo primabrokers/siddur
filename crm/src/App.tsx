@@ -13,7 +13,7 @@ import { NotFoundRoute } from './routes/NotFound'
 import { GiftAidRoute } from './routes/GiftAid'
 import { ImportRoute } from './routes/Import'
 import { PipelineRoute } from './routes/Pipeline'
-import { ReportsRoute } from './routes/Reports'
+import { CampaignDetailRoute, ReportsRoute } from './routes/Reports'
 import { SettingsRoute } from './routes/Settings'
 import { TasksRoute } from './routes/Tasks'
 import { TodayRoute } from './routes/Today'
@@ -54,6 +54,8 @@ export function AppRoutes() {
         <Route path="gift-aid" element={<GiftAidRoute />} />
         <Route path="import" element={<ImportRoute />} />
         <Route path="reports" element={<ReportsRoute />} />
+        {/* The per-campaign page reached from the Campaigns card (05 §4). */}
+        <Route path="reports/campaigns/:id" element={<CampaignDetailRoute />} />
         <Route path="settings" element={<SettingsRoute />} />
         <Route path="*" element={<NotFoundRoute />} />
       </Route>

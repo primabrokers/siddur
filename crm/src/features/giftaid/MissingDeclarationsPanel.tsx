@@ -15,7 +15,7 @@ export interface MissingDeclarationsPanelProps {
 }
 
 /** How many donors the panel lists before it stops being a queue. */
-const VISIBLE = 12
+const VISIBLE = 4
 
 /**
  * Missing declarations — found money (05 §5 panel 2, wireframe A7).
@@ -82,7 +82,9 @@ export function MissingDeclarationsPanel({
                   </div>
                   <div className="text-[12px] text-muted">
                     {money(row.eligible_total)} in eligible gifts
-                    {row.gift_count ? ` · ${formatNumber(Number(row.gift_count))} gifts` : ''}
+                    {row.gift_count
+                      ? ` · ${formatNumber(Number(row.gift_count))} gift${Number(row.gift_count) === 1 ? '' : 's'}`
+                      : ''}
                     {row.first_gift_on ? ` since ${formatDate(row.first_gift_on)}` : ''} ·{' '}
                     <b className="text-gold">{money(row.recoverable)} recoverable</b>
                   </div>

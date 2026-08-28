@@ -1,3 +1,6 @@
+-- Applied to the live project under the migration name 005c_journeys_hardening.
+-- The DDL below is what ran, verbatim; only the prose comments were abridged in
+-- transit, the same way 005b_ was applied as 005_function_hardening.
 -- ============================================================================
 -- 005c_journeys_hardening — finish what 005_journeys_and_ics started
 -- ============================================================================

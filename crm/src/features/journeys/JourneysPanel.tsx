@@ -134,12 +134,13 @@ export function JourneysPanel({ contactId, contactName, memberId, readOnly }: Jo
         // the cancelling one. Nothing stays visible — the enrolment leaves the
         // active list and its tasks are cancelled — but the row survives as
         // history, which is the honest record of what happened.
-        undo: (result) =>
-          detach.mutateAsync({
+        undo: async (result) => {
+          await detach.mutateAsync({
             contactId,
             enrollmentId: result.enrollmentId,
             reason: 'undone',
-          }),
+          })
+        },
       })
     } catch (error) {
       toast.push(error instanceof Error ? error.message : 'Could not attach the journey', {

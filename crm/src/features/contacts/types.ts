@@ -70,6 +70,15 @@ export interface ContactRow {
 
   is_archived: boolean | null
   merged_into_id: string | null
+
+  /**
+   * The rolling "Where we're holding" line (04 §5.8 / 09 §3), maintained by the
+   * `donor-brief` edge function. Optional because it is a deviation from 02
+   * §3.1 documented in `008_ai_fields.sql`, and because every existing fixture
+   * predates the two columns.
+   */
+  holding_line?: string | null
+  holding_line_at?: string | null
 }
 
 /**
@@ -235,6 +244,12 @@ export interface GiftAidDeclarationRow {
   covers_from: string | null
   cancelled_on: string | null
   evidence_url: string | null
+  /** 02 §3.7 — HMRC requires a written confirmation of an *oral* declaration;
+   *  until it is stamped the declaration covers nothing (05 §5). Optional so a
+   *  narrower fixture still satisfies the shape. */
+  oral_confirmation_sent_on?: string | null
+  /** Which locked HMRC wording the donor saw (02 §3.7 ▸ Beacon). */
+  wording_version?: string | null
 }
 
 export interface NoteRow {

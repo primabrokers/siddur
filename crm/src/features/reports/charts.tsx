@@ -54,10 +54,13 @@ export function BarChart({ layout, ariaLabel, peakLabel, onSelect, className }: 
   return (
     <svg
       viewBox={layout.viewBox}
-      width="100%"
-      height="auto"
       role="img"
       aria-label={ariaLabel}
+      // Width from the card, height from the viewBox's aspect ratio — so the
+      // 4px data-ends stay round instead of being stretched by
+      // `preserveAspectRatio="none"`. No `height` attribute: SVG wants a length,
+      // and "auto" belongs in CSS.
+      style={{ aspectRatio: `${layout.width} / ${layout.height}` }}
       className={cn('block h-auto w-full overflow-visible', className)}
       data-testid="giving-bar-chart"
     >

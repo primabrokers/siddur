@@ -13,6 +13,34 @@ export interface AiTabProps {
 }
 
 /**
+ * What is deployed, what each one does, and — the line that matters — what
+ * happens when there is no API key. Every answer is "the manual path", because
+ * that is the rule the product is built on (CLAUDE.md rule 6).
+ */
+const AI_FUNCTIONS = [
+  {
+    name: 'ai-quick-capture',
+    does: 'turns a dictated note into editable chips',
+    noKey: 'without a key: the manual log form, prefilled with the dictation',
+  },
+  {
+    name: 'donor-brief',
+    does: 'the five-line brief and the rolling holding line',
+    noKey: 'without a key: no brief offered; the timeline is unchanged',
+  },
+  {
+    name: 'draft-message',
+    does: 'first drafts of thank-yous, follow-ups and Gift Aid requests',
+    noKey: 'without a key: a blank compose box',
+  },
+  {
+    name: 'send-digest',
+    does: 'the morning digest, hourly at each member’s digest hour',
+    noKey: 'without a key: the digest still sends, without its opening sentence',
+  },
+] as const
+
+/**
  * AI settings (06 §4, 09 §1).
  *
  * Every feature is independently switchable, and switching one off is never a
@@ -78,6 +106,26 @@ export function AiTab({ readOnly }: AiTabProps) {
             )
           })}
         </ul>
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <SectionLabel>Edge functions</SectionLabel>
+        <ul className="flex flex-col gap-[2px] rounded-card border border-border bg-surface px-4 py-3 text-[12.5px] text-muted">
+          {AI_FUNCTIONS.map((fn) => (
+            <li key={fn.name} className="flex flex-wrap items-baseline gap-x-2 py-[3px]">
+              <code className="text-ink">{fn.name}</code>
+              <span className="text-faint">·</span>
+              <span>{fn.does}</span>
+              <span className="text-faint">·</span>
+              <span>{fn.noKey}</span>
+            </li>
+          ))}
+        </ul>
+        <p className="text-[11.5px] leading-[1.5] text-faint">
+          Each call carries the signed-in fundraiser’s own token, so an AI context can never contain a row
+          they could not open for themselves (11 §2). <code>send-digest</code> is the exception and runs as
+          the scheduler, which is why it carries no amounts at all.
+        </p>
       </section>
 
       <section className="flex flex-col gap-2">

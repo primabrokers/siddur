@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Pill } from '../../components'
 import { cn } from '../../lib/cn'
 import { labelText, type AiLabelState } from './core'
@@ -37,7 +38,7 @@ export function AiLabel({ state, className }: AiLabelProps) {
 }
 
 export interface WhyProps {
-  children: React.ReactNode
+  children: ReactNode
   className?: string
 }
 

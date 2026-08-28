@@ -27,6 +27,8 @@ import {
   useUnmarkThanked,
 } from '../../lib/queries/giving'
 import { useTeamMember } from '../auth/useTeamMember'
+import { DraftSheet } from '../ai'
+import { useAiFeature } from '../../lib/queries/ai'
 import { PageHeader } from '../shell/PageHeader'
 import { displayName } from '../contacts/normalise'
 import { ConfirmDialog } from './ConfirmDialog'
@@ -99,6 +101,8 @@ export function GivingView() {
   const [cancelPledge, setCancelPledge] = useState<PledgeRow | null>(null)
   const [cancelRecurring, setCancelRecurring] = useState<RecurringAgreementRow | null>(null)
   const [exportOpen, setExportOpen] = useState(false)
+  /** The gift whose thank-you is being drafted (09 §4). Null = sheet closed. */
+  const [draftRow, setDraftRow] = useState<QueueRow | null>(null)
 
   // Entry points from the command palette / deep links: /giving?tab=…&new=gift|pledge
   const [searchParams, setSearchParams] = useSearchParams()
@@ -120,6 +124,8 @@ export function GivingView() {
   /** 11 §2: the ledger arrived through the redacted view — no money to render. */
   const amountsHidden = data.amountsHidden
   const money = (amount: number | null) => (amountsHidden ? '—' : formatMoney(amount))
+  /** 09 §4 drafting, switchable in Settings; off means the queue is unchanged. */
+  const draftingOn = useAiFeature('drafting')
 
   const metrics = useMemo(() => givingMetrics(data), [data])
   const thanksQueue = useMemo(() => needsThanks(data), [data])
@@ -214,14 +220,20 @@ export function GivingView() {
         title="Giving"
         subtitle="Gifts, pledges, standing orders — thanked, receipted and coded on all three axes"
         actions={
-          readOnly ? undefined : (
-            <>
-              <Button onClick={() => openGift({})}>＋ Record gift</Button>
-              <Button variant="outline" onClick={() => setPledgeOpen(true)}>
-                Record pledge
-              </Button>
-            </>
-          )
+          <>
+            {/* The claim side of giving lives on its own screen (05 §5, M7). */}
+            <Link to="/gift-aid" className="text-[13px] font-semibold text-accent hover:text-accent-dark">
+              Gift Aid →
+            </Link>
+            {readOnly ? null : (
+              <>
+                <Button onClick={() => openGift({})}>＋ Record gift</Button>
+                <Button variant="outline" onClick={() => setPledgeOpen(true)}>
+                  Record pledge
+                </Button>
+              </>
+            )}
+          </>
         }
       />
 
@@ -373,6 +385,9 @@ export function GivingView() {
             amountsHidden={amountsHidden}
             onAction={thank}
             showDaysColumn
+            // 09 §4: the draft is a *first* draft — marking thanked stays the
+            // one-tap action, and the queue behaves identically with AI off.
+            {...(draftingOn ? { secondaryLabel: 'Draft', onSecondary: setDraftRow } : {})}
           />
         </section>
       ) : null}
@@ -611,6 +626,20 @@ export function GivingView() {
         </p>
         <p className="text-muted">Marking them sent stays a separate, per-row action.</p>
       </ConfirmDialog>
+
+      {/* Mounted only while a row is chosen, so each draft starts from that gift
+          and nothing survives between two donors (09 §4). */}
+      {draftRow ? (
+        <DraftSheet
+          open
+          onClose={() => setDraftRow(null)}
+          contactId={draftRow.gift.contact_id}
+          contactName={draftRow.contact ? displayName(draftRow.contact) : 'this donor'}
+          purpose="thank_you"
+          giftId={draftRow.gift.id}
+          contactEmail={draftRow.contact?.email ?? null}
+        />
+      ) : null}
     </>
   )
 }
@@ -677,6 +706,10 @@ interface QueueTableProps {
   amountsHidden?: boolean
   onAction: (row: QueueRow) => void
   showDaysColumn?: boolean
+  /** 09 §4: offer a first draft beside the one-tap "Mark thanked". Optional — */
+  secondaryLabel?: string
+  /** — and absent entirely when AI is off, which leaves the queue as it was. */
+  onSecondary?: (row: QueueRow) => void
 }
 
 /** The two queues share one table — same rows, one different verb (05 §3). */
@@ -690,6 +723,8 @@ function QueueTable({
   amountsHidden,
   onAction,
   showDaysColumn,
+  secondaryLabel,
+  onSecondary,
 }: QueueTableProps) {
   if (rows.length === 0) return <EmptyState title={emptyTitle} hint={emptyHint} />
 
@@ -747,9 +782,21 @@ function QueueTable({
               </td>
               <td className="px-3 py-2 text-right">
                 {readOnly ? null : (
-                  <Button size="sm" variant="outline" onClick={() => onAction(row)}>
-                    {actionLabel}
-                  </Button>
+                  <span className="inline-flex gap-2">
+                    {onSecondary && secondaryLabel ? (
+                      <Button
+                        size="sm"
+                        variant="accentOutline"
+                        onClick={() => onSecondary(row)}
+                        title="A first draft you read, edit and send yourself"
+                      >
+                        <span aria-hidden="true">✦</span> {secondaryLabel}
+                      </Button>
+                    ) : null}
+                    <Button size="sm" variant="outline" onClick={() => onAction(row)}>
+                      {actionLabel}
+                    </Button>
+                  </span>
                 )}
               </td>
             </tr>

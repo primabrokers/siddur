@@ -1,20 +1,18 @@
-import { EmptyState } from '../components'
-import { PageHeader } from '../features/shell/PageHeader'
+import { CampaignPage } from '../features/reports/CampaignPage'
+import { ReportsView } from '../features/reports/ReportsView'
 
 /**
- * Reports `[P2]` — spec 10.
+ * Reports — spec 06 §3 (artboard A8).
  *
- * TODO(reports): metric cards over saved filters (single number · progress
- * ring · live list), retention and LYBUNT/SYBUNT, appeal performance, export.
+ * Retention against sector benchmarks, giving over time, the six RFM personas,
+ * campaign and appeal performance, fundraiser activity and Gift Aid. Every
+ * number opens the list of people behind it.
  */
 export function ReportsRoute() {
-  return (
-    <>
-      <PageHeader title="Reports" subtitle="Retention, appeals, giving trends · phase 2" />
-      <EmptyState
-        title="Reporting lands here"
-        hint="Metric cards built from saved filters — donor retention against the sector benchmark, LYBUNT/SYBUNT movement, appeal and fund performance, and exports (an outward action, so it confirms)."
-      />
-    </>
-  )
+  return <ReportsView />
+}
+
+/** `/reports/campaigns/:id` — the per-campaign page (05 §4). */
+export function CampaignDetailRoute() {
+  return <CampaignPage />
 }
