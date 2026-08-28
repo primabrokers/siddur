@@ -94,10 +94,15 @@ export const qk = {
    */
   giving: {
     all: ['giving'] as const,
+    /**
+     * Prefix for the board caches only. Optimistic patches must target this,
+     * never `giving.all` — that also matches `giving.selects`, whose cache has
+     * a different shape.
+     */
+    boards: ['giving', 'board'] as const,
     board: (filters?: Filters) => ['giving', 'board', filters ?? {}] as const,
     /** Fund · campaign · appeal option lists for the entry selects (05 §4). */
     selects: () => ['giving', 'selects'] as const,
-    recurring: (filters?: Filters) => ['giving', 'recurring', filters ?? {}] as const,
   },
 
   giftAid: {
@@ -120,17 +125,42 @@ export const qk = {
     pledgeSummary: () => ['nudges', 'pledge-summary'] as const,
   },
 
+  /**
+   * Global search (03 §3). The term is the key, so an in-memory cache serves a
+   * repeated query instantly while a stale request is cancelled — the <300ms
+   * budget (11 §5) is met by the cache, not by the network.
+   */
+  search: {
+    all: ['search'] as const,
+    contacts: (term: string) => ['search', 'contacts', term] as const,
+  },
+
   savedViews: {
     all: ['saved-views'] as const,
     list: () => ['saved-views', 'list'] as const,
     /** Sidebar PINNED VIEWS with their counts. */
     pinned: () => ['saved-views', 'pinned'] as const,
     detail: (id: string) => ['saved-views', 'detail', id] as const,
+    /** One cheap id-only query per view; `staleTime` 60s (06 §1). */
+    count: (id: string, filters?: Filters) => ['saved-views', 'count', id, filters ?? {}] as const,
+    /** The rows behind the active view on the Contacts route. */
+    rows: (filters?: Filters) => ['saved-views', 'rows', filters ?? {}] as const,
   },
 
   lookups: {
     all: ['lookups'] as const,
     list: (listName: string) => ['lookups', listName] as const,
+    /** Every option including retired ones — the Settings editor (06 §4). */
+    admin: (listName: string) => ['lookups', 'admin', listName] as const,
+    /** `select distinct list_name` — the editor's list picker. */
+    names: () => ['lookups', 'names'] as const,
+  },
+
+  /** Settings (06 §4): rule switches, team roster, org details, AI toggles. */
+  settings: {
+    all: ['settings'] as const,
+    automationRules: () => ['settings', 'automation-rules'] as const,
+    team: () => ['settings', 'team'] as const,
   },
 
   reports: {

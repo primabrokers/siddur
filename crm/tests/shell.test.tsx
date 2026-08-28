@@ -3,6 +3,7 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { QueryClient } from '@tanstack/react-query'
+import { createFakeSupabase } from './support/fakeSupabase'
 
 // ---------------------------------------------------------------- mocks -----
 
@@ -16,14 +17,49 @@ const session = {
 
 const authState = { session: session as unknown as null }
 
-const maybeSingle = vi.fn(async () => ({
-  data: { id: 'user-1', role: 'fundraiser', full_name: 'Ahron Braun' },
-  error: null,
-}))
+// A real PostgREST stand-in, so the sidebar's saved-view queries (06 §1) run
+// the same code path they run in the browser.
+const fake = createFakeSupabase(
+  {
+    team_members: [
+      { id: 'user-1', role: 'fundraiser', full_name: 'Ahron Braun', email: 'braun@yeshiva.org', is_active: true },
+    ],
+    saved_views: [
+      {
+        id: 'view-overdue',
+        name: 'Overdue follow-ups',
+        entity: 'tasks',
+        layout: 'table',
+        filters: { due: 'overdue' },
+        columns: [],
+        icon: 'alert',
+        owner_id: null,
+        is_shared: true,
+      },
+      {
+        id: 'view-lybunt',
+        name: 'LYBUNT',
+        entity: 'contacts',
+        layout: 'table',
+        filters: { is_lybunt: true },
+        columns: [],
+        icon: 'trend-down',
+        owner_id: null,
+        is_shared: true,
+      },
+    ],
+    contacts: [],
+    contact_stats: [],
+    tasks: [],
+    donations: [],
+    lookup_options: [],
+    tags: [],
+    taggings: [],
+  },
+  { id: 'user-1', email: 'braun@yeshiva.org' },
+)
 
-const from = vi.fn(() => ({
-  select: () => ({ eq: () => ({ maybeSingle }) }),
-}))
+const from = vi.fn((table: string) => fake.client.from(table))
 
 const unsubscribe = vi.fn()
 const signOut = vi.fn(async () => ({ error: null }))
@@ -83,7 +119,9 @@ describe('app shell', () => {
     }
 
     expect(within(sidebar).getByText('Pinned views')).toBeInTheDocument()
-    expect(within(sidebar).getByText('Overdue follow-ups')).toBeInTheDocument()
+    // The pinned views are real `saved_views` rows now (06 §1), so they land
+    // one tick after the shell paints.
+    expect(await within(sidebar).findByText('Overdue follow-ups')).toBeInTheDocument()
     expect(within(sidebar).getByText('LYBUNT')).toBeInTheDocument()
   })
 

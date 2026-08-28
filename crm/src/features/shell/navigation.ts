@@ -34,20 +34,28 @@ export interface PinnedView {
   id: string
   label: string
   to: string
-  count: number
+  /** `undefined` while the count query is still in flight. */
+  count: number | undefined
   /** Renders the count in flag-red — the wireframe's overdue treatment. */
   urgent?: boolean
 }
 
 /**
- * PLACEHOLDER. Real pinned views come from `saved_views` (02 §3.18) with live
- * counts — see `qk.savedViews.pinned()`. The seeded set is 06 §1.
- *
- * TODO(views): load from Supabase once `saved_views` + counts exist.
+ * A view is urgent when working it to zero is *late*, not merely pending —
+ * the overdue queue and the lapsing-donor rescue lists. Matched on the view's
+ * own criteria rather than its name, so a renamed view keeps its treatment.
  */
-export const PLACEHOLDER_PINNED_VIEWS: PinnedView[] = [
-  { id: 'overdue', label: 'Overdue follow-ups', to: '/contacts?view=overdue', count: 4, urgent: true },
-  { id: 'lybunt', label: 'LYBUNT', to: '/contacts?view=lybunt', count: 23 },
-  { id: 'quiet-60', label: 'No contact 60+ days', to: '/contacts?view=quiet-60', count: 11 },
-  { id: 'pledges', label: 'Pledges outstanding', to: '/giving?view=pledges-outstanding', count: 6 },
-]
+export function isUrgentView(filters: {
+  flag?: string
+  due?: 'today' | 'overdue'
+  donor_status?: string[]
+}): boolean {
+  if (filters.due === 'overdue' || filters.flag === 'overdue') return true
+  return Boolean(filters.donor_status?.includes('pre_lapsed'))
+}
+
+/**
+ * How many views the sidebar shows before it stops being navigation and starts
+ * being a list. The rest live on the Contacts route's view picker (06 §1).
+ */
+export const PINNED_VIEW_LIMIT = 6

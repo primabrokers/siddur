@@ -1,40 +1,28 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { Avatar, IconPlus, IconSearch } from '../../components'
 import { initialsOf } from '../../lib/format'
 import { useAuth } from '../auth/AuthProvider'
 import { useTeamMember } from '../auth/useTeamMember'
 import { useCapture } from '../capture/QuickCapture'
+import { useOmni } from '../search/OmniProvider'
 
 /** Desktop top bar — search, quick capture, user. Per `wireframes/Main.dc.html`. */
 export function TopBar() {
   const { openCapture } = useCapture()
+  const { openSearch, openPalette } = useOmni()
   const { user, signOut } = useAuth()
   const { data: member } = useTeamMember()
   const [menuOpen, setMenuOpen] = useState(false)
-  const searchRef = useRef<HTMLButtonElement | null>(null)
 
   const displayName = member?.full_name ?? user?.email ?? 'You'
 
-  // "/" anywhere opens record search (03 §3). The palette itself is not built
-  // yet — focusing the field keeps the affordance honest.
-  // TODO(search): FTS + pg_trgm endpoint, result rows, Cmd/Ctrl+K palette.
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey) return
-      const target = event.target as HTMLElement | null
-      if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return
-      event.preventDefault()
-      searchRef.current?.focus()
-    }
-    document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
-  }, [])
-
   return (
     <header className="hidden items-center gap-3 border-b border-border bg-surface px-6 py-3 lg:flex">
+      {/* The field is a button on purpose: "/" and this click open the same
+          overlay, so there is one search surface rather than two (03 §3). */}
       <button
-        ref={searchRef}
         type="button"
+        onClick={openSearch}
         aria-label="Search people, phones, cities"
         className="flex max-w-[460px] grow items-center gap-2 rounded-input border border-border px-3 py-[7px] text-[13px] text-faint hover:border-faint"
       >
@@ -44,6 +32,16 @@ export function TopBar() {
       </button>
 
       <div className="ml-auto flex items-center gap-[10px]">
+        <button
+          type="button"
+          onClick={openPalette}
+          aria-label="Open the command palette"
+          title="Commands (⌘K)"
+          className="rounded-input border border-border px-[9px] py-[6px] text-[11.5px] text-muted hover:border-faint hover:text-ink"
+        >
+          ⌘K
+        </button>
+
         <button
           type="button"
           onClick={openCapture}

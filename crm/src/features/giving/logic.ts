@@ -23,6 +23,7 @@ import type {
   GiftAidDeclarationRow,
   GivingBoard,
   InstallmentDraft,
+  PledgeBalanceRow,
   PledgeInstallmentRow,
   PledgeRow,
   RecurringAgreementRow,
@@ -411,28 +412,57 @@ export interface PledgeProgress {
   fraction: number
   next: PledgeInstallmentRow | null
   overdue: PledgeInstallmentRow[]
+  overdueAmount: number
+  /** True when the money came from `pledge_balances` rather than the fallback. */
+  fromView: boolean
+}
+
+const numeric = (value: number | null | undefined): number | null => {
+  if (value === null || value === undefined) return null
+  const parsed = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(parsed) ? parsed : null
 }
 
 /**
  * Paid / balance / next installment / overdue rows for one pledge.
- * Balance due = total − payments applied − write-off (02 §3.5).
+ *
+ * The money comes from the **`pledge_balances` view** (02 §3.5/§4, I-8/I-9) —
+ * balance due = total − payments applied − write-off is the database's
+ * arithmetic, not the client's. The fallback below runs only when the view is
+ * unavailable (a fresh project, or a restricted read), so the card degrades to
+ * an approximation instead of an empty panel.
+ *
+ * Which rows *look* overdue is a date comparison on rows already in hand, not a
+ * rollup, so it stays here either way (`overdue` is computed, never stored).
  */
 export function pledgeProgress(
   pledge: PledgeRow,
   source: { donations: DonationRow[]; installments: PledgeInstallmentRow[] },
   now: Date = new Date(),
+  view: PledgeBalanceRow | null = null,
 ): PledgeProgress {
   const todayISO = toISODate(now)
-  const total = pledge.amount_gbp ?? pledge.total_amount ?? 0
-  const paid = source.donations
-    .filter((gift) => gift.pledge_id === pledge.id && gift.status === 'received')
-    .reduce((sum, gift) => sum + (gift.amount_gbp ?? gift.amount ?? 0), 0)
-  const writtenOff = pledge.write_off_amount ?? 0
-  const balance = Math.max(0, toPounds(toPence(total) - toPence(paid) - toPence(writtenOff)))
+  const total = numeric(view?.amount_gbp) ?? pledge.amount_gbp ?? pledge.total_amount ?? 0
 
   const open = source.installments
     .filter((row) => row.pledge_id === pledge.id && row.status !== 'paid' && row.status !== 'written_off')
     .sort((a, b) => a.due_on.localeCompare(b.due_on))
+  const overdue = open.filter((row) => row.due_on < todayISO)
+
+  const fallbackPaid = source.donations
+    .filter((gift) => gift.pledge_id === pledge.id && gift.status === 'received')
+    .reduce((sum, gift) => sum + (gift.amount_gbp ?? gift.amount ?? 0), 0)
+
+  const paid = numeric(view?.paid_amount) ?? fallbackPaid
+  const writtenOff = numeric(view?.write_off_amount) ?? pledge.write_off_amount ?? 0
+  const balance =
+    numeric(view?.balance) ?? Math.max(0, toPounds(toPence(total) - toPence(paid) - toPence(writtenOff)))
+
+  const next =
+    (view?.next_installment_id ? open.find((row) => row.id === view.next_installment_id) : undefined) ??
+    open.find((row) => row.due_on >= todayISO) ??
+    open[0] ??
+    null
 
   return {
     total,
@@ -440,9 +470,11 @@ export function pledgeProgress(
     writtenOff,
     balance,
     fraction: total > 0 ? Math.min(1, paid / total) : 0,
-    next: open.find((row) => row.due_on >= todayISO) ?? open[0] ?? null,
-    // `overdue` is computed, never stored (02 §3.5).
-    overdue: open.filter((row) => row.due_on < todayISO),
+    next,
+    overdue,
+    overdueAmount:
+      numeric(view?.overdue_amount) ?? toPounds(overdue.reduce((sum, row) => sum + toPence(row.amount), 0)),
+    fromView: view !== null,
   }
 }
 
@@ -452,7 +484,13 @@ export function outstandingPledgeBalance(board: GivingBoard, now: Date = new Dat
     .filter((pledge) => pledge.status === 'open')
     .reduce(
       (sum, pledge) =>
-        sum + pledgeProgress(pledge, { donations: board.gifts, installments: board.installments }, now).balance,
+        sum +
+        pledgeProgress(
+          pledge,
+          { donations: board.gifts, installments: board.installments },
+          now,
+          board.balances[pledge.id] ?? null,
+        ).balance,
       0,
     )
 }

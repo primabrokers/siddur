@@ -411,14 +411,17 @@ export function GivingView() {
               donations={data.gifts}
               installments={data.installments}
               refs={refs.data}
+              balance={data.balances[pledge.id] ?? null}
               readOnly={readOnly}
               amountsHidden={amountsHidden}
               canWriteOff={isAdmin}
               onRecordPayment={(target, installment) => {
-                const progress = pledgeProgress(target, {
-                  donations: data.gifts,
-                  installments: data.installments,
-                })
+                const progress = pledgeProgress(
+                  target,
+                  { donations: data.gifts, installments: data.installments },
+                  new Date(),
+                  data.balances[target.id] ?? null,
+                )
                 const contact = data.contacts[target.contact_id] ?? null
                 openGift({
                   contactId: target.contact_id,
@@ -436,10 +439,12 @@ export function GivingView() {
               onWriteOff={(target) =>
                 setWriteOff({
                   pledge: target,
-                  balance: pledgeProgress(target, {
-                    donations: data.gifts,
-                    installments: data.installments,
-                  }).balance,
+                  balance: pledgeProgress(
+                    target,
+                    { donations: data.gifts, installments: data.installments },
+                    new Date(),
+                    data.balances[target.id] ?? null,
+                  ).balance,
                 })
               }
               onCancel={setCancelPledge}
@@ -459,6 +464,7 @@ export function GivingView() {
                   donations={data.gifts}
                   installments={data.installments}
                   refs={refs.data}
+                  balance={data.balances[pledge.id] ?? null}
                   readOnly
                   amountsHidden={amountsHidden}
                 />

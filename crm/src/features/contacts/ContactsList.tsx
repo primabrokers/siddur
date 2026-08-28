@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router'
 import { Button, EmptyState, Money, PersonRow, Pill, TextInput } from '../../components'
 import { formatDayCount } from '../../lib/format'
@@ -28,19 +28,69 @@ function matches(row: ContactListRow, term: string): boolean {
   return haystack.includes(term)
 }
 
+/** Rows supplied by a saved view instead of the full contacts query (06 §1). */
+export interface ContactsSource {
+  rows: ContactListRow[]
+  isLoading: boolean
+  error: unknown
+  statsError: string | null
+}
+
+export interface ContactsListProps {
+  /** When present the list renders these rows and skips its own query. */
+  source?: ContactsSource
+  /** The active view's name; defaults to "Contacts". */
+  title?: string
+  /** The views bar (06 §1), rendered between the header and the rows. */
+  toolbar?: ReactNode
+  /** Shown under the count — the active view's own empty-state sentence. */
+  emptyHint?: string
+  /** Controlled create sheet, so the command palette can open it. */
+  createOpen?: boolean
+  onCreateOpenChange?: (open: boolean) => void
+}
+
 /**
  * The contacts list (06 §1, person-row layout). Rows carry the flag, the one
  * next-action line and 2–3 context chips (03 §6); the sort is flag severity
  * then name, so yellow "no next action" ranks above grey futures (I-3).
+ *
+ * The same component renders a saved view: a view is a different *row source*,
+ * not a different screen (03 §4 — one dataset, many lenses).
  */
-export function ContactsList() {
+export function ContactsList({
+  source,
+  title = 'Contacts',
+  toolbar,
+  emptyHint,
+  createOpen,
+  onCreateOpenChange,
+}: ContactsListProps = {}) {
   const navigate = useNavigate()
   const [term, setTerm] = useState('')
-  const [sheetOpen, setSheetOpen] = useState(false)
+  const [ownSheetOpen, setOwnSheetOpen] = useState(false)
   const stages = useLookupOptions('stage')
-  const { data, isLoading, error } = useContactsList()
+  const own = useContactsList({ enabled: source === undefined })
 
-  const rows = data?.rows ?? []
+  const sheetOpen = createOpen ?? ownSheetOpen
+  const setSheetOpen = (open: boolean) => {
+    if (onCreateOpenChange) onCreateOpenChange(open)
+    else setOwnSheetOpen(open)
+  }
+
+  const { rows, isLoading, error, statsError } = source ?? {
+    rows: own.data?.rows ?? [],
+    isLoading: own.isLoading,
+    error: own.error,
+    statsError: own.data?.statsError ?? null,
+  }
+
+  // A new lens starts with a clean quick-filter; the previous term would
+  // silently hide rows the view is meant to show.
+  useEffect(() => {
+    setTerm('')
+  }, [title])
+
   const filtered = useMemo(() => {
     const needle = term.trim().toLowerCase()
     return rows.filter((row) => matches(row, needle))
@@ -49,7 +99,7 @@ export function ContactsList() {
   return (
     <>
       <PageHeader
-        title="Contacts"
+        title={title}
         subtitle={
           isLoading
             ? 'Loading…'
@@ -72,15 +122,17 @@ export function ContactsList() {
         }
       />
 
+      {toolbar}
+
       {error ? (
         <p role="alert" className="mb-3 rounded-input bg-[#FBECEC] px-3 py-2 text-[12.5px] text-flag-overdue">
           {error instanceof Error ? error.message : 'Could not load contacts.'}
         </p>
       ) : null}
 
-      {data?.statsError ? (
+      {statsError ? (
         <p className="mb-3 rounded-input bg-[#FCF0E3] px-3 py-2 text-[12px] text-flag-today-ink">
-          Derived numbers unavailable ({data.statsError}) — flags, giving and next actions will fill in once
+          Derived numbers unavailable ({statsError}) — flags, giving and next actions will fill in once
           <code> contact_stats</code> is live.
         </p>
       ) : null}
@@ -93,14 +145,17 @@ export function ContactsList() {
         </div>
       ) : filtered.length === 0 ? (
         <EmptyState
-          title={rows.length === 0 ? 'No contacts yet' : 'Nothing matches that filter'}
+          title={rows.length === 0 ? (emptyHint ? 'Nobody here — which is the point' : 'No contacts yet') : 'Nothing matches that filter'}
           hint={
             rows.length === 0
-              ? 'Every person, household and organisation lives here, each carrying one visible next action.'
+              ? (emptyHint ??
+                'Every person, household and organisation lives here, each carrying one visible next action.')
               : 'Try part of a name, an organisation or a city.'
           }
           action={
-            rows.length === 0 ? <Button onClick={() => setSheetOpen(true)}>New contact</Button> : null
+            rows.length === 0 && !emptyHint ? (
+              <Button onClick={() => setSheetOpen(true)}>New contact</Button>
+            ) : null
           }
         />
       ) : (

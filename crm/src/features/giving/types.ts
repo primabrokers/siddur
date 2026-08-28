@@ -55,6 +55,30 @@ export interface TributeRow {
   notified_at: string | null
 }
 
+/**
+ * The `pledge_balances` view (02 §3.5 / §4) — the **authoritative** paid,
+ * written-off and outstanding figures for a pledge. Balance is derived, so it
+ * is read, never recomputed in the client (I-8/I-9).
+ */
+export interface PledgeBalanceRow {
+  pledge_id: string
+  contact_id: string
+  status: string
+  total_amount: number | null
+  amount_gbp: number | null
+  paid_amount: number | null
+  payment_count: number | null
+  write_off_amount: number | null
+  balance: number | null
+  installment_count: number | null
+  paid_installment_count: number | null
+  overdue_installment_count: number | null
+  overdue_amount: number | null
+  next_installment_id: string | null
+  next_installment_due_on: string | null
+  next_installment_amount: number | null
+}
+
 /** One selectable coding axis (02 §3.8). Inactive rows never reach the sheet. */
 export interface GivingOption {
   id: string
@@ -68,12 +92,6 @@ export interface GivingSelects {
   appeals: GivingOption[]
 }
 
-/** A gift row with its donor resolved — the Giving screen's table row. */
-export interface GiftListRow {
-  gift: DonationRow
-  contact: ContactRow | null
-}
-
 /**
  * Everything the Giving screen reads, in one query (see `qk.giving.board`).
  * Contacts are indexed by id and joined client-side — no PostgREST embeds.
@@ -84,6 +102,8 @@ export interface GivingBoard {
   installments: PledgeInstallmentRow[]
   recurring: RecurringAgreementRow[]
   contacts: Record<string, ContactRow>
+  /** `pledge_balances` keyed by pledge id — empty when the view is unavailable. */
+  balances: Record<string, PledgeBalanceRow>
   /** Gifts inside the metric windows (this month / this year), unfiltered. */
   yearGifts: DonationRow[]
   monthGifts: DonationRow[]
@@ -97,6 +117,7 @@ export const EMPTY_BOARD: GivingBoard = {
   installments: [],
   recurring: [],
   contacts: {},
+  balances: {},
   yearGifts: [],
   monthGifts: [],
   amountsHidden: false,
@@ -163,8 +184,11 @@ export function emptyGiftDraft(today: string, contactId = ''): GiftDraft {
 /** What `useCreateGift` writes: the donation row plus its two optional children. */
 export interface GiftInput {
   donation: Record<string, unknown>
-  softCredit: { contact_id: string; role: SoftCreditRole; amount: number } | null
-  tribute: Record<string, unknown> | null
+  softCredit: Pick<SoftCreditRow, 'contact_id' | 'role' | 'amount'> | null
+  tribute: Pick<
+    TributeRow,
+    'tribute_type' | 'honoree_name' | 'acknowledgee_name' | 'acknowledgee_address' | 'notify'
+  > | null
 }
 
 /** One editable row in the pledge sheet's schedule builder (05 §2). */

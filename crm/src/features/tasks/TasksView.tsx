@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import {
   Button,
   FilterChip,
@@ -66,6 +66,17 @@ export function TasksView() {
   const withUndo = useUndoToast()
   const toast = useToast()
 
+  // A pinned task view lands here as `?due=today|overdue` (06 §1). It narrows
+  // the groups below to that one queue; clearing the chip clears the param.
+  const [params, setParams] = useSearchParams()
+  const due = params.get('due') === 'overdue' ? 'overdue' : params.get('due') === 'today' ? 'today' : null
+  const setDue = (next: 'today' | 'overdue' | null) => {
+    const search = new URLSearchParams(params)
+    if (next) search.set('due', next)
+    else search.delete('due')
+    setParams(search, { replace: true })
+  }
+
   const [scope, setScope] = useState<TaskScope>('everyone')
   const [actionType, setActionType] = useState('')
   const [origin, setOrigin] = useState('')
@@ -87,7 +98,11 @@ export function TasksView() {
     [raw, memberId, scope, actionType, origin],
   )
 
-  const groups = useMemo(() => groupTasks(data), [data])
+  const allGroups = useMemo(() => groupTasks(data), [data])
+  const groups = useMemo(
+    () => (due ? allGroups.filter((group) => group.id === due) : allGroups),
+    [allGroups, due],
+  )
   const actionLabels = useMemo(
     () => Object.fromEntries((actionTypes.data ?? []).map((o) => [o.value, o.label])),
     [actionTypes.data],
@@ -137,6 +152,11 @@ export function TasksView() {
       />
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
+        {due ? (
+          <FilterChip active onClick={() => setDue(null)}>
+            {due === 'overdue' ? 'Overdue only' : 'Due today only'} ×
+          </FilterChip>
+        ) : null}
         <FilterChip active={scope === 'mine'} onClick={() => setScope('mine')}>
           Mine
         </FilterChip>

@@ -217,13 +217,15 @@ export interface ContactsListResult {
 
 export interface ContactsListOptions {
   includeArchived?: boolean
+  /** Off while a saved view supplies the rows instead (06 §1). */
+  enabled?: boolean
 }
 
 export function useContactsList(options: ContactsListOptions = {}): UseQueryResult<ContactsListResult> {
-  const { includeArchived = false } = options
+  const { includeArchived = false, enabled = true } = options
   return useQuery<ContactsListResult>({
     queryKey: qk.contacts.list({ includeArchived }),
-    enabled: isConfigured,
+    enabled: isConfigured && enabled,
     queryFn: async () => {
       const contacts = await selectRows<ContactRow>('contacts', (q) => {
         let query = q.is('merged_into_id', null)

@@ -377,6 +377,44 @@ describe('pledge progress and balance (05 §2)', () => {
     expect(progress.next?.id).toBe('i2')
   })
 
+  it('prefers the pledge_balances view over the client fallback (I-8/I-9)', () => {
+    const view = {
+      pledge_id: 'pl-1',
+      contact_id: 'dovid',
+      status: 'open',
+      total_amount: 25000,
+      amount_gbp: 25000,
+      // Deliberately different from what the client would compute, so the test
+      // fails the moment the view stops being the source of truth.
+      paid_amount: 12345,
+      payment_count: 3,
+      write_off_amount: 500,
+      balance: 12155,
+      installment_count: 2,
+      paid_installment_count: 1,
+      overdue_installment_count: 1,
+      overdue_amount: 4321,
+      next_installment_id: 'i2',
+      next_installment_due_on: iso(addDays(NOW, 30)),
+      next_installment_amount: 5000,
+    }
+    const progress = pledgeProgress(pledge({ id: 'pl-1' }), { donations, installments }, NOW, view)
+    expect(progress).toMatchObject({
+      paid: 12345,
+      writtenOff: 500,
+      balance: 12155,
+      overdueAmount: 4321,
+      fromView: true,
+    })
+    expect(progress.next?.id).toBe('i2')
+    // The overdue *rows* still come from the installments in hand.
+    expect(progress.overdue.map((row) => row.id)).toEqual(['i1'])
+
+    // Without the view the card still renders, from the payments it can see.
+    const fallback = pledgeProgress(pledge({ id: 'pl-1' }), { donations, installments }, NOW)
+    expect(fallback).toMatchObject({ paid: 5000, balance: 20000, overdueAmount: 5000, fromView: false })
+  })
+
   it('sums the outstanding balance across open pledges only', () => {
     const board: GivingBoard = {
       ...EMPTY_BOARD,

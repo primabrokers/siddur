@@ -37,6 +37,7 @@ import type {
   GivingBoard,
   GivingOption,
   GivingSelects,
+  PledgeBalanceRow,
   PledgeInstallmentRow,
   PledgeRow,
   RecurringAgreementRow,
@@ -72,6 +73,26 @@ async function fetchDonations(build: (q: any) => any): Promise<{ rows: DonationR
   }
 }
 
+/**
+ * The `pledge_balances` view (02 §3.5/§4) — paid, written off, outstanding and
+ * the next installment, all computed by the database (I-8/I-9). The view is
+ * owned by the migrations, so a missing one degrades to an empty index and the
+ * cards fall back to an approximation rather than failing.
+ */
+async function fetchPledgeBalances(pledgeIds: string[]): Promise<Record<string, PledgeBalanceRow>> {
+  if (pledgeIds.length === 0) return {}
+  try {
+    const rows = await selectRows<PledgeBalanceRow>('pledge_balances', (q) =>
+      q.in('pledge_id', pledgeIds),
+    )
+    const index: Record<string, PledgeBalanceRow> = {}
+    for (const row of rows) index[row.pledge_id] = row
+    return index
+  } catch {
+    return {}
+  }
+}
+
 /* ------------------------------------------------------------------- board */
 
 async function fetchBoard(now: Date): Promise<GivingBoard> {
@@ -93,12 +114,14 @@ async function fetchBoard(now: Date): Promise<GivingBoard> {
   const gifts = recent.rows
 
   const pledgeIds = pledges.map((pledge) => pledge.id)
-  const installments =
+  const [installments, balances] = await Promise.all([
     pledgeIds.length > 0
-      ? await selectRows<PledgeInstallmentRow>('pledge_installments', (q) =>
+      ? selectRows<PledgeInstallmentRow>('pledge_installments', (q) =>
           q.in('pledge_id', pledgeIds).order('due_on', { ascending: true }),
         )
-      : []
+      : Promise.resolve([]),
+    fetchPledgeBalances(pledgeIds),
+  ])
 
   const contactIds = unique([
     ...gifts.map((gift) => gift.contact_id),
@@ -131,6 +154,7 @@ async function fetchBoard(now: Date): Promise<GivingBoard> {
     installments,
     recurring,
     contacts,
+    balances,
     yearGifts,
     monthGifts: gifts.filter((gift) => inWindow(gift, monthStart, monthEnd)),
     amountsHidden: recent.amountsHidden,
@@ -196,8 +220,15 @@ function invalidateGiving(client: QueryClient, contactId?: string | null) {
   }
 }
 
+/**
+ * Patch the board caches in place (the optimistic half of a one-tap write).
+ * Scoped to `qk.giving.boards`, never `qk.giving.all` — the latter also matches
+ * `qk.giving.selects`, whose cache is a different shape entirely.
+ */
 const patchBoard = (client: QueryClient, update: (board: GivingBoard) => GivingBoard) => {
-  client.setQueriesData<GivingBoard>({ queryKey: qk.giving.all }, (board) => (board ? update(board) : board))
+  client.setQueriesData<GivingBoard>({ queryKey: qk.giving.boards }, (board) =>
+    board && Array.isArray(board.gifts) ? update(board) : board,
+  )
 }
 
 const applyGiftPatch = (board: GivingBoard, id: string, patch: Partial<DonationRow>): GivingBoard => ({
@@ -269,7 +300,14 @@ export function useCreateGift() {
   })
 }
 
-/** Undo for a just-saved gift: children first, then the donation itself. */
+/**
+ * Undo for a just-saved gift: children first, then the donation itself.
+ *
+ * TODO(M7/08 §2): whatever the triggers created for the gift (the thank-you
+ * task, the receipt queueing, the claim line) should unwind with it — a
+ * database concern, since only the triggers know what they wrote. Until then an
+ * undone gift can leave an open thank-you task behind.
+ */
 export function useDeleteGift() {
   const client = useQueryClient()
   return useMutation<void, Error, { id: string; contactId?: string | null }>({
@@ -331,7 +369,7 @@ export function useMarkThanked() {
       return { completedTaskIds, previousStatus: gift.thank_you_status }
     },
     onMutate: async ({ gift }) => {
-      await client.cancelQueries({ queryKey: qk.giving.all })
+      await client.cancelQueries({ queryKey: qk.giving.boards })
       patchBoard(client, (board) => applyGiftPatch(board, gift.id, { thank_you_status: 'done' }))
     },
     onSettled: (_d, _e, variables) => invalidateGiving(client, variables.gift.contact_id),
@@ -375,7 +413,7 @@ export function useSetReceiptStatus() {
       if (error) fail(error)
     },
     onMutate: async ({ gift, status }) => {
-      await client.cancelQueries({ queryKey: qk.giving.all })
+      await client.cancelQueries({ queryKey: qk.giving.boards })
       patchBoard(client, (board) => applyGiftPatch(board, gift.id, { receipt_status: status }))
     },
     onSettled: (_d, _e, variables) => invalidateGiving(client, variables.gift.contact_id),
@@ -518,7 +556,7 @@ export function useSetRecurringStatus() {
       if (error) fail(error)
     },
     onMutate: async ({ agreement, status }) => {
-      await client.cancelQueries({ queryKey: qk.giving.all })
+      await client.cancelQueries({ queryKey: qk.giving.boards })
       patchBoard(client, (board) => ({
         ...board,
         recurring: board.recurring.map((row) => (row.id === agreement.id ? { ...row, status } : row)),

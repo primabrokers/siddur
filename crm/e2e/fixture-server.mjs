@@ -383,6 +383,27 @@ const DB = {
     { id: 'ins-7', pledge_id: 'pl-2', due_on: daysFromNow(-100), amount: 800, status: 'paid' },
   ],
 
+  /**
+   * The `pledge_balances` view (02 §3.5/§4) — the authoritative paid/balance
+   * figures the cards read (I-8/I-9). Static here, recomputed by the real view.
+   */
+  pledge_balances: [
+    {
+      pledge_id: 'pl-1', contact_id: DOVID, status: 'open', pledged_on: '2025-10-01', currency: 'GBP',
+      total_amount: 25000, amount_gbp: 25000, fund_id: 'f2', campaign_id: 'c1', appeal_id: null,
+      paid_amount: 10000, payment_count: 1, write_off_amount: 0, balance: 15000,
+      installment_count: 3, paid_installment_count: 2, overdue_installment_count: 0, overdue_amount: 0,
+      next_installment_id: 'ins-3', next_installment_due_on: daysFromNow(19), next_installment_amount: 5000,
+    },
+    {
+      pledge_id: 'pl-2', contact_id: KATZ, status: 'open', pledged_on: '2025-06-01', currency: 'GBP',
+      total_amount: 4000, amount_gbp: 4000, fund_id: 'f1', campaign_id: null, appeal_id: null,
+      paid_amount: 800, payment_count: 1, write_off_amount: 0, balance: 3200,
+      installment_count: 4, paid_installment_count: 1, overdue_installment_count: 3, overdue_amount: 2400,
+      next_installment_id: 'ins-6', next_installment_due_on: daysFromNow(-80), next_installment_amount: 800,
+    },
+  ],
+
   // M4: standing orders, including the failing one behind the nudge (08 §3).
   recurring_agreements: [
     {

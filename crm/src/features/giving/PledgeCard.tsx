@@ -8,6 +8,7 @@ import type {
   ContactRow,
   DonationRow,
   GivingRefs,
+  PledgeBalanceRow,
   PledgeInstallmentRow,
   PledgeRow,
 } from './types'
@@ -18,6 +19,8 @@ export interface PledgeCardProps {
   donations: DonationRow[]
   installments: PledgeInstallmentRow[]
   refs?: GivingRefs | null
+  /** The `pledge_balances` row — the database's paid/balance figures (I-8). */
+  balance?: PledgeBalanceRow | null
   /** Write-off is admin-only (11 §1). */
   canWriteOff?: boolean
   readOnly?: boolean
@@ -47,6 +50,7 @@ export function PledgeCard({
   donations,
   installments,
   refs,
+  balance,
   canWriteOff,
   readOnly,
   amountsHidden,
@@ -54,7 +58,7 @@ export function PledgeCard({
   onWriteOff,
   onCancel,
 }: PledgeCardProps) {
-  const progress = pledgeProgress(pledge, { donations, installments })
+  const progress = pledgeProgress(pledge, { donations, installments }, new Date(), balance ?? null)
   // Sorted here rather than trusting the fetch order — the schedule reads as a
   // schedule only in date order.
   const mine = installments
@@ -120,7 +124,7 @@ export function PledgeCard({
         {progress.overdue.length > 0 ? (
           <span className="font-semibold text-flag-overdue">
             {progress.overdue.length} overdue installment{progress.overdue.length === 1 ? '' : 's'} —{' '}
-            {formatMoney(progress.overdue.reduce((sum, row) => sum + row.amount, 0))}
+            {formatMoney(progress.overdueAmount)}
           </span>
         ) : null}
       </div>

@@ -48,12 +48,29 @@ async function signInIfNeeded(page) {
   await todayHeading.waitFor({ timeout: 25_000 })
 }
 
-/** Both entry sheets open on the contact picker; choose the first match. */
+/**
+ * Both entry sheets open on the contact picker. Prefer the named donor (the
+ * fixtures' Dovid Cohen, who has history, a declaration and an open pledge);
+ * against a live database with a different cast, take whoever is first.
+ */
 async function pickContact(dialog, term) {
   const search = dialog.getByLabel('Search contacts')
-  if (await search.isVisible().catch(() => false)) {
-    await search.fill(term)
-    await dialog.getByRole('button', { name: new RegExp(term, 'i') }).first().click()
+  if (!(await search.isVisible().catch(() => false))) return
+  await search.fill(term)
+  await dialog.page().waitForTimeout(400)
+  const named = dialog.getByRole('button', { name: new RegExp(term, 'i') })
+  if (await named.count()) {
+    await named.first().click()
+    return
+  }
+  await search.fill('')
+  await dialog.page().waitForTimeout(400)
+  const first = dialog.locator('div.overflow-y-auto button').first()
+  if (await first.count()) {
+    log('picker: no match for', term, '— taking the first contact')
+    await first.click()
+  } else {
+    log('picker: no contacts at all — the sheet stays on the picker')
   }
 }
 
@@ -141,7 +158,15 @@ async function main() {
     // 6 — the profile entry point: the Giving tab's "Record gift" opens the
     // same sheet already bound to this donor (04 §5.3 → 05 §1).
     await page.getByRole('tab', { name: /Recent gifts/ }).click()
-    await page.locator('table a[href^="/contacts/"]').first().click()
+    await page.waitForTimeout(500)
+    const donorLink = page.locator('table a[href^="/contacts/"]').first()
+    if ((await donorLink.count()) === 0) {
+      log('no gifts in the ledger yet — skipping the profile entry-point shot')
+      if (errors.length > 0) log('console errors:', errors.slice(0, 6))
+      else log('no console errors')
+      return
+    }
+    await donorLink.click()
     await page.getByRole('tab', { name: 'Giving' }).click()
     await page.waitForTimeout(900)
     const profileGift = page.getByRole('button', { name: 'Record gift' })
