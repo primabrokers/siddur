@@ -138,8 +138,10 @@ export function SearchOverlay({ open, onClose }: SearchOverlayProps) {
   }, [debounced])
 
   useEffect(() => {
+    // Optional chaining on the call too: jsdom (and some older engines) have
+    // no `scrollIntoView`, and keeping the highlight in view is a nicety.
     const node = listRef.current?.querySelector<HTMLElement>('[aria-selected="true"]')
-    node?.scrollIntoView({ block: 'nearest' })
+    node?.scrollIntoView?.({ block: 'nearest' })
   }, [cursor, rows.length])
 
   function pick(result: SearchResult | undefined) {

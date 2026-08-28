@@ -68,16 +68,18 @@ export function TeamTab({ readOnly, selfId }: TeamTabProps) {
                     <div className="text-[11.5px] text-faint">{member.email}</div>
                   </td>
                   <td className="py-[10px] pr-3">
-                    <Select
-                      aria-label={`Role for ${member.full_name}`}
-                      value={member.role}
-                      disabled={readOnly || isSelf}
-                      options={ROLES}
-                      onChange={(event) =>
-                        update.mutate({ id: member.id, patch: { role: event.target.value as TeamRole } })
-                      }
-                      className="w-[140px] py-[5px] text-[12.5px]"
-                    />
+                    <div className="w-[140px]">
+                      <Select
+                        aria-label={`Role for ${member.full_name}`}
+                        value={member.role}
+                        disabled={readOnly || isSelf}
+                        options={ROLES}
+                        onChange={(event) =>
+                          update.mutate({ id: member.id, patch: { role: event.target.value as TeamRole } })
+                        }
+                        className="py-[5px] text-[12.5px]"
+                      />
+                    </div>
                   </td>
                   <td className="py-[10px] pr-3">
                     {member.role === 'viewer' ? (
@@ -103,19 +105,21 @@ export function TeamTab({ readOnly, selfId }: TeamTabProps) {
                     )}
                   </td>
                   <td className="py-[10px] pr-3">
-                    <Select
-                      aria-label={`Digest hour for ${member.full_name}`}
-                      value={String(member.digest_hour)}
-                      disabled={readOnly}
-                      options={HOURS}
-                      onChange={(event) =>
-                        update.mutate({
-                          id: member.id,
-                          patch: { digest_hour: Number(event.target.value) },
-                        })
-                      }
-                      className="w-[92px] py-[5px] text-[12.5px]"
-                    />
+                    <div className="w-[96px]">
+                      <Select
+                        aria-label={`Digest hour for ${member.full_name}`}
+                        value={String(member.digest_hour)}
+                        disabled={readOnly}
+                        options={HOURS}
+                        onChange={(event) =>
+                          update.mutate({
+                            id: member.id,
+                            patch: { digest_hour: Number(event.target.value) },
+                          })
+                        }
+                        className="py-[5px] text-[12.5px]"
+                      />
+                    </div>
                   </td>
                   <td className="py-[10px]">
                     <label className="flex items-center gap-2 text-[12.5px] text-muted">

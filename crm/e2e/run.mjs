@@ -1,17 +1,33 @@
 #!/usr/bin/env node
 /**
- * End-to-end walkthrough — STUB.
+ * End-to-end entry point — a signpost, not a runner.
  *
- * TODO(e2e): drive Chromium with playwright-core
- * (`/opt/pw-browsers/chromium`, `--no-sandbox`, per crm/CLAUDE.md), start the
- * Vite preview server on 5180, sign in against the live project, and capture
- * the four acceptance walkthroughs from spec 12 §2 as screenshots into
- * `e2e/screenshots/`.
+ * The four spec 12 §2 acceptance tests are **executable and in CI** as vitest
+ * suites (`crm/tests/acceptance/`), offline by default against a deterministic
+ * seeded Monday, and against the live project with `LIVE=1` (`npm run
+ * test:live`, which also runs the 11 §1 RLS conformance matrix).
  *
- * Exits 0 so `npm run e2e` is wired and green from day one.
+ * What lives here instead is the *visual* pass: per-milestone screenshot
+ * scripts that drive Chromium (`/opt/pw-browsers/chromium`, `--no-sandbox`)
+ * against either the offline fixture server or the live project through the
+ * relay. Each script's header carries its own recipe.
+ *
+ * TODO(e2e): a single walkthrough that chains the four milestone scripts and
+ * diffs the shots against a baseline. Until then, run them individually.
  */
 
-console.log('e2e: stub — no browser walkthrough yet.')
-console.log('     TODO: playwright-core + Chromium at /opt/pw-browsers/chromium (--no-sandbox),')
-console.log('     preview on :5180, spec 12 §2 acceptance walkthroughs, screenshots to e2e/screenshots/.')
+const SCRIPTS = [
+  ['m1-shots.mjs', 'contacts list, profile, details'],
+  ['m2-shots.mjs', 'Action Stream, tasks, close-the-loop'],
+  ['m3-capture-shots.mjs', 'Quick Capture — input, confirm, saved'],
+  ['m4-shots.mjs', 'giving, gift entry, pledges, thanks'],
+  ['m5-shots.mjs', 'search, command palette, views bar, settings'],
+]
+
+console.log('e2e: the acceptance tests are vitest suites, not browser scripts.')
+console.log('     npm test                 — the four spec 12 §2 tests, offline')
+console.log('     npm run test:live        — the same four + the RLS matrix, live')
+console.log('')
+console.log('     Screenshot scripts (see each header for its recipe):')
+for (const [file, what] of SCRIPTS) console.log(`       node e2e/${file}`.padEnd(38), what)
 process.exit(0)

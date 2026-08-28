@@ -153,17 +153,19 @@ export function ViewsBar({
           </button>
         ))}
 
-        <Select
-          aria-label="Add a filter"
-          value=""
-          placeholder="Add filter…"
-          options={additions.map((addition) => ({ value: addition.id, label: addition.label }))}
-          onChange={(event) => {
-            const addition = additions.find((item) => item.id === event.target.value)
-            if (addition) onFiltersChange(addition.apply(filters))
-          }}
-          className="w-[190px] py-[4px] text-[12px]"
-        />
+        <div className="w-[190px]">
+          <Select
+            aria-label="Add a filter"
+            value=""
+            placeholder="Add filter…"
+            options={additions.map((addition) => ({ value: addition.id, label: addition.label }))}
+            onChange={(event) => {
+              const addition = additions.find((item) => item.id === event.target.value)
+              if (addition) onFiltersChange(addition.apply(filters))
+            }}
+            className="py-[4px] text-[12px]"
+          />
+        </div>
 
         {dirty && !isEmptyFilters(filters) ? (
           <Button size="sm" variant="accentOutline" onClick={onSaveAsView} className="ml-auto">

@@ -29,12 +29,14 @@ Font: "Albert Sans" (Google Fonts) with system-ui fallback. Radii: cards 10px, i
 crm/
   src/lib/         env.ts, supabase.ts, queries/ (typed data access), format.ts, dates.ts
   src/components/  ui primitives: Flag, Pill, PersonRow, MetricCard, TimelineEntry, NudgeCard, Sheet, Toast…
-  src/features/    contacts/ stream/ tasks/ capture/ giving/ settings/
+  src/features/    contacts/ stream/ tasks/ capture/ giving/ search/ views/ settings/
   src/routes/      route components composing features
   supabase/
     migrations/    SQL mirror of what's applied
     functions/     edge functions (ai-quick-capture)
-  tests/           vitest integration + the four acceptance tests (spec 12 §2)
+  tests/           vitest integration; acceptance/ holds the four spec 12 §2 tests
+                   (offline by default; `LIVE=1` runs the live + RLS siblings)
+                   and support/ the in-memory PostgREST stand-in they run on
   e2e/             playwright screenshots/walkthrough
 ```
 
@@ -50,6 +52,6 @@ crm/
 
 ## Commands
 
-`npm run dev` (port 5180) · `npm run build` · `npm run typecheck` · `npm test` (vitest) · `npm run e2e`
+`npm run dev` (port 5180) · `npm run build` · `npm run typecheck` · `npm test` (vitest) · `npm run test:live` (LIVE=1 acceptance + RLS against the real project) · `npm run e2e`
 
 Before declaring any milestone done: typecheck + build + tests green, and the feature exercised against the live Supabase project.

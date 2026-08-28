@@ -121,8 +121,23 @@ const statsBase = {
 }
 
 const DB = {
-  team_members: [{ id: BRAUN, full_name: "R' Braun", role: 'admin', email: 'admin@demo.test' }],
+  team_members: [
+    {
+      id: BRAUN, full_name: "R' Braun", role: 'admin', email: 'admin@demo.test',
+      can_see_amounts: true, digest_hour: 7, digest_channel: 'email', is_active: true,
+    },
+    {
+      id: '11111111-1111-1111-1111-111111111112', full_name: 'Rivka Klein', role: 'fundraiser',
+      email: 'fundraiser@demo.test', can_see_amounts: true, digest_hour: 8, digest_channel: 'email', is_active: true,
+    },
+    {
+      id: '11111111-1111-1111-1111-111111111113', full_name: 'Shaindy Viewer', role: 'viewer',
+      email: 'viewer@demo.test', can_see_amounts: false, digest_hour: 7, digest_channel: 'none', is_active: true,
+    },
+  ],
 
+  // M5 (Settings): every option carries an id, because the lookup editor writes
+  // by primary key (06 §4).
   lookup_options: [
     ...['prospect|Prospect', 'cultivation|Cultivation', 'in_discussion|In discussion', 'active_donor|Active donor', 'stewardship|Stewardship', 'keep_in_touch|Keep in touch'].map(
       (v, i) => ({ list_name: 'stage', value: v.split('|')[0], label: v.split('|')[1], sort_order: i, color: null, meta: {}, is_active: true }),
@@ -562,6 +577,62 @@ const DB = {
   ],
 }
 
+// The lookup rows above are written as list/value pairs; the Settings editor
+// updates by `id`, so stamp one on each.
+DB.lookup_options.forEach((option, index) => {
+  option.id = `lo-${index}`
+})
+
+// ---------------------------------------------------------------------------
+// M5: saved views (06 §1) and the automation-rule switches (08 §7).
+// ---------------------------------------------------------------------------
+
+const view = (id, name, entity, filters, icon) => ({
+  id, name, entity, layout: 'table', filters, sort: {}, group_by: null,
+  columns: [], icon, owner_id: null, is_shared: true, created_at: new Date().toISOString(),
+})
+
+DB.saved_views = [
+  view('sv-followups', 'Follow-ups today', 'tasks', { due: 'today' }, 'clock'),
+  view('sv-overdue', 'Overdue follow-ups', 'tasks', { due: 'overdue' }, 'alert'),
+  view('sv-lybunt', 'LYBUNT', 'contacts', { is_lybunt: true }, 'trend-down'),
+  view('sv-quiet-30', 'No contact 30+ days', 'contacts', { days_since_contact_gte: 30 }, 'clock'),
+  view('sv-quiet-60', 'No contact 60+ days', 'contacts', { days_since_contact_gte: 60 }, 'clock'),
+  view('sv-quiet-90', 'No contact 90+ days', 'contacts', { days_since_contact_gte: 90 }, 'clock'),
+  view('sv-prospects', 'High-priority prospects', 'contacts', { stage: ['prospect', 'cultivation', 'in_discussion'], priority: ['high'] }, 'star'),
+  view('sv-pledges', 'Pledges outstanding', 'contacts', { pledge_balance_gt: 0 }, 'handshake'),
+  view('sv-prelapsed', 'Pre-lapsed rescue list', 'contacts', { donor_status: ['pre_lapsed'] }, 'alert'),
+  view('sv-stewardship', 'Recent gifts needing stewardship', 'donations', { donated_within_days: 30, thank_you_status_not: ['done'] }, 'gift'),
+  view('sv-ga', 'GA: missing declarations', 'donations', { gift_aid_status: ['pending_declaration'] }, 'alert'),
+]
+
+DB.automation_rules = [
+  ['thank_you_on_gift', { due_in_days: 2, big_gift_threshold: 500, major_gift_threshold: 5000, skip_if_open: true }],
+  ['receipt_on_gift', { system_default: 'email' }],
+  ['first_gift_call', { within_hours: 48 }],
+  ['gift_aid_evaluate', { back_years: 4, require_oral_confirmation: true }],
+  ['ga_declaration_chase', { min_amount: 0 }],
+  ['household_soft_credit', {}],
+  ['influencer_prompt', {}],
+  ['tribute_acknowledgee', { due_in_days: 3 }],
+  ['stage_change_prompts', {}],
+  ['pledge_schedule', {}],
+  ['kit_due', {}],
+  ['proposal_follow_up', { days: 7 }],
+  ['pledge_chase', { first_after_days: 14, second_after_days: 30, repeat_days: 30 }],
+  ['recurring_failing', { late_days: 7 }],
+  ['neglect_flags', { high_priority_days: 30, active_donor_days: 60, vip_days: 90, vip_tag: 'VIP' }],
+  ['engagement_recompute', { lookback_days: 365, halflife_days: 120, recency_days: 30 }],
+  ['donor_status', { new_months: 6, active_months: 12, pre_lapsed_months: 18 }],
+  ['donor_status_recompute', {}],
+  ['meeting_reminder', { days_before: 1 }],
+  ['stale_prospects', { days: 90 }],
+  ['auto_tags', {}],
+  ['rfm_recompute', {}],
+  ['no_next_action_audit', {}],
+  ['duplicate_scan', { name_similarity: 0.6 }],
+].map(([rule_key, params]) => ({ rule_key, is_enabled: rule_key !== 'rfm_recompute', params, updated_at: new Date().toISOString() }))
+
 const CORS = {
   'access-control-allow-origin': '*',
   'access-control-allow-methods': 'GET,POST,PATCH,PUT,DELETE,OPTIONS,HEAD',
@@ -590,7 +661,7 @@ const SESSION = {
 function applyFilters(rows, url) {
   let out = rows
   for (const [key, raw] of url.searchParams.entries()) {
-    if (['select', 'order', 'limit', 'offset'].includes(key)) continue
+    if (['select', 'order', 'limit', 'offset', 'or'].includes(key)) continue
     const [op, ...rest] = raw.split('.')
     const value = rest.join('.')
     const cmp = (row) => String(row[key] ?? '')
@@ -606,8 +677,42 @@ function applyFilters(rows, url) {
     else if (op === 'gt') out = out.filter((r) => r[key] != null && cmp(r) > value)
     else if (op === 'lte') out = out.filter((r) => r[key] != null && cmp(r) <= value)
     else if (op === 'lt') out = out.filter((r) => r[key] != null && cmp(r) < value)
+    // M5 (search): `ilike` and the `or=(…)` grammar the search overlay builds.
+    else if (op === 'ilike') out = out.filter((r) => r[key] != null && likeRe(value).test(String(r[key])))
+  }
+
+  // `or` arrives as its own parameter, not as `<column>=or.…`.
+  const orClause = url.searchParams.get('or')
+  if (orClause) {
+    const terms = orClause.replace(/^\(|\)$/g, '').split(',').map(parseOrTerm)
+    out = out.filter((row) => terms.some((term) => term(row)))
   }
   return out
+}
+
+/** PostgREST accepts `*` and `%` as the wildcard in `ilike`. */
+function likeRe(pattern) {
+  const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/[*%]/g, '.*')
+  return new RegExp(`^${escaped}$`, 'i')
+}
+
+/** One `column.op.value` term inside an `or=(…)` clause. */
+function parseOrTerm(term) {
+  const [column, op, ...rest] = term.split('.')
+  const value = rest.join('.')
+  if (!column || !op) return () => false
+  if (op === 'eq') return (row) => String(row[column] ?? '') === value
+  if (op === 'neq') return (row) => String(row[column] ?? '') !== value
+  if (op === 'ilike') {
+    const re = likeRe(value)
+    return (row) => row[column] != null && re.test(String(row[column]))
+  }
+  if (op === 'is') return (row) => (value === 'null' ? row[column] == null : row[column] != null)
+  if (op === 'gte') return (row) => row[column] != null && String(row[column]) >= value
+  if (op === 'gt') return (row) => row[column] != null && String(row[column]) > value
+  if (op === 'lte') return (row) => row[column] != null && String(row[column]) <= value
+  if (op === 'lt') return (row) => row[column] != null && String(row[column]) < value
+  return () => false
 }
 
 async function readJson(req) {

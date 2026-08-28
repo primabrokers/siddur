@@ -63,7 +63,10 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   }, [term])
 
   useEffect(() => {
-    listRef.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' })
+    // `scrollIntoView` is absent in jsdom and in a few older engines; keeping
+    // the highlight in view is a nicety, never a requirement.
+    const node = listRef.current?.querySelector<HTMLElement>('[aria-selected="true"]')
+    node?.scrollIntoView?.({ block: 'nearest' })
   }, [cursor, flat.length])
 
   const context: CommandContext = {

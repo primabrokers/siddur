@@ -365,6 +365,10 @@ export interface ViewRouteTarget {
  * Where a pinned view navigates. Contact views open the Contacts route with
  * the view applied; the two task views open the task list filtered to the same
  * queue; gift-side views open the Giving screen's matching queue tab.
+ *
+ * TODO(giving): `/giving?tab=` is currently inert — the Giving screen's tab is
+ * local state with no URL binding, so a gift-side view lands on its default
+ * tab. One `useSearchParams` read in `features/giving/GivingView` closes it.
  */
 export function routeForView(view: { id: string; entity: ViewEntity; filters: ViewFilters }): string {
   if (view.entity === 'tasks') {

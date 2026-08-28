@@ -41,14 +41,16 @@ function OptionRow({ option, readOnly, onPatch }: RowProps) {
   return (
     <tr className={cn('border-t border-border', !option.is_active && 'text-faint')}>
       <td className="py-[6px] pr-3">
-        <TextInput
-          value={label}
-          disabled={readOnly}
-          aria-label={`Label for ${option.value}`}
-          onChange={(event) => setLabel(event.target.value)}
-          onBlur={() => label.trim() !== option.label && onPatch({ label: label.trim() })}
-          className="py-[5px] text-[13px]"
-        />
+        <div className="w-[220px]">
+          <TextInput
+            value={label}
+            disabled={readOnly}
+            aria-label={`Label for ${option.value}`}
+            onChange={(event) => setLabel(event.target.value)}
+            onBlur={() => label.trim() !== option.label && onPatch({ label: label.trim() })}
+            className="py-[5px] text-[13px]"
+          />
+        </div>
       </td>
       <td className="py-[6px] pr-3 text-[12px] text-faint">
         <code>{option.value}</code>
@@ -64,18 +66,20 @@ function OptionRow({ option, readOnly, onPatch }: RowProps) {
         />
       </td>
       <td className="py-[6px] pr-3">
-        <TextInput
-          type="number"
-          value={sort}
-          disabled={readOnly}
-          aria-label={`Sort order for ${option.value}`}
-          onChange={(event) => setSort(event.target.value)}
-          onBlur={() => {
-            const parsed = Number.parseInt(sort, 10)
-            if (Number.isFinite(parsed) && parsed !== option.sort_order) onPatch({ sort_order: parsed })
-          }}
-          className="w-[70px] py-[5px] text-[13px]"
-        />
+        <div className="w-[72px]">
+          <TextInput
+            type="number"
+            value={sort}
+            disabled={readOnly}
+            aria-label={`Sort order for ${option.value}`}
+            onChange={(event) => setSort(event.target.value)}
+            onBlur={() => {
+              const parsed = Number.parseInt(sort, 10)
+              if (Number.isFinite(parsed) && parsed !== option.sort_order) onPatch({ sort_order: parsed })
+            }}
+            className="py-[5px] text-[13px]"
+          />
+        </div>
       </td>
       <td className="py-[6px] text-right">
         <label className="inline-flex items-center gap-2 text-[12.5px] text-muted">
@@ -142,13 +146,14 @@ export function LookupsTab({ readOnly }: LookupsTabProps) {
       <div className="flex flex-wrap items-end gap-3">
         <label className="flex flex-col gap-[6px]">
           <span className="text-[12px] font-semibold text-muted">List</span>
-          <Select
-            aria-label="Lookup list"
-            value={listName}
-            onChange={(event) => setListName(event.target.value)}
-            options={(names.data ?? []).map((name) => ({ value: name, label: humaniseList(name) }))}
-            className="w-[220px]"
-          />
+          <div className="w-[220px]">
+            <Select
+              aria-label="Lookup list"
+              value={listName}
+              onChange={(event) => setListName(event.target.value)}
+              options={(names.data ?? []).map((name) => ({ value: name, label: humaniseList(name) }))}
+            />
+          </div>
         </label>
         <p className="pb-[9px] text-[12px] text-muted">
           {rows.length} option{rows.length === 1 ? '' : 's'} · retiring never deletes history
@@ -191,13 +196,15 @@ export function LookupsTab({ readOnly }: LookupsTabProps) {
         <div className="flex flex-wrap items-end gap-2">
           <label className="flex flex-col gap-[6px]">
             <span className="text-[12px] font-semibold text-muted">Add an option</span>
-            <TextInput
-              value={newLabel}
-              onChange={(event) => setNewLabel(event.target.value)}
-              placeholder="Label — e.g. “Shul committee”"
-              aria-label="New option label"
-              className="w-[260px] py-[7px] text-[13px]"
-            />
+            <div className="w-[260px]">
+              <TextInput
+                value={newLabel}
+                onChange={(event) => setNewLabel(event.target.value)}
+                placeholder="Label — e.g. “Shul committee”"
+                aria-label="New option label"
+                className="py-[7px] text-[13px]"
+              />
+            </div>
           </label>
           <Button disabled={newLabel.trim() === '' || create.isPending} onClick={() => void addOption()}>
             Add

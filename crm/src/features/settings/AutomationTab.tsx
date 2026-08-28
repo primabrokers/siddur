@@ -85,23 +85,27 @@ function ParamField({
   return (
     <label className="flex items-center gap-2 text-[12.5px] text-muted">
       <span className="whitespace-nowrap">{field.label}</span>
-      <TextInput
-        type={numeric ? 'number' : 'text'}
-        value={draft}
-        disabled={disabled}
-        aria-label={field.label}
-        title={field.help}
-        onChange={(event) => setDraft(event.target.value)}
-        onBlur={() => {
-          if (numeric) {
-            const parsed = Number(draft)
-            if (Number.isFinite(parsed) && parsed !== Number(value)) onCommit(parsed)
-          } else if (draft !== String(value ?? '')) {
-            onCommit(draft)
-          }
-        }}
-        className={cn('py-[4px] text-[12.5px]', numeric ? 'w-[84px]' : 'w-[150px]')}
-      />
+      {/* The width lives on a wrapper: `TextInput` carries `w-full`, and two
+          width utilities on one element is a coin toss, not a decision. */}
+      <span className={cn('inline-block shrink-0', numeric ? 'w-[86px]' : 'w-[150px]')}>
+        <TextInput
+          type={numeric ? 'number' : 'text'}
+          value={draft}
+          disabled={disabled}
+          aria-label={field.label}
+          title={field.help}
+          onChange={(event) => setDraft(event.target.value)}
+          onBlur={() => {
+            if (numeric) {
+              const parsed = Number(draft)
+              if (Number.isFinite(parsed) && parsed !== Number(value)) onCommit(parsed)
+            } else if (draft !== String(value ?? '')) {
+              onCommit(draft)
+            }
+          }}
+          className="py-[4px] text-[12.5px]"
+        />
+      </span>
       {field.suffix ? <span className="text-faint">{field.suffix}</span> : null}
     </label>
   )
