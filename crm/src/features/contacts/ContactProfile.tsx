@@ -20,6 +20,7 @@ import {
 import { canEdit, useTeamMember } from '../auth/useTeamMember'
 import { useCapture } from '../capture/QuickCapture'
 import { MergeFromProfile } from '../dataquality'
+import { JourneysPanel } from '../journeys'
 import { ContactSheet } from './ContactSheet'
 import { DetailsTab } from './DetailsTab'
 import { GivingTab } from './GivingTab'
@@ -264,6 +265,12 @@ export function ContactProfile({ id }: { id: string }) {
             stats={stats}
             onSetCadence={(days) => patch({ contact_frequency_days: days })}
             onSetPause={(until) => patch({ kit_paused_until: until })}
+          />
+          <JourneysPanel
+            contactId={contact.id}
+            contactName={name}
+            memberId={teamMember.data?.id ?? null}
+            readOnly={!canEdit(teamMember.data)}
           />
           <OpenPledgePanel giving={giving.data} refs={refs.data} />
         </aside>

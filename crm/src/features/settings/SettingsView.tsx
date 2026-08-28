@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Pill, Tabs } from '../../components'
 import { useAuth } from '../auth/AuthProvider'
 import { useTeamMember } from '../auth/useTeamMember'
+import { CalendarFeedLine } from '../journeys'
 import { PageHeader } from '../shell/PageHeader'
 import { AiTab } from './AiTab'
 import { AutomationTab } from './AutomationTab'
@@ -70,7 +71,14 @@ export function SettingsView() {
 
       {tab === 'lookups' ? <LookupsTab readOnly={readOnly} /> : null}
       {tab === 'automation' ? <AutomationTab readOnly={readOnly} /> : null}
-      {tab === 'team' ? <TeamTab readOnly={readOnly} selfId={member?.id ?? null} /> : null}
+      {/* The calendar feed (10 §4) is personal, not configuration: it sits above
+          the roster and is never read-only, because it is the viewer's own. */}
+      {tab === 'team' ? (
+        <>
+          <CalendarFeedLine memberId={member?.id ?? null} />
+          <TeamTab readOnly={readOnly} selfId={member?.id ?? null} />
+        </>
+      ) : null}
       {tab === 'organisation' ? <OrganisationTab readOnly={readOnly} /> : null}
       {tab === 'ai' ? <AiTab readOnly={readOnly} /> : null}
     </>

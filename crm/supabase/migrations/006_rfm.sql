@@ -34,7 +34,7 @@
 
 /** The display name every report list shows: person name, else organisation. */
 create or replace function public.crm_display_name(p_first text, p_last text, p_org text)
-returns text language sql immutable as $$
+returns text language sql immutable set search_path = pg_catalog as $$
   select coalesce(
     nullif(trim(coalesce(p_first, '') || ' ' || coalesce(p_last, '')), ''),
     nullif(trim(coalesce(p_org, '')), ''),
@@ -49,7 +49,7 @@ $$;
  */
 create or replace function public.crm_scrub_money(p_doc jsonb, p_keys text[])
 returns jsonb
-language plpgsql immutable as $$
+language plpgsql immutable set search_path = pg_catalog as $$
 declare
   v_out jsonb;
 begin
@@ -77,7 +77,7 @@ end $$;
 -- Every key that carries money in a report payload. One list, so a new card
 -- cannot accidentally leak an amount past a viewer's redaction.
 create or replace function public.crm_money_keys()
-returns text[] language sql immutable as $$
+returns text[] language sql immutable set search_path = pg_catalog as $$
   select array[
     'total','raised','goal','pledged_outstanding','gift_total','amount','lifetime',
     'claimed','recoverable','prior_total','largest','paid','outstanding','ytd',
@@ -457,7 +457,7 @@ language sql stable security definer set search_path = public, pg_temp as $$
       a.id, a.name, a.year, a.channel,
       regexp_replace(a.name, '\s*\d{4}\s*$', '') as stem,
       coalesce(sum(d.amount_gbp) filter (where d.status = 'received'), 0)::numeric(14,2) as total,
-      count(d.id) filter (where d.status = 'received')::int as gift_count
+      (count(d.id) filter (where d.status = 'received'))::int as gift_count
     from public.appeals a
     left join public.donations d on d.appeal_id = a.id
     group by a.id, a.name, a.year, a.channel
@@ -531,8 +531,8 @@ language sql stable security definer set search_path = public, pg_temp as $$
   outstanding as (
     select
       coalesce(sum(d.amount_gbp) filter (where d.gift_aid_status = 'eligible'), 0)::numeric(14,2) as eligible_amount,
-      count(*) filter (where d.gift_aid_status = 'eligible')::int  as eligible_gifts,
-      count(*) filter (where d.gift_aid_status = 'pending_declaration')::int as pending_gifts,
+      (count(*) filter (where d.gift_aid_status = 'eligible'))::int  as eligible_gifts,
+      (count(*) filter (where d.gift_aid_status = 'pending_declaration'))::int as pending_gifts,
       coalesce(sum(d.amount_gbp) filter (where d.gift_aid_status = 'pending_declaration'), 0)::numeric(14,2) as pending_amount
     from public.donations d
     where d.status = 'received' and d.gift_aid_claim_id is null
@@ -540,9 +540,9 @@ language sql stable security definer set search_path = public, pg_temp as $$
   cover as (
     select
       count(distinct d.contact_id)::int as donors,
-      count(distinct d.contact_id) filter (where exists (
+      (count(distinct d.contact_id) filter (where exists (
         select 1 from public.gift_aid_declarations g
-        where g.contact_id = d.contact_id and g.cancelled_on is null))::int as declared
+        where g.contact_id = d.contact_id and g.cancelled_on is null)))::int as declared
     from public.donations d
     join public.contacts c on c.id = d.contact_id
     where d.status = 'received' and d.currency = 'GBP' and c.contact_kind = 'individual'
@@ -662,6 +662,10 @@ stable
 security definer
 set search_path = public, pg_temp
 as $fn$
+-- Every column reference below is qualified: `contact_id`, `gift_count` and
+-- `amount` are OUT parameters of the RETURNS TABLE, and plpgsql resolves a bare
+-- name to the variable, not the column ("column reference is ambiguous"). The
+-- `dy` CTE renames its key to `cid` for the same reason.
 declare
   v_money boolean := public.crm_can_see_amounts();
   v_year  int     := coalesce(p_year, extract(year from current_date)::int);
@@ -672,32 +676,32 @@ begin
 
   return query
   with dy as (
-    select d.contact_id, extract(year from d.donated_on)::int as yr
+    select d.contact_id as cid, extract(year from d.donated_on)::int as yr
     from public.donations d where d.status = 'received' group by 1, 2
   ),
-  firsts as (select contact_id, min(yr) as first_yr from dy group by 1),
+  firsts as (select dy.cid, min(dy.yr) as first_yr from dy group by 1),
   picked as (
     select c.id
     from public.contacts c
     where c.merged_into_id is null and
       case p_key
         when 'retention_new' then
-          exists (select 1 from dy where dy.contact_id = c.id and dy.yr = v_year)
-          and (select first_yr from firsts f where f.contact_id = c.id) = v_year
+          exists (select 1 from dy where dy.cid = c.id and dy.yr = v_year)
+          and (select f.first_yr from firsts f where f.cid = c.id) = v_year
         when 'retention_repeat' then
-          exists (select 1 from dy where dy.contact_id = c.id and dy.yr = v_year)
-          and exists (select 1 from dy where dy.contact_id = c.id and dy.yr = v_year - 1)
+          exists (select 1 from dy where dy.cid = c.id and dy.yr = v_year)
+          and exists (select 1 from dy where dy.cid = c.id and dy.yr = v_year - 1)
         when 'retention_reactivated' then
-          exists (select 1 from dy where dy.contact_id = c.id and dy.yr = v_year)
-          and not exists (select 1 from dy where dy.contact_id = c.id and dy.yr = v_year - 1)
-          and (select first_yr from firsts f where f.contact_id = c.id) < v_year
+          exists (select 1 from dy where dy.cid = c.id and dy.yr = v_year)
+          and not exists (select 1 from dy where dy.cid = c.id and dy.yr = v_year - 1)
+          and (select f.first_yr from firsts f where f.cid = c.id) < v_year
         when 'retention_lapsed' then
-          exists (select 1 from dy where dy.contact_id = c.id and dy.yr = v_year - 1)
-          and not exists (select 1 from dy where dy.contact_id = c.id and dy.yr = v_year)
+          exists (select 1 from dy where dy.cid = c.id and dy.yr = v_year - 1)
+          and not exists (select 1 from dy where dy.cid = c.id and dy.yr = v_year)
         when 'retention_prior' then
-          exists (select 1 from dy where dy.contact_id = c.id and dy.yr = v_year - 1)
+          exists (select 1 from dy where dy.cid = c.id and dy.yr = v_year - 1)
         when 'donors' then
-          exists (select 1 from dy where dy.contact_id = c.id and dy.yr = v_year)
+          exists (select 1 from dy where dy.cid = c.id and dy.yr = v_year)
         when 'rfm' then
           exists (select 1 from public.taggings t join public.tags g on g.id = t.tag_id
                   where t.contact_id = c.id and g.category = 'rfm_auto' and g.name = p_arg
@@ -732,7 +736,7 @@ begin
       where d.status = 'received'
         and (p_key not in ('retention_new','retention_repeat','retention_reactivated','donors','bucket')
              or extract(year from d.donated_on)::int = v_year)), 0)::numeric(14,2) end,
-    count(d.id) filter (where d.status = 'received')::int,
+    (count(d.id) filter (where d.status = 'received'))::int,
     max(d.donated_on) filter (where d.status = 'received')
   from picked
   join public.contacts c on c.id = picked.id
