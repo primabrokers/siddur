@@ -216,6 +216,61 @@ describe('contact_stats mapping (02 §4.1)', () => {
     expect(mapContactStats({ contact_id: 'c1', flag: 'nonsense' })?.flag).toBe('none')
   })
 
+  it('reads the live view\'s actual column names (checked against the applied migration)', () => {
+    // Column list taken verbatim from information_schema for public.contact_stats.
+    const stats = mapContactStats({
+      contact_id: 'c1',
+      household_id: 'h1',
+      lifetime_giving: 65000,
+      giving_this_year: 15000,
+      giving_last_year: 20000,
+      soft_lifetime_giving: 6500,
+      soft_giving_this_year: 500,
+      soft_giving_last_year: 250,
+      gift_count: 7,
+      largest_gift: 20000,
+      average_gift: 9286,
+      first_gift_date: '2019-05-02',
+      first_gift_amount: 1000,
+      last_gift_date: '2026-03-12',
+      last_gift_amount: 15000,
+      is_lybunt: false,
+      is_sybunt: false,
+      pledge_balance: 15000,
+      last_meaningful_contact_at: '2026-08-11T10:00:00Z',
+      last_meaningful_contact_kind: 'meeting',
+      days_since_contact: 12,
+      kit_due_on: '2026-10-11',
+      open_task_count: 1,
+      next_action_id: 't1',
+      next_action_title: 'Call re proposal',
+      next_action_due_on: '2026-08-21',
+      next_action_type: 'call',
+      flag: 'overdue',
+      donor_status: 'active',
+      household_lifetime_giving: 71500,
+      household_gift_count: 9,
+    })
+
+    expect(stats).toMatchObject({
+      lifetime_giving: 65000,
+      this_year_giving: 15000,
+      last_year_giving: 20000,
+      soft_credit_lifetime: 6500,
+      soft_credit_this_year: 500,
+      first_gift_on: '2019-05-02',
+      last_gift_on: '2026-03-12',
+      last_contact_at: '2026-08-11T10:00:00Z',
+      last_contact_kind: 'meeting',
+      household_lifetime_giving: 71500,
+      household_gift_count: 9,
+      flag: 'overdue',
+      donor_status: 'active',
+    })
+    // The view does not carry a Gift Aid flag; the profile reads declarations.
+    expect(stats?.has_ga_declaration).toBeNull()
+  })
+
   it('returns null without a contact id', () => {
     expect(mapContactStats(null)).toBeNull()
     expect(mapContactStats({ lifetime_giving: 1 })).toBeNull()

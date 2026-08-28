@@ -111,6 +111,7 @@ export function mapContactStats(row: StatsRecord | null | undefined): ContactSta
     ]),
     soft_credit_this_year: num(row, [
       'soft_credit_this_year',
+      'soft_giving_this_year',
       'soft_this_year_giving',
       'soft_this_year',
       'this_year_soft_credit',
@@ -147,6 +148,9 @@ export function mapContactStats(row: StatsRecord | null | undefined): ContactSta
       'gift_aid_declaration_on_file',
       'ga_declaration',
     ]),
+    household_id: str(row, ['household_id']),
+    household_lifetime_giving: num(row, ['household_lifetime_giving', 'household_lifetime']),
+    household_gift_count: num(row, ['household_gift_count']),
   }
 }
 

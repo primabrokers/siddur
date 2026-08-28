@@ -35,7 +35,19 @@ vi.mock('../src/lib/supabase', () => ({
 }))
 vi.mock('../src/lib/env', () => ({ isConfigured: true, SUPABASE_URL: '', SUPABASE_ANON_KEY: '' }))
 
-const { findDuplicates } = await import('../src/lib/queries/contacts')
+/** Capture the options each hook hands to useQuery, so a data path can be run
+ *  without mounting React. */
+let lastQueryOptions: { queryFn: () => Promise<any> } | null = null
+vi.mock('@tanstack/react-query', () => ({
+  useQuery: (options: { queryFn: () => Promise<unknown> }) => {
+    lastQueryOptions = options as { queryFn: () => Promise<any> }
+    return { data: undefined, isLoading: false, error: null }
+  },
+  useMutation: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
+  useQueryClient: () => ({ invalidateQueries: vi.fn(), cancelQueries: vi.fn(), getQueryData: vi.fn(), setQueryData: vi.fn() }),
+}))
+
+const { findDuplicates, useContactGiving } = await import('../src/lib/queries/contacts')
 
 const contact = (over: Partial<ContactRow>): ContactRow =>
   ({
@@ -110,3 +122,63 @@ describe('findDuplicates', () => {
     expect(await findDuplicates({ first_name: 'Chaim', last_name: 'Lax' })).toEqual([])
   })
 })
+
+/**
+ * Amounts and private notes must never be fetched through a path that bypasses
+ * the redacted views (CLAUDE.md rule 7 / 11 §2). `donations_sel` requires
+ * `crm_can_see_amounts()`, so a restricted viewer gets zero rows from
+ * `donations` — the reader must fall back to `donations_redacted` rather than
+ * reporting "never gave".
+ */
+describe('gift reads honour the redacted view', () => {
+  beforeEach(() => {
+    recorded.length = 0
+    responses = []
+  })
+
+  it('falls back to donations_redacted when donations yields nothing', async () => {
+    const gift = { id: 'd1', contact_id: 'c1', donated_on: '2026-03-12', amount: null, amount_gbp: null }
+    // Promise.all starts donations, pledges and recurring in the same tick;
+    // the redacted retry only happens after donations comes back empty.
+    responses = [
+      [], // donations — RLS hides every row from this member
+      [], // pledges
+      [], // recurring_agreements
+      [gift] as never, // donations_redacted
+    ]
+
+    const result = await runGivingQuery('c1')
+
+    expect(recorded.map((r) => r.table)).toContain('donations')
+    expect(recorded.map((r) => r.table)).toContain('donations_redacted')
+    expect(result.donations).toHaveLength(1)
+    expect(result.amountsHidden).toBe(true)
+  })
+
+  it('uses donations directly, and never the redacted view, when amounts are visible', async () => {
+    const gift = { id: 'd1', contact_id: 'c1', donated_on: '2026-03-12', amount: 500, amount_gbp: 500 }
+    responses = [[gift] as never, [], []]
+
+    const result = await runGivingQuery('c1')
+
+    expect(recorded.map((r) => r.table)).not.toContain('donations_redacted')
+    expect(result.amountsHidden).toBe(false)
+    expect(result.donations[0]?.amount_gbp).toBe(500)
+  })
+
+  it('reports an empty ledger, not hidden amounts, when the donor simply never gave', async () => {
+    responses = [[], [], [], []]
+    const result = await runGivingQuery('c1')
+    expect(result.donations).toEqual([])
+    expect(result.amountsHidden).toBe(false)
+  })
+})
+
+/** Invoke the hook's queryFn directly — no React needed for a data-path test. */
+async function runGivingQuery(id: string) {
+  lastQueryOptions = null
+  useContactGiving(id)
+  const options = lastQueryOptions as { queryFn: () => Promise<any> } | null
+  if (!options) throw new Error('useContactGiving did not register a query')
+  return options.queryFn()
+}

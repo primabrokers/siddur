@@ -120,9 +120,12 @@ const giving = {
       status: 'received',
       pledge_id: 'p1',
       installment_id: null,
+      recurring_agreement_id: null,
       receipt_status: 'sent',
+      receipt_pref: null,
       thank_you_status: 'done',
       gift_aid_status: 'claimed',
+      gift_aid_claim_id: null,
       is_gasds: false,
       notes: null,
     },
@@ -146,6 +149,7 @@ const giving = {
   installments: [
     { id: 'i1', pledge_id: 'p1', due_on: '2026-09-15', amount: 5000, status: 'expected' },
   ],
+  amountsHidden: false,
   recurring: [
     {
       id: 'r1',
@@ -226,6 +230,18 @@ const household = {
   combinedLifetime: 71500,
   combinedThisYear: 15000,
 }
+
+// The profile asks the auth feature whether this member may create gifts
+// (11 §1); the profile's own behaviour is what is under test here.
+vi.mock('../src/features/auth/useTeamMember', () => ({
+  useTeamMember: () => ({
+    data: { id: 'braun', role: 'admin', full_name: "R' Braun" },
+    isLoading: false,
+    error: null,
+  }),
+  canEdit: () => true,
+  isAdmin: () => true,
+}))
 
 vi.mock('../src/lib/queries/contacts', () => ({
   useContact: () => query({ contact, stats, statsError: null, introducedBy: null }),
@@ -336,7 +352,8 @@ describe('ContactProfile — the whole record (04 §5)', () => {
     // Two pledge cards (the tab and the rail) share one progress mechanism.
     expect(screen.getAllByRole('progressbar')[0]).toHaveAttribute('aria-valuenow', '60')
     expect(screen.getByText(/Standing order failing/)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Record gift' })).toBeDisabled()
+    // Gift entry arrived with M4; the profile passes the donor through to it.
+    expect(screen.getByRole('button', { name: 'Record gift' })).toBeEnabled()
     expect(screen.getByText('Soft credit — lifetime')).toBeInTheDocument()
   })
 

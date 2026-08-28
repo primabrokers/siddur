@@ -107,6 +107,10 @@ export interface ContactStats {
   donor_status: DonorStatus | null
   /** 02 §4.2 magic column — present when the view exposes it. */
   has_ga_declaration: boolean | null
+  /** Household rollups, computed in the view — never summed in the client (I-9). */
+  household_id: string | null
+  household_lifetime_giving: number | null
+  household_gift_count: number | null
 }
 
 /** One contacts-list row: the record plus its derived numbers. */
@@ -159,9 +163,10 @@ export interface DonationRow {
   id: string
   contact_id: string
   donated_on: string
-  amount: number
+  /** Null when the row came from `donations_redacted` (11 §2). */
+  amount: number | null
   currency: string
-  amount_gbp: number
+  amount_gbp: number | null
   fund_id: string | null
   campaign_id: string | null
   appeal_id: string | null
@@ -169,9 +174,13 @@ export interface DonationRow {
   status: string
   pledge_id: string | null
   installment_id: string | null
+  recurring_agreement_id: string | null
   receipt_status: string
+  /** Per-gift override of the receipt preference cascade (02 §3.4). */
+  receipt_pref: string | null
   thank_you_status: string
   gift_aid_status: string
+  gift_aid_claim_id: string | null
   is_gasds: boolean | null
   notes: string | null
 }
@@ -209,6 +218,8 @@ export interface RecurringAgreementRow {
   fund_id: string | null
   starts_on: string
   ends_on: string | null
+  /** Day of the month the payment is expected (02 §3.6). */
+  expected_day: number | null
   status: string
   last_payment_on: string | null
   missed_count: number | null
@@ -290,6 +301,8 @@ export interface ContactGiving {
   pledges: PledgeRow[]
   installments: PledgeInstallmentRow[]
   recurring: RecurringAgreementRow[]
+  /** The gifts came through the redacted view: show the ledger, not the money. */
+  amountsHidden: boolean
 }
 
 /** Draft shape for the create/edit sheet — a subset of 02 §3.1 (I-5). */

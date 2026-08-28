@@ -17,6 +17,7 @@ import {
   useTeamMembers,
   useUpdateContact,
 } from '../../lib/queries/contacts'
+import { canEdit, useTeamMember } from '../auth/useTeamMember'
 import { useCapture } from '../capture/QuickCapture'
 import { ContactSheet } from './ContactSheet'
 import { DetailsTab } from './DetailsTab'
@@ -59,6 +60,7 @@ export function ContactProfile({ id }: { id: string }) {
   const [editOpen, setEditOpen] = useState(false)
 
   const { openCapture } = useCapture()
+  const teamMember = useTeamMember()
   const toast = useToast()
   const withUndo = useUndoToast()
 
@@ -174,11 +176,9 @@ export function ContactProfile({ id }: { id: string }) {
         actions={
           <ProfileActionBar
             contact={contact}
-            onLog={() => {
-              // TODO(M3): pass the contact through to Quick Capture — the
-              // provider's API is `openCapture()` only today (features/capture).
-              openCapture()
-            }}
+            // Quick Capture opens with this contact already chosen, so the
+            // confirm sheet skips matching entirely (04 §4 / 09 §2).
+            onLog={() => openCapture({ contactId: contact.id, contactName: name })}
             onTask={() => setTaskOpen(true)}
             onMeet={() => setMeetOpen(true)}
             onArchive={() => void archive()}
@@ -234,6 +234,9 @@ export function ContactProfile({ id }: { id: string }) {
               stats={stats}
               refs={refs.data}
               loading={giving.isLoading}
+              contactId={contact.id}
+              contactName={name}
+              readOnly={!canEdit(teamMember.data)}
             />
           ) : null}
 

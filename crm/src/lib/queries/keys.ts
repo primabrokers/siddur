@@ -87,6 +87,19 @@ export const qk = {
     installments: (pledgeId: string) => ['pledges', 'installments', pledgeId] as const,
   },
 
+  /**
+   * The Giving screen (05 §1–§4). One board query behind the metric cards and
+   * all five tabs — gifts, the thanks/receipt queues, pledges and recurring
+   * agreements — so a one-tap "Mark thanked" has exactly one cache to patch.
+   */
+  giving: {
+    all: ['giving'] as const,
+    board: (filters?: Filters) => ['giving', 'board', filters ?? {}] as const,
+    /** Fund · campaign · appeal option lists for the entry selects (05 §4). */
+    selects: () => ['giving', 'selects'] as const,
+    recurring: (filters?: Filters) => ['giving', 'recurring', filters ?? {}] as const,
+  },
+
   giftAid: {
     all: ['gift-aid'] as const,
     claimable: (filters?: Filters) => ['gift-aid', 'claimable', filters ?? {}] as const,

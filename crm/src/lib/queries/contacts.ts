@@ -87,6 +87,42 @@ async function selectMaybe<T>(table: string, build: (q: any) => any): Promise<T 
 /** De-duplicate id lists before an `in` filter. */
 const unique = <T,>(values: T[]): T[] => Array.from(new Set(values))
 
+/* ------------------------------------------------------------- donations */
+
+export interface DonationsResult {
+  rows: DonationRow[]
+  /** True when the rows came from `donations_redacted` — no amounts to show. */
+  amountsHidden: boolean
+}
+
+/**
+ * Read gifts through whichever path this member is allowed (11 §2, CLAUDE.md
+ * rule 7). `donations.donations_sel` requires `crm_can_see_amounts()`, so a
+ * restricted viewer sees *no rows* there — which would look like "never gave"
+ * rather than "amounts hidden". `donations_redacted` is the same ledger without
+ * the amount columns, so we fall back to it whenever the amount-bearing table
+ * yields nothing.
+ *
+ * The choice is made from what the database actually returns, not from a
+ * client-side copy of the policy: a member who may see amounts gets them, and
+ * anyone else fails closed into the redacted view. A genuine non-donor comes
+ * back empty from both, which is the same answer either way.
+ */
+async function fetchDonations(
+  build: (q: any) => any,
+): Promise<DonationsResult> {
+  const rows = await selectRows<DonationRow>('donations', build)
+  if (rows.length > 0) return { rows, amountsHidden: false }
+
+  try {
+    const redacted = await selectRows<DonationRow>('donations_redacted', build)
+    return { rows: redacted, amountsHidden: redacted.length > 0 }
+  } catch {
+    // No redacted view (or no access to it either): an empty ledger is correct.
+    return { rows: [], amountsHidden: false }
+  }
+}
+
 /* -------------------------------------------------------------- reference */
 
 export function useTeamMembers(): UseQueryResult<TeamMemberLite[]> {
@@ -282,13 +318,11 @@ export function useContactTimeline(id: string | undefined): {
     queryKey: qk.contacts.timeline(id ?? 'none'),
     enabled: isConfigured && Boolean(id),
     queryFn: async () => {
-      const [interactions, donations, declarations, notes, tasks, pledges] = await Promise.all([
+      const [interactions, gifts, declarations, notes, tasks, pledges] = await Promise.all([
         selectRows<InteractionRow>('interactions', (q) =>
           q.eq('contact_id', id).order('occurred_at', { ascending: false }).limit(200),
         ),
-        selectRows<DonationRow>('donations', (q) =>
-          q.eq('contact_id', id).order('donated_on', { ascending: false }).limit(200),
-        ),
+        fetchDonations((q) => q.eq('contact_id', id).order('donated_on', { ascending: false }).limit(200)),
         selectRows<GiftAidDeclarationRow>('gift_aid_declarations', (q) => q.eq('contact_id', id)),
         selectRows<NoteRow>('notes', (q) =>
           q.eq('contact_id', id).order('created_at', { ascending: false }).limit(200),
@@ -306,7 +340,14 @@ export function useContactTimeline(id: string | undefined): {
           : []
 
       // Only the next installment belongs in "Upcoming" (04 §5.2).
-      return { interactions, donations, declarations, notes, tasks, installments: installments.slice(0, 1) }
+      return {
+        interactions,
+        donations: gifts.rows,
+        declarations,
+        notes,
+        tasks,
+        installments: installments.slice(0, 1),
+      }
     },
   })
 
@@ -331,10 +372,8 @@ export function useContactGiving(id: string | undefined): UseQueryResult<Contact
     queryKey: qk.contacts.giving(id ?? 'none'),
     enabled: isConfigured && Boolean(id),
     queryFn: async () => {
-      const [donations, pledges, recurring] = await Promise.all([
-        selectRows<DonationRow>('donations', (q) =>
-          q.eq('contact_id', id).order('donated_on', { ascending: false }),
-        ),
+      const [gifts, pledges, recurring] = await Promise.all([
+        fetchDonations((q) => q.eq('contact_id', id).order('donated_on', { ascending: false })),
         selectRows<PledgeRow>('pledges', (q) => q.eq('contact_id', id).order('pledged_on', { ascending: false })),
         selectRows<RecurringAgreementRow>('recurring_agreements', (q) => q.eq('contact_id', id)),
       ])
@@ -345,7 +384,13 @@ export function useContactGiving(id: string | undefined): UseQueryResult<Contact
               q.in('pledge_id', pledgeIds).order('due_on', { ascending: true }),
             )
           : []
-      return { donations, pledges, installments, recurring }
+      return {
+        donations: gifts.rows,
+        pledges,
+        installments,
+        recurring,
+        amountsHidden: gifts.amountsHidden,
+      }
     },
   })
 }
@@ -426,14 +471,19 @@ export function useHousehold(householdId: string | null | undefined): UseQueryRe
         contact,
         stats: stats[contact.id] ?? null,
       }))
+      // The household rollup is computed in `contact_stats` (02 §4.1), so take
+      // it from there rather than adding the members up here (I-9). The sum is
+      // only a fallback for a view that does not expose the column.
+      const rolled = rows.map((r) => r.stats?.household_lifetime_giving ?? null).find((v) => v !== null)
       const sum = (pick: (s: ContactStats) => number | null): number | null => {
         const values = rows.map((r) => (r.stats ? pick(r.stats) : null)).filter((v): v is number => v !== null)
         return values.length === 0 ? null : values.reduce((a, b) => a + b, 0)
       }
+
       return {
         household,
         members: rows,
-        combinedLifetime: sum((s) => s.lifetime_giving),
+        combinedLifetime: rolled ?? sum((s) => s.lifetime_giving),
         combinedThisYear: sum((s) => s.this_year_giving),
       }
     },

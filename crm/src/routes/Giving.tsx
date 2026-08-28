@@ -1,21 +1,12 @@
-import { EmptyState } from '../components'
-import { PageHeader } from '../features/shell/PageHeader'
+import { GivingView } from '../features/giving/GivingView'
 
 /**
- * Giving — spec 07. Money in, receipts out, Gift Aid.
+ * Giving — spec 05 §1–§4. Money in, promises tracked, thanks and receipts out.
  *
- * TODO(giving): gift entry with ask-array chips, pledges + installments,
- * standing orders and missed-payment detection, receipts, Gift Aid claim
- * builder and the HMRC file (an outward action — it gets a confirm, I-12).
+ * TODO(M7): the Gift Aid workspace (05 §5) — the rolling claim, the
+ * missing-declaration queue and the HMRC Charities Online export. The gift
+ * sheet's inline eligibility line is the only Gift Aid surface here.
  */
 export function GivingRoute() {
-  return (
-    <>
-      <PageHeader title="Giving" subtitle="Gifts, pledges, standing orders, Gift Aid" />
-      <EmptyState
-        title="Giving lands here"
-        hint="Recording gifts against fund / campaign / appeal, pledge schedules and their installments, recurring agreements with missed-payment detection, receipting, and the Gift Aid claim run."
-      />
-    </>
-  )
+  return <GivingView />
 }
