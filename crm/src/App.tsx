@@ -13,6 +13,7 @@ import { NotFoundRoute } from './routes/NotFound'
 import { PipelineRoute } from './routes/Pipeline'
 import { ReportsRoute } from './routes/Reports'
 import { SettingsRoute } from './routes/Settings'
+import { TasksRoute } from './routes/Tasks'
 import { TodayRoute } from './routes/Today'
 
 export function createQueryClient(): QueryClient {
@@ -42,6 +43,8 @@ export function AppRoutes() {
         }
       >
         <Route index element={<TodayRoute />} />
+        {/* Under the daily loop, reached from Today's header (04 §3). */}
+        <Route path="tasks" element={<TasksRoute />} />
         <Route path="contacts" element={<ContactsRoute />} />
         <Route path="contacts/:id" element={<ContactDetailRoute />} />
         <Route path="giving" element={<GivingRoute />} />

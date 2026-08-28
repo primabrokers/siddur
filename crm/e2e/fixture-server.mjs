@@ -31,6 +31,16 @@ const RIVKY = 'aaaaaaaa-0000-0000-0000-000000000002'
 const WEISS = 'aaaaaaaa-0000-0000-0000-000000000003'
 const HOUSE = 'bbbbbbbb-0000-0000-0000-000000000001'
 
+// M2 (Action Stream) cast — the people in Main.dc.html / MobileToday.dc.html.
+const ADLER = 'aaaaaaaa-0000-0000-0000-000000000008'
+const KLEIN = 'aaaaaaaa-0000-0000-0000-000000000009'
+const REICH = 'aaaaaaaa-0000-0000-0000-000000000010'
+const KATZ = 'aaaaaaaa-0000-0000-0000-000000000011'
+const GOLDSTEIN = 'aaaaaaaa-0000-0000-0000-000000000012'
+const SFELD = 'aaaaaaaa-0000-0000-0000-000000000013'
+const nowAt = (hour, minute = 0) =>
+  new Date(today.getFullYear(), today.getMonth(), today.getDate(), hour, minute, 0).toISOString()
+
 const contactBase = {
   title: null,
   hebrew_name: null,
@@ -190,6 +200,12 @@ const DB = {
       city: 'London',
       stage: 'cultivation',
     },
+    { ...contactBase, id: ADLER, first_name: 'Reuven', last_name: 'Adler', city: 'Golders Green', stage: 'active_donor', phone: '+447700900201', whatsapp: '+447700900201', priority: 'high', things_to_remember: 'Prefers a call to an email — always.' },
+    { ...contactBase, id: KLEIN, first_name: 'Klein', last_name: 'Family', city: 'Edgware', stage: 'cultivation', phone: '+447700900202', whatsapp: '+447700900202' },
+    { ...contactBase, id: REICH, first_name: 'Baruch', last_name: 'Reich', city: 'Hendon', stage: 'in_discussion', phone: '+447700900203' },
+    { ...contactBase, id: KATZ, first_name: 'Yanky', last_name: 'Katz', city: 'Golders Green', stage: 'stewardship', phone: '+447700900204', whatsapp: '+447700900204', tier: 'A' },
+    { ...contactBase, id: GOLDSTEIN, first_name: 'Goldstein', last_name: 'Family', city: 'Manchester', stage: 'keep_in_touch', contact_frequency_days: 60, phone: '+447700900205' },
+    { ...contactBase, id: SFELD, first_name: 'Shmuel', last_name: 'Feld', city: 'London', stage: 'active_donor', phone: '+447700900206', whatsapp: '+447700900206' },
   ],
 
   contact_stats: [
@@ -228,6 +244,12 @@ const DB = {
     { ...statsBase, contact_id: 'aaaaaaaa-0000-0000-0000-000000000005', lifetime_giving: 3600, this_year_giving: 3600, days_since_contact: 71, flag: 'future', donor_status: 'active', next_action_title: 'Dinner invite', next_action_due_on: daysFromNow(6), next_action_type: 'invite_event' },
     { ...statsBase, contact_id: 'aaaaaaaa-0000-0000-0000-000000000006', lifetime_giving: 950, this_year_giving: 950, days_since_contact: 58, flag: 'today', donor_status: 'active', next_action_title: 'Call', next_action_due_on: daysFromNow(0), next_action_type: 'call' },
     { ...statsBase, contact_id: 'aaaaaaaa-0000-0000-0000-000000000007', lifetime_giving: 5000, last_year_giving: 5000, is_lybunt: true, days_since_contact: 96, flag: 'none', donor_status: 'pre_lapsed' },
+    { ...statsBase, contact_id: ADLER, lifetime_giving: 18400, this_year_giving: 1800, gift_count: 14, days_since_contact: 9, flag: 'future', donor_status: 'active' },
+    { ...statsBase, contact_id: KLEIN, lifetime_giving: 180, this_year_giving: 180, gift_count: 1, first_gift_on: daysFromNow(-3), first_gift_amount: 180, last_gift_on: daysFromNow(-3), last_gift_amount: 180, days_since_contact: 3, flag: 'today', donor_status: 'new' },
+    { ...statsBase, contact_id: REICH, lifetime_giving: 2600, last_year_giving: 2600, is_lybunt: true, days_since_contact: 34, flag: 'none', donor_status: 'pre_lapsed' },
+    { ...statsBase, contact_id: KATZ, lifetime_giving: 42000, this_year_giving: 0, gift_count: 9, days_since_contact: 92, flag: 'waiting', donor_status: 'pre_lapsed' },
+    { ...statsBase, contact_id: GOLDSTEIN, lifetime_giving: 7400, this_year_giving: 400, gift_count: 11, days_since_contact: 63, kit_due_on: daysFromNow(0), flag: 'today', donor_status: 'active' },
+    { ...statsBase, contact_id: SFELD, lifetime_giving: 9200, this_year_giving: 2000, gift_count: 6, days_since_contact: 21, flag: 'overdue', donor_status: 'active' },
   ],
 
   funds: [{ id: 'f1', name: 'Scholarships' }, { id: 'f2', name: 'Building' }],
@@ -251,6 +273,12 @@ const DB = {
       team_member_id: BRAUN, summary: 'Naming opportunities walkthrough', outcome: null, is_meaningful: false,
       location: 'His office', purpose: 'Naming opportunities', attendees: null, ask_amount: null, source: 'manual',
     },
+    {
+      id: 'int-4', contact_id: ADLER, occurred_at: nowAt(14), kind: 'meeting', status: 'scheduled',
+      team_member_id: BRAUN, summary: 'Office visit — building campaign proposal', outcome: null,
+      is_meaningful: false, location: 'office', purpose: 'Building campaign proposal', attendees: null,
+      ask_amount: null, source: 'manual',
+    },
   ],
 
   donations: [
@@ -266,6 +294,24 @@ const DB = {
       pledge_id: 'pl-1', installment_id: null, recurring_agreement_id: null, receipt_status: 'sent',
       receipt_pref: null, thank_you_status: 'done', gift_aid_status: 'claimed', gift_aid_claim_id: null, is_gasds: false, notes: null,
     },
+    {
+      id: 'don-3', contact_id: SFELD, donated_on: daysFromNow(-5), amount: 5000, currency: 'GBP', amount_gbp: 5000,
+      fund_id: 'f1', campaign_id: null, appeal_id: null, payment_method: 'bank_transfer', status: 'received',
+      pledge_id: null, installment_id: null, recurring_agreement_id: null, receipt_status: 'sent',
+      receipt_pref: null, thank_you_status: 'done', gift_aid_status: 'eligible', gift_aid_claim_id: null, is_gasds: false, notes: null,
+    },
+    {
+      id: 'don-4', contact_id: ADLER, donated_on: daysFromNow(-2), amount: 3220, currency: 'GBP', amount_gbp: 3220,
+      fund_id: 'f2', campaign_id: 'c1', appeal_id: null, payment_method: 'standing_order', status: 'received',
+      pledge_id: null, installment_id: null, recurring_agreement_id: null, receipt_status: 'sent',
+      receipt_pref: null, thank_you_status: 'done', gift_aid_status: 'eligible', gift_aid_claim_id: null, is_gasds: false, notes: null,
+    },
+    {
+      id: 'don-5', contact_id: KLEIN, donated_on: daysFromNow(-3), amount: 180, currency: 'GBP', amount_gbp: 180,
+      fund_id: 'f1', campaign_id: null, appeal_id: null, payment_method: 'card', status: 'received',
+      pledge_id: null, installment_id: null, recurring_agreement_id: null, receipt_status: 'queued',
+      receipt_pref: null, thank_you_status: 'task_open', gift_aid_status: 'pending_declaration', gift_aid_claim_id: null, is_gasds: false, notes: null,
+    },
   ],
 
   pledges: [
@@ -273,11 +319,18 @@ const DB = {
       id: 'pl-1', contact_id: DOVID, total_amount: 25000, currency: 'GBP', amount_gbp: 25000, fund_id: 'f2',
       campaign_id: 'c1', appeal_id: null, pledged_on: '2025-10-01', status: 'open', write_off_amount: null, notes: null,
     },
+    {
+      id: 'pl-2', contact_id: KATZ, total_amount: 4000, currency: 'GBP', amount_gbp: 4000, fund_id: 'f1',
+      campaign_id: null, appeal_id: null, pledged_on: '2025-06-01', status: 'open', write_off_amount: null, notes: null,
+    },
   ],
   pledge_installments: [
     { id: 'ins-1', pledge_id: 'pl-1', due_on: '2025-11-15', amount: 5000, status: 'paid' },
     { id: 'ins-2', pledge_id: 'pl-1', due_on: '2025-12-15', amount: 5000, status: 'paid' },
     { id: 'ins-3', pledge_id: 'pl-1', due_on: daysFromNow(19), amount: 5000, status: 'expected' },
+    { id: 'ins-4', pledge_id: 'pl-2', due_on: daysFromNow(-20), amount: 800, status: 'expected' },
+    { id: 'ins-5', pledge_id: 'pl-2', due_on: daysFromNow(-50), amount: 800, status: 'expected' },
+    { id: 'ins-6', pledge_id: 'pl-2', due_on: daysFromNow(-80), amount: 800, status: 'expected' },
   ],
   recurring_agreements: [],
 
@@ -311,7 +364,91 @@ const DB = {
     {
       id: 'task-1', contact_id: DOVID, title: 'Call re proposal', action_type: 'call', details: null,
       assigned_to: BRAUN, due_on: daysFromNow(-4), priority: 'high', status: 'todo', waiting_for: null,
-      completed_at: null, origin: 'manual',
+      completed_at: null, origin: 'manual', queue_order: null, opportunity_id: null,
+    },
+    {
+      id: 'task-2', contact_id: SFELD, title: 'WhatsApp — dinner journal ad', action_type: 'whatsapp',
+      details: null, assigned_to: BRAUN, due_on: daysFromNow(-1), priority: 'medium', status: 'todo',
+      waiting_for: null, completed_at: null, origin: 'manual', queue_order: null, opportunity_id: null,
+    },
+    {
+      id: 'task-3', contact_id: 'aaaaaaaa-0000-0000-0000-000000000006', title: 'Call about the dinner journal',
+      action_type: 'call', details: null, assigned_to: BRAUN, due_on: daysFromNow(0), priority: 'medium',
+      status: 'todo', waiting_for: null, completed_at: null, origin: 'manual', queue_order: null, opportunity_id: null,
+    },
+    {
+      id: 'task-4', contact_id: 'aaaaaaaa-0000-0000-0000-000000000005', title: 'Call re the standing order',
+      action_type: 'call', details: null, assigned_to: BRAUN, due_on: daysFromNow(0), priority: 'high',
+      status: 'todo', waiting_for: null, completed_at: null, origin: 'manual', queue_order: null, opportunity_id: null,
+    },
+    {
+      id: 'task-5', contact_id: KLEIN, title: 'Thank-you call — first gift', action_type: 'call', details: null,
+      assigned_to: BRAUN, due_on: daysFromNow(0), priority: 'high', status: 'todo', waiting_for: null,
+      completed_at: null, origin: 'auto:thank_you', queue_order: null, opportunity_id: null,
+    },
+    {
+      id: 'task-6', contact_id: WEISS, title: 'WhatsApp the shiur times', action_type: 'whatsapp', details: null,
+      assigned_to: BRAUN, due_on: daysFromNow(0), priority: 'low', status: 'todo', waiting_for: null,
+      completed_at: null, origin: 'manual', queue_order: null, opportunity_id: null,
+    },
+    {
+      id: 'task-7', contact_id: KATZ, title: 'Gift Aid declaration', action_type: 'call', details: null,
+      assigned_to: BRAUN, due_on: daysFromNow(0), priority: 'medium', status: 'waiting',
+      waiting_for: 'Gift Aid form sent 12 Aug — awaiting return', completed_at: null, origin: 'auto:signal',
+      queue_order: null, opportunity_id: null,
+    },
+    {
+      id: 'task-8', contact_id: GOLDSTEIN, title: 'Keep in touch — every 2 months', action_type: 'keep_in_touch',
+      details: null, assigned_to: BRAUN, due_on: daysFromNow(0), priority: 'medium', status: 'todo',
+      waiting_for: null, completed_at: null, origin: 'auto:kit', queue_order: null, opportunity_id: null,
+    },
+    {
+      id: 'task-9', contact_id: DOVID, title: 'Send the naming brochure', action_type: 'send_proposal',
+      details: null, assigned_to: BRAUN, due_on: null, priority: 'medium', status: 'queued', waiting_for: null,
+      completed_at: null, origin: 'manual', queue_order: 1, opportunity_id: null,
+    },
+    {
+      id: 'task-10', contact_id: DOVID, title: 'Invite to the siyum', action_type: 'invite_event', details: null,
+      assigned_to: BRAUN, due_on: null, priority: 'low', status: 'queued', waiting_for: null,
+      completed_at: null, origin: 'manual', queue_order: 2, opportunity_id: null,
+    },
+    {
+      id: 'task-11', contact_id: 'aaaaaaaa-0000-0000-0000-000000000005', title: 'Dinner invite',
+      action_type: 'invite_event', details: null, assigned_to: BRAUN, due_on: daysFromNow(3), priority: 'medium',
+      status: 'todo', waiting_for: null, completed_at: null, origin: 'manual', queue_order: null, opportunity_id: null,
+    },
+    {
+      id: 'task-12', contact_id: RIVKY, title: 'Send the newsletter', action_type: 'send_email', details: null,
+      assigned_to: BRAUN, due_on: daysFromNow(6), priority: 'low', status: 'todo', waiting_for: null,
+      completed_at: null, origin: 'manual', queue_order: null, opportunity_id: null,
+    },
+    {
+      id: 'task-13', contact_id: ADLER, title: 'Confirm the meeting time', action_type: 'call', details: null,
+      assigned_to: BRAUN, due_on: daysFromNow(0), priority: 'medium', status: 'done', waiting_for: null,
+      completed_at: nowAt(8, 40), origin: 'auto:meeting_reminder', queue_order: null, opportunity_id: null,
+    },
+    {
+      id: 'task-14', contact_id: WEISS, title: 'Thank-you call', action_type: 'call', details: null,
+      assigned_to: BRAUN, due_on: daysFromNow(0), priority: 'medium', status: 'done', waiting_for: null,
+      completed_at: nowAt(9, 15), origin: 'manual', queue_order: null, opportunity_id: null,
+    },
+  ],
+
+  signals: [
+    {
+      id: 'sig-1', contact_id: KLEIN, rule_key: 'first_gift_call',
+      reason: 'gave £180 on Sunday — a thank-you call within 48h is the strongest retention move',
+      state: 'open', snoozed_until: null, dedupe_key: 'first_gift_call:klein', created_at: nowAt(5), resolved_at: null,
+    },
+    {
+      id: 'sig-2', contact_id: ADLER, rule_key: 'recurring_failing',
+      reason: "£150/month standing order is 9 days late. Call — don't email",
+      state: 'open', snoozed_until: null, dedupe_key: 'recurring_failing:adler', created_at: nowAt(5), resolved_at: null,
+    },
+    {
+      id: 'sig-3', contact_id: KATZ, rule_key: 'neglect_flags',
+      reason: 'no meaningful contact in 92 days (threshold: 90 for VIPs)',
+      state: 'open', snoozed_until: null, dedupe_key: 'neglect_flags:katz', created_at: nowAt(5), resolved_at: null,
     },
   ],
 
@@ -355,21 +492,42 @@ const SESSION = {
   },
 }
 
-/** Apply just the filters the app sends: eq / in on one column. */
+/** Apply the filters the app sends: eq / in / is / gt / gte / lt / lte. */
 function applyFilters(rows, url) {
   let out = rows
   for (const [key, raw] of url.searchParams.entries()) {
     if (['select', 'order', 'limit', 'offset'].includes(key)) continue
     const [op, ...rest] = raw.split('.')
     const value = rest.join('.')
+    const cmp = (row) => String(row[key] ?? '')
     if (op === 'eq') out = out.filter((r) => String(r[key]) === value)
+    else if (op === 'neq') out = out.filter((r) => String(r[key]) !== value)
     else if (op === 'in') {
       const list = value.replace(/^\(|\)$/g, '').split(',').map((v) => v.replace(/^"|"$/g, ''))
       out = out.filter((r) => list.includes(String(r[key])))
     } else if (op === 'is') out = out.filter((r) => (value === 'null' ? r[key] == null : r[key] != null))
+    // Dates and timestamps compare lexicographically in ISO form, which is all
+    // the stream queries need (due_on, completed_at, occurred_at, donated_on).
+    else if (op === 'gte') out = out.filter((r) => r[key] != null && cmp(r) >= value)
+    else if (op === 'gt') out = out.filter((r) => r[key] != null && cmp(r) > value)
+    else if (op === 'lte') out = out.filter((r) => r[key] != null && cmp(r) <= value)
+    else if (op === 'lt') out = out.filter((r) => r[key] != null && cmp(r) < value)
   }
   return out
 }
+
+async function readJson(req) {
+  const chunks = []
+  for await (const chunk of req) chunks.push(chunk)
+  if (chunks.length === 0) return null
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString('utf8'))
+  } catch {
+    return null
+  }
+}
+
+let inserted = 0
 
 const server = createServer(async (req, res) => {
   const url = new URL(req.url, `http://127.0.0.1:${PORT}`)
@@ -391,8 +549,30 @@ const server = createServer(async (req, res) => {
     if (!rows) {
       return send(404, { code: 'PGRST205', message: `Could not find the table 'public.${table}'` })
     }
-    const filtered = applyFilters(rows, url)
     const single = (req.headers.accept ?? '').includes('vnd.pgrst.object')
+
+    // Writes mutate the in-memory tables so the harness can exercise complete /
+    // snooze / reschedule end to end, exactly as the live project would.
+    if (req.method === 'POST') {
+      const body = await readJson(req)
+      const list = Array.isArray(body) ? body : [body ?? {}]
+      const created = list.map((row) => ({ id: `fixture-${++inserted}`, created_at: new Date().toISOString(), ...row }))
+      rows.push(...created)
+      return send(201, single ? created[0] : created)
+    }
+    if (req.method === 'PATCH') {
+      const patch = (await readJson(req)) ?? {}
+      const targets = applyFilters(rows, url)
+      for (const row of targets) Object.assign(row, patch)
+      return send(200, single ? (targets[0] ?? null) : targets)
+    }
+    if (req.method === 'DELETE') {
+      const targets = new Set(applyFilters(rows, url))
+      DB[table] = rows.filter((row) => !targets.has(row))
+      return send(200, [])
+    }
+
+    const filtered = applyFilters(rows, url)
     if (single) return send(200, filtered[0] ?? null)
     return send(200, filtered, { 'content-range': `0-${Math.max(filtered.length - 1, 0)}/${filtered.length}` })
   }

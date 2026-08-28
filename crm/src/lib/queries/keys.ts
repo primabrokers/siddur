@@ -58,8 +58,14 @@ export const qk = {
     all: ['tasks'] as const,
     list: (filters?: Filters) => ['tasks', 'list', filters ?? {}] as const,
     detail: (id: string) => ['tasks', 'detail', id] as const,
-    /** The Action Stream for one day / owner. */
+    /**
+     * The Action Stream *and* the Tasks view read this one board (open tasks +
+     * today's completions + today's meetings + the contacts/stats they need),
+     * so an optimistic complete/snooze has exactly one cache shape to patch.
+     */
     stream: (filters?: Filters) => ['tasks', 'stream', filters ?? {}] as const,
+    /** Queued (dateless) stack for one contact — the close-the-loop offer. */
+    queued: (contactId: string) => ['tasks', 'queued', contactId] as const,
   },
 
   interactions: {
@@ -93,9 +99,12 @@ export const qk = {
     detail: (id: string) => ['opportunities', 'detail', id] as const,
   },
 
+  /** The Action Stream rail. Storage is the `signals` table (02 §3.18). */
   nudges: {
     all: ['nudges'] as const,
     list: () => ['nudges', 'list'] as const,
+    /** Overdue pledge installments — the rail's summary card (04 §1). */
+    pledgeSummary: () => ['nudges', 'pledge-summary'] as const,
   },
 
   savedViews: {
@@ -114,6 +123,8 @@ export const qk = {
   reports: {
     all: ['reports'] as const,
     metric: (name: string, filters?: Filters) => ['reports', name, filters ?? {}] as const,
+    /** The metric strip's money card: gifts received this calendar month. */
+    monthGiving: (month: string) => ['reports', 'month-giving', month] as const,
   },
 } as const
 

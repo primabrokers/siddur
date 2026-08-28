@@ -18,6 +18,8 @@ export interface PersonRowProps {
   leading?: ReactNode
   /** Hide the avatar (mobile rows lead with the flag dot only). */
   showAvatar?: boolean
+  /** Class for the avatar — e.g. `max-sm:hidden` on dense mobile rows. */
+  avatarClassName?: string
   /** Dashed border — the "needs a next action" treatment. */
   dashed?: boolean
   onClick?: () => void
@@ -36,6 +38,7 @@ export function PersonRow({
   actions,
   leading,
   showAvatar = true,
+  avatarClassName,
   dashed = false,
   onClick,
   className,
@@ -53,14 +56,16 @@ export function PersonRow({
     >
       {leading}
       {flag ? <FlagDot variant={flag} /> : null}
-      {showAvatar ? <Avatar name={name} /> : null}
+      {showAvatar ? <Avatar name={name} className={avatarClassName} /> : null}
       <span className="min-w-0 grow">
         <span className="block truncate text-[13.5px] font-semibold">{name}</span>
         {subtitle ? <span className="block truncate text-[12.5px] text-muted">{subtitle}</span> : null}
       </span>
       {chips ? <span className="hidden shrink-0 items-center gap-[6px] sm:flex">{chips}</span> : null}
+      {/* Touch has no hover: the actions stay visible below `lg` and reveal on
+          hover/focus on the desktop rows (MobileToday.dc.html). */}
       {actions ? (
-        <span className="flex shrink-0 items-center gap-2 text-faint opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+        <span className="flex shrink-0 items-center gap-2 text-faint transition-opacity focus-within:opacity-100 lg:opacity-0 lg:group-hover:opacity-100">
           {actions}
         </span>
       ) : null}
