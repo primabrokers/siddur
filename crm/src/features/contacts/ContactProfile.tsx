@@ -24,7 +24,7 @@ import { useCapture } from '../capture/QuickCapture'
 import { MergeFromProfile } from '../dataquality'
 import { JourneysPanel } from '../journeys'
 // Deep import, not the barrel: the profile needs one sheet, not the whole board.
-const NewOpportunityFromProfile = (_props: Record<string, unknown>) => null
+import { NewOpportunityFromProfile } from '../pipeline/NewOpportunityFromProfile'
 import { DeclarationSheet } from '../giftaid/DeclarationSheet'
 import { declarationState } from '../giftaid/logic'
 import { ContactSheet } from './ContactSheet'

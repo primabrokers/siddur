@@ -22,6 +22,7 @@ const SCRIPTS = [
   ['m3-capture-shots.mjs', 'Quick Capture — input, confirm, saved'],
   ['m4-shots.mjs', 'giving, gift entry, pledges, thanks'],
   ['m5-shots.mjs', 'search, command palette, views bar, settings'],
+  ['m7-shots.mjs', 'Gift Aid workspace, Review & export'],
 ]
 
 console.log('e2e: the acceptance tests are vitest suites, not browser scripts.')

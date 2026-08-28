@@ -54,19 +54,30 @@ export const recoverable = (amountGbp: number | null | undefined): number =>
 export type DeclarationState = 'active' | 'pending_confirmation' | 'cancelled'
 
 /**
+ * The three fields the lifecycle depends on. Narrower than `DeclarationRow` so
+ * the profile — whose row shape predates 02 §3.7's full field list — can ask
+ * the same question without carrying the whole record.
+ */
+export interface DeclarationLifecycle {
+  method: string
+  oral_confirmation_sent_on?: string | null
+  cancelled_on: string | null
+}
+
+/**
  * Where a declaration stands right now (05 §5 "recent declarations").
  *
  * An oral declaration is *not* usable until the written confirmation HMRC
  * requires has been sent — it shows "confirmation pending" until stamped.
  */
-export function declarationState(declaration: DeclarationRow): DeclarationState {
+export function declarationState(declaration: DeclarationLifecycle): DeclarationState {
   if (declaration.cancelled_on) return 'cancelled'
   if (declaration.method === 'oral' && !declaration.oral_confirmation_sent_on) return 'pending_confirmation'
   return 'active'
 }
 
 /** True while HMRC still needs the written confirmation of an oral declaration. */
-export const awaitsWrittenConfirmation = (declaration: DeclarationRow): boolean =>
+export const awaitsWrittenConfirmation = (declaration: DeclarationLifecycle): boolean =>
   declaration.method === 'oral' && !declaration.oral_confirmation_sent_on && !declaration.cancelled_on
 
 /**
