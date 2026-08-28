@@ -501,8 +501,10 @@ export function GiftSheet({ open, onClose, contactId, contactName, preset, onSav
             {giftAid.state === 'eligible' && giftAid.declaration ? (
               <span className="text-[11.5px]">
                 Declaration {formatDate(giftAid.declaration.declared_on)} ·{' '}
-                {giftAid.declaration.covers_future ? 'enduring' : 'single gift'} · +
-                {formatMoney(amountGbp === null ? null : Math.round(amountGbp * 0.25 * 100) / 100)} claimable
+                {giftAid.declaration.covers_future ? 'enduring' : 'single gift'}
+                {amountGbp !== null && amountGbp > 0
+                  ? ` · +${formatMoney(Math.round(amountGbp * 0.25 * 100) / 100)} claimable`
+                  : ''}
               </span>
             ) : null}
             {giftAid.state === 'no_declaration' ? (
