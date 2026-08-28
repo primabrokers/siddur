@@ -1,12 +1,10 @@
 /**
- * Generated Supabase types.
+ * Supabase types — INTENTIONALLY `any` while feature agents are mid-build.
  *
- * PLACEHOLDER — regenerated from the live schema
- * (`supabase gen types typescript --project-id zyvhcnhablkgbsgtljma`).
- * Until then this is `any`, so `supabase.from(...)` accepts every table name.
- *
- * Write query code that still compiles once real types land: annotate results
- * with a local interface (`.returns<Row[]>()` or `const rows: Row[] = data ?? []`)
- * rather than relying on inference from this file.
+ * The real generated types live in `database.types.generated.ts` (from the
+ * live schema at migrations 001–005b). Adopting them strictly surfaces ~44
+ * errors across the query layer; that adoption happens as one dedicated
+ * integration pass AFTER migrations 006–010 land, when the file is
+ * regenerated and swapped in here.
  */
-export type Database = any // regenerated from live schema
+export type Database = any

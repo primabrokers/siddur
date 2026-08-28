@@ -15,10 +15,11 @@ const fromEnv = (key: 'VITE_SUPABASE_URL' | 'VITE_SUPABASE_ANON_KEY'): string =>
 export const SUPABASE_URL = fromEnv('VITE_SUPABASE_URL') || 'https://zyvhcnhablkgbsgtljma.supabase.co'
 
 /**
- * Placeholder — set `VITE_SUPABASE_ANON_KEY` (see `.env.example`). Left empty
+ * The publishable key is safe to ship client-side (CLAUDE.md · Backend); `VITE_SUPABASE_ANON_KEY` overrides it. Left overridable
  * on purpose so nothing half-configured silently talks to the wrong project.
  */
-export const SUPABASE_ANON_KEY = fromEnv('VITE_SUPABASE_ANON_KEY') || ''
+export const SUPABASE_ANON_KEY =
+  fromEnv('VITE_SUPABASE_ANON_KEY') || 'sb_publishable_TUrSdmuJIrQ-YJCH5zDkJg_QDdFCZw-'
 
 /** False until a publishable key is supplied; the UI degrades to a notice. */
 export const isConfigured: boolean = SUPABASE_URL.length > 0 && SUPABASE_ANON_KEY.length > 0
