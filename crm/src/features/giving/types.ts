@@ -16,7 +16,7 @@ import type {
   GivingRefs,
   PledgeInstallmentRow,
   PledgeRow,
-  RecurringAgreementRow as BaseRecurringAgreementRow,
+  RecurringAgreementRow,
 } from '../contacts/types'
 
 export type {
@@ -27,15 +27,7 @@ export type {
   GivingRefs,
   PledgeInstallmentRow,
   PledgeRow,
-}
-
-/**
- * 02 §3.6 lists `expected_day` (the day of the month the payment lands); the M1
- * row shape in `features/contacts/types.ts` predates the recurring cards, so it
- * is added here rather than by editing another feature's file.
- */
-export interface RecurringAgreementRow extends BaseRecurringAgreementRow {
-  expected_day: number | null
+  RecurringAgreementRow,
 }
 
 /** 02 §3.14 — parallel credit, never added to financial totals (D2). */

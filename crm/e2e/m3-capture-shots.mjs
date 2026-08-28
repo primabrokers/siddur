@@ -84,7 +84,13 @@ async function main() {
     await page.screenshot({ path: shot('confirm') })
     log('wrote', shot('confirm'))
 
-    if (!FALLBACK) {
+    if (FALLBACK) {
+      // With no parse there is no contact chip: the manual form asks for the
+      // name, which is the only thing (besides the summary) that gates Save.
+      log('fallback notice:', await page.getByTestId('capture-failure-notice').innerText())
+      await page.getByLabel('Contact name').fill('Dovid Cohen')
+      await page.waitForTimeout(300)
+    } else {
       const chip = page.getByRole('button', { name: 'Change the due date' })
       log('date chip reads:', (await chip.innerText()).replace(/\s+/g, ' '))
       const who = page.getByTestId('capture-contact-matched')

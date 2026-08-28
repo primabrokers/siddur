@@ -199,6 +199,24 @@ describe('pane 2 — confirm', () => {
     expect(screen.getByText(/Heard “before the dinner”/)).toBeInTheDocument()
   })
 
+  it('renders empty chips and the raw note when confidence is low (09 §2)', async () => {
+    const user = userEvent.setup()
+    invoke.mockResolvedValue({ data: { ...parsedFixture(), confidence: 0.31 }, error: null })
+    open()
+
+    await user.type(screen.getByLabelText('What happened'), RAW)
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+    await screen.findByRole('heading', { name: 'Check & save' })
+
+    const notice = screen.getByTestId('capture-low-confidence')
+    expect(notice).toHaveTextContent('Not confident enough to fill the chips')
+    expect(notice).toHaveTextContent(RAW)
+    expect(screen.getByLabelText('Summary')).toHaveValue('')
+    expect(screen.queryByText('London')).not.toBeInTheDocument()
+    // Matching is arithmetic, not the model — the contact chip still stands.
+    expect(screen.getByTestId('capture-contact-matched')).toHaveTextContent('Dovid Cohen')
+  })
+
   it('falls back to the manual form with the note prefilled when the AI is off', async () => {
     const user = userEvent.setup()
     invoke.mockResolvedValue({

@@ -55,7 +55,11 @@ export function PledgeCard({
   onCancel,
 }: PledgeCardProps) {
   const progress = pledgeProgress(pledge, { donations, installments })
-  const mine = installments.filter((row) => row.pledge_id === pledge.id)
+  // Sorted here rather than trusting the fetch order — the schedule reads as a
+  // schedule only in date order.
+  const mine = installments
+    .filter((row) => row.pledge_id === pledge.id)
+    .sort((a, b) => a.due_on.localeCompare(b.due_on))
   const closed = pledge.status !== 'open'
 
   return (

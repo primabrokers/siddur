@@ -95,9 +95,7 @@ export function GivingView() {
   const [giftPreset, setGiftPreset] = useState<{ contactId?: string; contactName?: string; preset?: GiftSheetPreset }>({})
   const [pledgeOpen, setPledgeOpen] = useState(false)
   const [recurringOpen, setRecurringOpen] = useState(false)
-  const [writeOff, setWriteOff] = useState<PledgeRow | null>(null)
-  const [writeOffAmount, setWriteOffAmount] = useState('')
-  const [writeOffReason, setWriteOffReason] = useState('')
+  const [writeOff, setWriteOff] = useState<{ pledge: PledgeRow; balance: number } | null>(null)
   const [cancelPledge, setCancelPledge] = useState<PledgeRow | null>(null)
   const [cancelRecurring, setCancelRecurring] = useState<RecurringAgreementRow | null>(null)
   const [exportOpen, setExportOpen] = useState(false)
@@ -156,17 +154,16 @@ export function GivingView() {
     })
   }
 
-  function confirmWriteOff() {
+  function confirmWriteOff(amount: number | null, reason: string) {
     if (!writeOff) return
-    const amount = parseAmount(writeOffAmount)
-    const pledge = writeOff
+    const { pledge } = writeOff
     setWriteOff(null)
     void setPledgeStatus
       .mutateAsync({
         pledge,
         status: 'written_off',
-        writeOffAmount: amount ?? null,
-        reason: writeOffReason.trim() === '' ? null : writeOffReason.trim(),
+        writeOffAmount: amount,
+        reason: reason.trim() === '' ? null : reason.trim(),
       })
       .then(() => toast.push('Pledge written off — the history stays on the record', { tone: 'neutral' }))
   }
@@ -311,7 +308,7 @@ export function GivingView() {
                       {amountsHidden ? null : (
                         <td className="px-3 py-2">
                           <Money amount={gift.amount_gbp ?? gift.amount} />
-                          {gift.currency !== 'GBP' ? (
+                          {gift.currency !== 'GBP' && gift.amount !== null ? (
                             <span className="ml-1 text-[11.5px] text-muted">
                               ({gift.currency} {gift.amount})
                             </span>
@@ -436,15 +433,15 @@ export function GivingView() {
                   },
                 })
               }}
-              onWriteOff={(target) => {
-                const progress = pledgeProgress(target, {
-                  donations: data.gifts,
-                  installments: data.installments,
+              onWriteOff={(target) =>
+                setWriteOff({
+                  pledge: target,
+                  balance: pledgeProgress(target, {
+                    donations: data.gifts,
+                    installments: data.installments,
+                  }).balance,
                 })
-                setWriteOffAmount(String(progress.balance))
-                setWriteOffReason('')
-                setWriteOff(target)
-              }}
+              }
               onCancel={setCancelPledge}
             />
           ))}
@@ -542,35 +539,14 @@ export function GivingView() {
       <PledgeSheet open={pledgeOpen} onClose={() => setPledgeOpen(false)} />
       <RecurringSheet open={recurringOpen} onClose={() => setRecurringOpen(false)} />
 
-      <ConfirmDialog
-        open={writeOff !== null}
-        onClose={() => setWriteOff(null)}
-        onConfirm={confirmWriteOff}
-        title="Write off this pledge?"
-        confirmLabel="Write it off"
-        pending={setPledgeStatus.isPending}
-      >
-        <p>
-          The pledge stays on the record with its history; the balance goes to zero and it stops chasing
-          (05 §2). This cannot be undone from here — reopening one is an admin database change.
-        </p>
-        <Field label="Amount written off" required>
-          <TextInput
-            inputMode="decimal"
-            aria-label="Amount written off"
-            value={writeOffAmount}
-            onChange={(e) => setWriteOffAmount(e.target.value)}
-          />
-        </Field>
-        <Field label="Reason" hint="Kept with the pledge so the history explains itself.">
-          <TextArea
-            rows={2}
-            aria-label="Write-off reason"
-            value={writeOffReason}
-            onChange={(e) => setWriteOffReason(e.target.value)}
-          />
-        </Field>
-      </ConfirmDialog>
+      {writeOff ? (
+        <WriteOffDialog
+          balance={writeOff.balance}
+          pending={setPledgeStatus.isPending}
+          onClose={() => setWriteOff(null)}
+          onConfirm={confirmWriteOff}
+        />
+      ) : null}
 
       <ConfirmDialog
         open={cancelPledge !== null}
@@ -616,6 +592,58 @@ export function GivingView() {
         <p className="text-muted">Marking them sent stays a separate, per-row action.</p>
       </ConfirmDialog>
     </>
+  )
+}
+
+interface WriteOffDialogProps {
+  balance: number
+  pending?: boolean
+  onClose: () => void
+  onConfirm: (amount: number | null, reason: string) => void
+}
+
+/**
+ * Write-off (05 §2, admin only): amount + reason behind a confirm, because the
+ * pledge's balance goes to zero and the chase stops — an irreversible write,
+ * not an undoable one (I-12).
+ *
+ * Its own component so typing does not re-render the whole screen; the dialog
+ * re-mounts per pledge, which also re-seeds the amount with the balance due.
+ */
+function WriteOffDialog({ balance, pending, onClose, onConfirm }: WriteOffDialogProps) {
+  const [amount, setAmount] = useState(() => String(balance))
+  const [reason, setReason] = useState('')
+
+  return (
+    <ConfirmDialog
+      open
+      onClose={onClose}
+      onConfirm={() => onConfirm(parseAmount(amount), reason)}
+      title="Write off this pledge?"
+      confirmLabel="Write it off"
+      pending={pending}
+    >
+      <p>
+        The pledge stays on the record with its history; the balance goes to zero and it stops chasing
+        (05 §2). This cannot be undone from here — reopening one is an admin database change.
+      </p>
+      <Field label="Amount written off" required>
+        <TextInput
+          inputMode="decimal"
+          aria-label="Amount written off"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+        />
+      </Field>
+      <Field label="Reason" hint="Kept with the pledge so the history explains itself.">
+        <TextArea
+          rows={2}
+          aria-label="Write-off reason"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+        />
+      </Field>
+    </ConfirmDialog>
   )
 }
 

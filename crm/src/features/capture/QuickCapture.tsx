@@ -147,16 +147,18 @@ export function QuickCaptureSheet({ open, onClose, request }: SheetProps) {
   const parse = useParseCapture()
   const save = useSaveCapture()
 
-  // Re-arm the sheet whenever it is opened for a (possibly different) contact.
-  const opened = useRef(false)
+  // Re-arm whenever the sheet is opened — including a second open for a
+  // different contact while it is still mounted (profile → profile).
+  const armedFor = useRef<string | null | undefined>(undefined)
   useEffect(() => {
     if (!open) {
-      opened.current = false
+      armedFor.current = undefined
       return
     }
-    if (opened.current) return
-    opened.current = true
-    dispatch({ type: 'open', contactId: request.contactId ?? null })
+    const contactId = request.contactId ?? null
+    if (armedFor.current === contactId) return
+    armedFor.current = contactId
+    dispatch({ type: 'open', contactId })
     setQueued(readQueue())
   }, [open, request.contactId])
 
@@ -310,7 +312,7 @@ export function QuickCaptureSheet({ open, onClose, request }: SheetProps) {
       onClose={onClose}
       title={header}
       leading={
-        state.pane === 'confirm' && state.text.trim() !== '' ? (
+        state.pane === 'confirm' ? (
           <button type="button" onClick={() => dispatch({ type: 'back' })} className="text-muted hover:text-ink">
             Back
           </button>
@@ -318,7 +320,11 @@ export function QuickCaptureSheet({ open, onClose, request }: SheetProps) {
           <button type="button" onClick={onClose} className="text-muted hover:text-ink">
             Cancel
           </button>
-        ) : null
+        ) : (
+          <button type="button" onClick={onClose} className="text-muted hover:text-ink">
+            Close
+          </button>
+        )
       }
       trailing={
         state.pane === 'input' ? (

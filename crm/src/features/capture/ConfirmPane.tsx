@@ -74,14 +74,17 @@ export function ConfirmPane({ state, dispatch, kinds, actionTypes, today, preset
         </p>
       ) : null}
 
+      {/* 09 §2: a low-confidence parse renders empty chips and shows the raw
+          text, rather than filling the record with guesses. */}
       {lowConfidence ? (
-        <p
+        <div
           role="status"
           data-testid="capture-low-confidence"
-          className="rounded-card border border-flag-none bg-[#FDF8E3] px-3 py-2 text-[12.5px] leading-[1.45] text-flag-none-ink"
+          className="flex flex-col gap-[6px] rounded-card border border-flag-none bg-[#FDF8E3] px-3 py-2 text-[12.5px] leading-[1.45] text-flag-none-ink"
         >
-          Not confident enough to fill the chips — your note is kept below, fill in what matters.
-        </p>
+          <span>Not confident enough to fill the chips — here is exactly what you said.</span>
+          <span className="rounded-input bg-surface px-[10px] py-2 text-[12px] text-muted">{state.text}</span>
+        </div>
       ) : null}
 
       {/* ------------------------------------------------------------- WHO */}

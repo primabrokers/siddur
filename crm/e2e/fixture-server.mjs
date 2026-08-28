@@ -136,6 +136,13 @@ const DB = {
     ...['high|High', 'medium|Medium', 'low|Low'].map((v, i) => ({ list_name: 'priority', value: v.split('|')[0], label: v.split('|')[1], sort_order: i, color: null, meta: {}, is_active: true })),
     ...['general|General', 'personal|Personal', 'family|Family', 'giving|Giving'].map((v, i) => ({ list_name: 'note_category', value: v.split('|')[0], label: v.split('|')[1], sort_order: i, color: null, meta: {}, is_active: true })),
     ...['proposal|Proposal', 'letter|Letter', 'photo|Photo'].map((v, i) => ({ list_name: 'document_kind', value: v.split('|')[0], label: v.split('|')[1], sort_order: i, color: null, meta: {}, is_active: true })),
+    // M4 (Giving): the two lists gift entry reads (02 §6, §3.15).
+    ...['bank_transfer|Bank transfer', 'standing_order|Standing order', 'card|Card', 'cash|Cash', 'contactless|Contactless', 'cheque|Cheque', 'voucher_agency|Voucher agency', 'other|Other'].map((v, i) => ({
+      list_name: 'payment_method', value: v.split('|')[0], label: v.split('|')[1], sort_order: i, color: null, meta: {}, is_active: true,
+    })),
+    ...['in_honor|In honour of', 'in_memory|In memory of', 'yahrzeit|Yahrzeit', 'simcha|Simcha'].map((v, i) => ({
+      list_name: 'tribute_type', value: v.split('|')[0], label: v.split('|')[1], sort_order: i, color: null, meta: {}, is_active: true,
+    })),
   ],
 
   households: [
@@ -252,9 +259,19 @@ const DB = {
     { ...statsBase, contact_id: SFELD, lifetime_giving: 9200, this_year_giving: 2000, gift_count: 6, days_since_contact: 21, flag: 'overdue', donor_status: 'active' },
   ],
 
-  funds: [{ id: 'f1', name: 'Scholarships' }, { id: 'f2', name: 'Building' }],
-  campaigns: [{ id: 'c1', name: 'Building campaign' }],
-  appeals: [{ id: 'a1', name: 'Purim appeal' }],
+  // The three coding axes (02 §3.8). `is_active` drives the M4 entry selects.
+  funds: [
+    { id: 'f0', name: 'General', code: 'GEN', is_restricted: false, is_active: true },
+    { id: 'f1', name: 'Scholarships', code: 'SCH', is_restricted: true, is_active: true },
+    { id: 'f2', name: 'Building', code: 'BLD', is_restricted: true, is_active: true },
+  ],
+  campaigns: [
+    { id: 'c1', name: 'Building campaign', goal_amount: 500000, starts_on: '2025-09-01', ends_on: null, is_active: true },
+  ],
+  appeals: [
+    { id: 'a1', name: 'Purim appeal', campaign_id: null, year: 2026, channel: 'letter', is_active: true },
+    { id: 'a2', name: 'Dinner 2026 letter', campaign_id: 'c1', year: 2026, channel: 'dinner', is_active: true },
+  ],
 
   interactions: [
     {
@@ -312,6 +329,38 @@ const DB = {
       pledge_id: null, installment_id: null, recurring_agreement_id: null, receipt_status: 'queued',
       receipt_pref: null, thank_you_status: 'task_open', gift_aid_status: 'pending_declaration', gift_aid_claim_id: null, is_gasds: false, notes: null,
     },
+    // M4 (Giving): the thanks/receipt queues and the metric windows (05 §3–§4).
+    {
+      id: 'don-6', contact_id: KATZ, donated_on: daysFromNow(-9), amount: 7500, currency: 'GBP', amount_gbp: 7500,
+      fund_id: 'f2', campaign_id: 'c1', appeal_id: 'a2', payment_method: 'cheque', status: 'received',
+      pledge_id: null, installment_id: null, recurring_agreement_id: null, receipt_status: 'not_sent',
+      receipt_pref: null, thank_you_status: 'not_done', gift_aid_status: 'eligible', gift_aid_claim_id: null, is_gasds: false, notes: null,
+    },
+    {
+      id: 'don-7', contact_id: REICH, donated_on: daysFromNow(-1), amount: 250, currency: 'GBP', amount_gbp: 250,
+      fund_id: 'f0', campaign_id: null, appeal_id: 'a2', payment_method: 'bank_transfer', status: 'received',
+      pledge_id: null, installment_id: null, recurring_agreement_id: null, receipt_status: 'not_sent',
+      receipt_pref: null, thank_you_status: 'not_done', gift_aid_status: 'pending_declaration', gift_aid_claim_id: null, is_gasds: false, notes: null,
+    },
+    {
+      id: 'don-8', contact_id: GOLDSTEIN, donated_on: daysFromNow(0), amount: 36, currency: 'GBP', amount_gbp: 36,
+      fund_id: 'f0', campaign_id: null, appeal_id: null, payment_method: 'cash', status: 'received',
+      pledge_id: null, installment_id: null, recurring_agreement_id: null, receipt_status: 'not_required',
+      receipt_pref: null, thank_you_status: 'not_done', gift_aid_status: 'ineligible', gift_aid_claim_id: null, is_gasds: true, notes: 'Kiddush collection',
+    },
+    {
+      id: 'don-9', contact_id: 'aaaaaaaa-0000-0000-0000-000000000006', donated_on: daysFromNow(-14),
+      amount: 1000, currency: 'USD', amount_gbp: 790,
+      fund_id: 'f1', campaign_id: null, appeal_id: null, payment_method: 'bank_transfer', status: 'received',
+      pledge_id: null, installment_id: null, recurring_agreement_id: null, receipt_status: 'queued',
+      receipt_pref: 'letter', thank_you_status: 'not_done', gift_aid_status: 'ineligible', gift_aid_claim_id: null, is_gasds: false, notes: null,
+    },
+    {
+      id: 'don-10', contact_id: KATZ, donated_on: daysFromNow(-100), amount: 800, currency: 'GBP', amount_gbp: 800,
+      fund_id: 'f1', campaign_id: null, appeal_id: null, payment_method: 'bank_transfer', status: 'received',
+      pledge_id: 'pl-2', installment_id: 'ins-7', recurring_agreement_id: null, receipt_status: 'sent',
+      receipt_pref: null, thank_you_status: 'done', gift_aid_status: 'claimed', gift_aid_claim_id: null, is_gasds: false, notes: null,
+    },
   ],
 
   pledges: [
@@ -331,8 +380,32 @@ const DB = {
     { id: 'ins-4', pledge_id: 'pl-2', due_on: daysFromNow(-20), amount: 800, status: 'expected' },
     { id: 'ins-5', pledge_id: 'pl-2', due_on: daysFromNow(-50), amount: 800, status: 'expected' },
     { id: 'ins-6', pledge_id: 'pl-2', due_on: daysFromNow(-80), amount: 800, status: 'expected' },
+    { id: 'ins-7', pledge_id: 'pl-2', due_on: daysFromNow(-100), amount: 800, status: 'paid' },
   ],
-  recurring_agreements: [],
+
+  // M4: standing orders, including the failing one behind the nudge (08 §3).
+  recurring_agreements: [
+    {
+      id: 'rec-1', contact_id: ADLER, amount: 150, currency: 'GBP', frequency: 'monthly',
+      payment_method: 'standing_order', fund_id: 'f0', starts_on: '2024-04-01', ends_on: null,
+      expected_day: 1, status: 'failing', last_payment_on: daysFromNow(-39), missed_count: 1,
+    },
+    {
+      id: 'rec-2', contact_id: GOLDSTEIN, amount: 36, currency: 'GBP', frequency: 'monthly',
+      payment_method: 'standing_order', fund_id: 'f1', starts_on: '2023-01-01', ends_on: null,
+      expected_day: 15, status: 'active', last_payment_on: daysFromNow(-13), missed_count: 0,
+    },
+    {
+      id: 'rec-3', contact_id: SFELD, amount: 500, currency: 'GBP', frequency: 'quarterly',
+      payment_method: 'bank_transfer', fund_id: 'f2', starts_on: '2025-01-01', ends_on: null,
+      expected_day: 1, status: 'paused', last_payment_on: daysFromNow(-95), missed_count: 0,
+    },
+  ],
+
+  // Written by gift entry (02 §3.14/§3.15); the trigger-owned rows stay empty.
+  soft_credits: [],
+  tributes: [],
+  gift_aid_claims: [],
 
   gift_aid_declarations: [
     {
