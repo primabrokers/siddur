@@ -22,6 +22,8 @@ const SCRIPTS = [
   ['m3-capture-shots.mjs', 'Quick Capture — input, confirm, saved'],
   ['m4-shots.mjs', 'giving, gift entry, pledges, thanks'],
   ['m5-shots.mjs', 'search, command palette, views bar, settings'],
+  ['m6-pipeline-shots.mjs', 'pipeline board, rotting cards, drag zones'],
+  ['m6-live-smoke.mjs', 'pipeline: a real stage move + loss, against live'],
   ['m7-shots.mjs', 'Gift Aid workspace, Review & export'],
 ]
 
