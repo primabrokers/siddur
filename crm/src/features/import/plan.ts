@@ -24,6 +24,13 @@ export interface PlanInput {
   resolutions: ResolutionMap
   /** Funds already on file; matched case-insensitively by name or code. */
   funds: FundRow[]
+  /**
+   * Unknown fund names the user has agreed to create. A gift whose fund is
+   * neither on file nor in this list has nowhere to be filed, so it is left
+   * out of the plan — and the dry run says "4 gifts" only when four gifts are
+   * genuinely going to be written.
+   */
+  createFunds?: string[]
 }
 
 const fundKey = (name: string): string => name.trim().toLowerCase()
@@ -46,15 +53,17 @@ export function matchFund(funds: FundRow[], name: string | null): FundRow | null
  * carries `createIndex` — the position in `creates` whose returned id it will
  * be given once the insert comes back.
  */
-export function buildCommitPlan({ rows, resolutions, funds }: PlanInput): CommitPlan {
+export function buildCommitPlan({ rows, resolutions, funds, createFunds = [] }: PlanInput): CommitPlan {
   const creates: CommitPlan['creates'] = []
   const merges: CommitPlan['merges'] = []
   const gifts: CommitPlan['gifts'] = []
   const unknownFunds = new Set<string>()
+  const agreed = new Set(createFunds.map((name) => name.trim().toLowerCase()))
 
   let blocked = 0
   let held = 0
   let skipped = 0
+  let giftsWithoutFund = 0
 
   rows.forEach((row, index) => {
     if (isBlocked(row)) {
@@ -85,8 +94,17 @@ export function buildCommitPlan({ rows, resolutions, funds }: PlanInput): Commit
     }
 
     if (row.gift) {
-      if (row.gift.fund && !matchFund(funds, row.gift.fund)) unknownFunds.add(row.gift.fund.trim())
-      gifts.push({ row, gift: row.gift, targetId, createIndex })
+      const name = row.gift.fund?.trim() ?? ''
+      const onFile = Boolean(matchFund(funds, row.gift.fund))
+      if (name !== '' && !onFile) unknownFunds.add(name)
+
+      // A gift has to be filed under a fund (02 §3.4). One that has nowhere to
+      // go is counted apart rather than promised and then quietly dropped.
+      if (onFile || (name !== '' && agreed.has(name.toLowerCase()))) {
+        gifts.push({ row, gift: row.gift, targetId, createIndex })
+      } else {
+        giftsWithoutFund += 1
+      }
     }
   })
 
@@ -96,6 +114,7 @@ export function buildCommitPlan({ rows, resolutions, funds }: PlanInput): Commit
     held,
     skipped,
     gifts: gifts.length,
+    giftsWithoutFund,
     blocked,
     unknownFunds: [...unknownFunds].sort((a, b) => a.localeCompare(b)),
   }

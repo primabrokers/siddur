@@ -126,12 +126,12 @@ export function useDuplicatePairs(state: 'open' | 'dismissed' = 'open'): UseQuer
         const contacts = await selectRows<ContactRow>('contacts', (q) => q.in('id', ids))
         const byId = new Map(contacts.map((c) => [c.id, c]))
         const pairs = queue
-          .map((row) => {
+          .map((row): DuplicatePair | null => {
             const a = byId.get(row.contact_a_id)
             const b = byId.get(row.contact_b_id)
             if (!a || !b) return null
             if (a.merged_into_id || b.merged_into_id) return null
-            return { id: row.id, a, b, score: row.score, reason: row.reason, fromQueue: true } satisfies DuplicatePair
+            return { id: row.id, a, b, score: row.score, reason: row.reason, fromQueue: true }
           })
           .filter((p): p is DuplicatePair => p !== null)
         return { pairs, queueError, usedFallback: false }

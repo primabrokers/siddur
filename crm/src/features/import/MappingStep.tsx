@@ -93,15 +93,18 @@ export function MappingStep({ parsed, mapping, onChange }: MappingStepProps) {
         </div>
 
         <div className="ml-auto flex items-end gap-2">
-          <TextInput
-            value={templateName}
-            onChange={(e) => setTemplateName(e.target.value)}
-            placeholder="Name this mapping"
-            aria-label="Name this mapping"
-            className="w-[180px] py-[7px] text-[12.5px]"
-          />
+          <div className="w-[180px]">
+            <TextInput
+              value={templateName}
+              onChange={(e) => setTemplateName(e.target.value)}
+              placeholder="Name this mapping"
+              aria-label="Name this mapping"
+              className="py-[7px] text-[12.5px]"
+            />
+          </div>
           <Button
             variant="outline"
+            className="whitespace-nowrap"
             disabled={templateName.trim() === ''}
             onClick={() => {
               setTemplates(saveTemplate(templateName, parsed.headers, mapping))

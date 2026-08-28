@@ -43,6 +43,10 @@ export interface ProfileActionBarProps {
   onTask: () => void
   onMeet: () => void
   onArchive: () => void
+  /** Opens the merge tool for this contact (06 §5). Admin-only. */
+  onMerge?: () => void
+  /** Merge is admin + confirm (11 §1); the item stays visible but disabled. */
+  canMerge?: boolean
   className?: string
 }
 
@@ -57,6 +61,8 @@ export function ProfileActionBar({
   onTask,
   onMeet,
   onArchive,
+  onMerge,
+  canMerge = false,
   className,
 }: ProfileActionBarProps) {
   const phone = normalisePhone(contact.phone)
@@ -93,6 +99,14 @@ export function ProfileActionBar({
             label: 'Record gift — M4',
             onSelect: () => undefined,
             disabled: true,
+          },
+          {
+            id: 'merge',
+            // Shown to everyone, enabled for admins only — hiding it would
+            // hide the capability rather than the permission (11 §1).
+            label: 'Merge with a duplicate…',
+            onSelect: () => onMerge?.(),
+            disabled: !canMerge || !onMerge || Boolean(contact.is_organisation_self),
           },
           { id: 'archive', label: 'Archive contact', onSelect: onArchive, tone: 'danger' },
         ]}

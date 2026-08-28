@@ -162,6 +162,8 @@ export interface DryRunSummary {
   skipped: number
   /** Gifts to insert (rows with a gift whose contact survives). */
   gifts: number
+  /** Gifts with no fund to file them under — not written, and said so. */
+  giftsWithoutFund: number
   /** Rows with a blocking issue; never written. */
   blocked: number
   /** Fund names in the file with no matching fund record. */

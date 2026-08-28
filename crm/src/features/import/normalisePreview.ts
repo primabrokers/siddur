@@ -241,7 +241,7 @@ export function normaliseRow(row: string[], mapping: ColumnMapping, line: number
   const named = Boolean(contact.first_name || contact.last_name || contact.organization)
   if (!named) issues.push({ field: 'row', level: 'block', message: 'No name and no organisation — nothing to create.' })
 
-  const gift = buildGift(raw, issues)
+  const gift = buildGift(raw, issues, changes)
 
   const displayName =
     [contact.first_name, contact.last_name].filter(Boolean).join(' ') || contact.organization || '(no name)'
@@ -249,9 +249,15 @@ export function normaliseRow(row: string[], mapping: ColumnMapping, line: number
   return { line, contact, gift, changes, issues, displayName }
 }
 
+/**
+ * The gift half of a row. Its rewrites go into the same `changes` list as the
+ * contact's: "£1,000" becoming `1000` and "15/03/2024" becoming `2024-03-15`
+ * are exactly the kind of thing the preview promises to show.
+ */
 function buildGift(
   raw: Partial<Record<ImportField, string>>,
   issues: RowIssue[],
+  changes: FieldChange[],
 ): GiftDraft | null {
   const amountText = raw.gift_amount
   const dateText = raw.gift_date
@@ -275,6 +281,13 @@ function buildGift(
   if (!donated_on) {
     issues.push({ field: 'gift_date', level: 'block', message: dateText ? `Could not read the gift date "${dateText}".` : 'A gift amount with no date.' })
     return null
+  }
+
+  if (amountText && amountText !== String(amount)) {
+    changes.push({ field: 'gift_amount', from: amountText, to: String(amount), rule: 'amount' })
+  }
+  if (dateText && dateText !== donated_on) {
+    changes.push({ field: 'gift_date', from: dateText, to: donated_on, rule: 'date → ISO' })
   }
 
   return {

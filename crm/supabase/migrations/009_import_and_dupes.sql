@@ -32,11 +32,21 @@ create table if not exists public.import_batches (
   donation_count integer not null default 0,
   status         text not null default 'committed'
                  check (status in ('committed', 'undone')),
+  -- When the run finished writing. This is the line the undo draws between
+  -- "the import did this" and "somebody has used it since": inserting a gift
+  -- fires the automation triggers (08 §7), which create a thank-you task and a
+  -- signal against the brand-new contact. Without a finish time those look
+  -- exactly like a fundraiser's own work, and undo would refuse to remove a
+  -- single row it had just written.
+  completed_at   timestamptz,
   undone_at      timestamptz
 );
 
 comment on table public.import_batches is
   'One committed CSV import run (06 §5). `import_batch` on contacts/donations points here; undo deletes by that stamp.';
+
+-- Added after the first live run, so an existing table gets it too.
+alter table public.import_batches add column if not exists completed_at timestamptz;
 
 -- The stamp. Nullable everywhere: hand-entered records simply carry null.
 alter table public.contacts

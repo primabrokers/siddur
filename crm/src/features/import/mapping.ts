@@ -18,7 +18,10 @@ import type { ColumnMapping, FieldSpec, ImportField, MappingTemplate } from './t
 
 export const FIELD_SPECS: FieldSpec[] = [
   { field: 'title', label: 'Title', group: 'contact', synonyms: ['title', 'honorific', 'salutation', 'prefix'], hint: 'Rabbi / Mr / Mrs — canonicalised' },
-  { field: 'first_name', label: 'First name', group: 'contact', synonyms: ['firstname', 'first', 'forename', 'givenname', 'christianname', 'name'] },
+  // A column headed simply "Name" is deliberately *not* a first-name synonym:
+  // it is almost always a full name, and splitting it wrongly is worse than
+  // asking. It stays unmapped until a human says what it is.
+  { field: 'first_name', label: 'First name', group: 'contact', synonyms: ['firstname', 'first', 'forename', 'givenname', 'christianname'] },
   { field: 'last_name', label: 'Last name', group: 'contact', synonyms: ['lastname', 'last', 'surname', 'familyname', 'secondname'] },
   { field: 'hebrew_name', label: 'Hebrew name', group: 'contact', synonyms: ['hebrewname', 'hebrew', 'shemhakodesh', 'yiddishname'] },
   { field: 'organization', label: 'Organisation', group: 'contact', synonyms: ['organisation', 'organization', 'company', 'business', 'firm', 'employer'] },
@@ -81,9 +84,13 @@ const SYNONYM_INDEX: Array<{ key: string; field: ImportField }> = FIELD_SPECS.fl
  * Guess one header's field, ignoring any already taken.
  *
  * Pass 1 — exact synonym.
- * Pass 2 — the header *starts with* a synonym ("mobilephone" → phone).
- * Pass 3 — the header contains one, ≥4 characters so "tel" cannot match
- *          "clientele" and "wa" cannot match "warmth".
+ * Pass 2 — the header starts or ends with a synonym of ≥3 characters
+ *          ("mobilephone" → phone), which keeps "wa" from claiming "warmth".
+ * Pass 3 — the header contains one of ≥4 characters, so "tel" cannot match
+ *          "clientele".
+ *
+ * The length floors are the whole reason this is three passes rather than one
+ * `includes`: a two-letter synonym is only ever trustworthy as an exact match.
  */
 export function guessField(header: string, taken: ReadonlySet<ImportField> = new Set()): ImportField | null {
   const key = headerKey(header)
@@ -93,7 +100,9 @@ export function guessField(header: string, taken: ReadonlySet<ImportField> = new
   const exact = free.find((entry) => entry.key === key)
   if (exact) return exact.field
 
-  const prefixed = free.find((entry) => key.startsWith(entry.key) || key.endsWith(entry.key))
+  const prefixed = free.find(
+    (entry) => entry.key.length >= 3 && (key.startsWith(entry.key) || key.endsWith(entry.key)),
+  )
   if (prefixed) return prefixed.field
 
   const contained = free.find((entry) => entry.key.length >= 4 && key.includes(entry.key))
@@ -109,8 +118,11 @@ export function guessMapping(headers: string[]): ColumnMapping {
   const taken = new Set<ImportField>()
   const mapping: ColumnMapping = []
 
-  // Two passes so exact matches claim their field before looser ones do:
-  // "Name" must not steal `first_name` from a later "First Name" column.
+  // Exact matches claim their field before any looser pass gets a look-in, so
+  // a vague header cannot take the field its precise neighbour needs. Within
+  // the exact pass, file order wins: two spellings of the same thing ("Phone",
+  // "Telephone") are equally right, and the leftmost is the one a person reads
+  // as the main column.
   headers.forEach((header, index) => {
     const key = headerKey(header)
     const exact = SYNONYM_INDEX.find((entry) => entry.key === key)

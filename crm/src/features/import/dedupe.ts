@@ -9,13 +9,17 @@
  *
  * The wizard proposes; the human disposes. Defaults are deliberately timid:
  *
- *   - a **contact-detail** match (email/phone) defaults to `merge` — the same
- *     phone number is about as certain as this gets;
- *   - a **name-only** match defaults to `review`, which imports *nothing* this
- *     run. Two Cohens in Golders Green are usually two Cohens. That is the
- *     spec's "3 duplicates held for review".
- *   - a **within-file** repeat defaults to `skip`, because the earlier row is
- *     already creating the person.
+ *   - a **contact-detail** match (email/phone) against an existing record
+ *     defaults to `merge` — the same phone number is about as certain as this
+ *     gets;
+ *   - a **within-file repeat on a contact detail** defaults to `skip`, because
+ *     the earlier row is already creating that person;
+ *   - **anything matched on the name alone** defaults to `review`, which
+ *     imports nothing this run. Two Cohens in Golders Green are usually two
+ *     Cohens, and Shloimy and Rivky Fischer are certainly two Fischers — a
+ *     surname is the single most common false positive in this whole file, so
+ *     it never silently loses a row. That is the spec's "3 duplicates held for
+ *     review".
  */
 
 import { rankDuplicates, scoreDuplicate, type DuplicateReason } from '../contacts/normalise'
@@ -110,7 +114,10 @@ export function defaultResolution(duplicate: RowDuplicate): Resolution {
   if (duplicate.existing && isStrongMatch(duplicate.existing.reasons)) {
     return { action: 'merge', targetId: duplicate.existing.contact.id, isDefault: true }
   }
-  if (duplicate.withinFile !== null) {
+  // A repeat inside the file is only skipped on the strength of a shared
+  // contact detail. On a shared surname alone it is held, not discarded: two
+  // siblings in one sheet must not become one person without a human saying so.
+  if (duplicate.withinFile !== null && isStrongMatch(duplicate.reasons)) {
     return { action: 'skip', targetId: null, isDefault: true }
   }
   return { action: 'review', targetId: null, isDefault: true }

@@ -1,8 +1,20 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router'
 import { Button, EmptyState, Money, PersonRow, Pill, TextInput } from '../../components'
+import { cn } from '../../lib/cn'
 import { formatDayCount } from '../../lib/format'
 import { useContactsList, useLookupOptions } from '../../lib/queries/contacts'
+import { useTeamMember } from '../auth/useTeamMember'
+import {
+  BulkActionSheet,
+  ColumnPicker,
+  MAGIC_COLUMN_BY_ID,
+  loadColumns,
+  renderColumn,
+  saveColumns,
+  sortByColumn,
+  type MagicColumnId,
+} from '../dataquality'
 import { PageHeader } from '../shell/PageHeader'
 import { ContactSheet } from './ContactSheet'
 import { displayName, fullName } from './normalise'
@@ -71,6 +83,14 @@ export function ContactsList({
   const [ownSheetOpen, setOwnSheetOpen] = useState(false)
   const stages = useLookupOptions('stage')
   const own = useContactsList({ enabled: source === undefined })
+  const member = useTeamMember()
+
+  // Magic columns (03 §4) and the selection they get bulk-acted on (06 §1).
+  // Both are keyed by the *view's* title, so switching lens keeps each queue's
+  // own columns and never carries a stale selection across.
+  const [columns, setColumns] = useState<MagicColumnId[]>(() => loadColumns(title))
+  const [sort, setSort] = useState<{ id: MagicColumnId; direction: 'asc' | 'desc' } | null>(null)
+  const [selected, setSelected] = useState<Set<string>>(() => new Set())
 
   const sheetOpen = createOpen ?? ownSheetOpen
   const setSheetOpen = (open: boolean) => {
@@ -89,12 +109,36 @@ export function ContactsList({
   // silently hide rows the view is meant to show.
   useEffect(() => {
     setTerm('')
+    setSelected(new Set())
+    setSort(null)
+    setColumns(loadColumns(title))
   }, [title])
 
   const filtered = useMemo(() => {
     const needle = term.trim().toLowerCase()
-    return rows.filter((row) => matches(row, needle))
-  }, [rows, term])
+    const matched = rows.filter((row) => matches(row, needle))
+    // The default order is flag severity then name (I-3), set by the query.
+    // A magic-column sort is an explicit override of that, never a silent one.
+    if (!sort) return matched
+    const column = MAGIC_COLUMN_BY_ID[sort.id]
+    return column ? sortByColumn(matched, column, sort.direction) : matched
+  }, [rows, term, sort])
+
+  const selectedRows = useMemo(
+    () => filtered.filter((row) => selected.has(row.contact.id)),
+    [filtered, selected],
+  )
+
+  const toggleRow = (id: string) => {
+    setSelected((current) => {
+      const next = new Set(current)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const allShownSelected = filtered.length > 0 && filtered.every((row) => selected.has(row.contact.id))
 
   return (
     <>
@@ -116,6 +160,14 @@ export function ContactsList({
               placeholder="Filter by name or city"
               aria-label="Filter contacts by name or city"
               className="w-[200px] py-[7px] text-[13px] sm:w-[240px]"
+            />
+            <ColumnPicker
+              active={columns}
+              onChange={(ids) => {
+                setColumns(ids)
+                saveColumns(title, ids)
+                if (sort && !ids.includes(sort.id)) setSort(null)
+              }}
             />
             <Button onClick={() => setSheetOpen(true)}>New contact</Button>
           </div>
@@ -159,14 +211,71 @@ export function ContactsList({
           }
         />
       ) : (
-        <ul className="flex flex-col gap-2">
-          {filtered.map(({ contact, stats }) => {
+        <>
+          {/* The select-all / column header strip. It only earns its row when
+              there is a selection to manage or a column to sort by. */}
+          {columns.length > 0 || selected.size > 0 ? (
+            <div className="mb-2 flex items-center gap-3 px-1 text-[11.5px] text-muted">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={allShownSelected}
+                  aria-label="Select every contact shown"
+                  onChange={() =>
+                    setSelected(allShownSelected ? new Set() : new Set(filtered.map((r) => r.contact.id)))
+                  }
+                  className="h-[15px] w-[15px] accent-[#0E6E6B]"
+                />
+                Select all
+              </label>
+              <div className="ml-auto flex items-center gap-2">
+                {columns.map((id) => {
+                  const column = MAGIC_COLUMN_BY_ID[id]
+                  if (!column) return null
+                  const active = sort?.id === id
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() =>
+                        setSort(
+                          active
+                            ? sort.direction === 'desc'
+                              ? { id, direction: 'asc' }
+                              : null
+                            : { id, direction: 'desc' },
+                        )
+                      }
+                      className={cn(
+                        'w-[104px] text-right transition-colors',
+                        active ? 'font-semibold text-accent-dark' : 'hover:text-ink',
+                      )}
+                    >
+                      {column.label}
+                      {active ? (sort.direction === 'desc' ? ' ↓' : ' ↑') : ''}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ) : null}
+
+          <ul className="flex flex-col gap-2">
+            {filtered.map((row) => {
+            const { contact, stats } = row
             const next = nextActionPhrase(stats?.next_action_due_on)
             const ytd = stats?.this_year_giving ?? null
             return (
-              <li key={contact.id}>
+              <li key={contact.id} className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={selected.has(contact.id)}
+                  onChange={() => toggleRow(contact.id)}
+                  aria-label={`Select ${displayName(contact) || contact.organization || 'contact'}`}
+                  className="h-[15px] w-[15px] shrink-0 accent-[#0E6E6B]"
+                />
                 <PersonRow
-                  className="min-h-[52px]"
+                  className="min-h-[52px] grow"
                   name={displayName(contact) || contact.organization || 'Unnamed contact'}
                   flag={stats?.flag ?? 'none'}
                   dashed={(stats?.flag ?? 'none') === 'none'}
@@ -208,11 +317,37 @@ export function ContactsList({
                     </>
                   }
                 />
+                {/* Magic columns (03 §4): read-only projections of
+                    `contact_stats`, never recomputed here (I-8). */}
+                {columns.map((id) => {
+                  const column = MAGIC_COLUMN_BY_ID[id]
+                  if (!column) return null
+                  const value = renderColumn(column, row)
+                  return (
+                    <span
+                      key={id}
+                      title={column.label}
+                      className={cn(
+                        'w-[104px] shrink-0 text-right text-[12.5px] tabular-nums',
+                        column.money ? 'text-gold' : 'text-muted',
+                      )}
+                    >
+                      {value === '' ? <span className="text-faint">—</span> : value}
+                    </span>
+                  )
+                })}
               </li>
             )
           })}
-        </ul>
+          </ul>
+        </>
       )}
+
+      <BulkActionSheet
+        rows={selectedRows}
+        onClear={() => setSelected(new Set())}
+        isAdmin={member.data?.role === 'admin'}
+      />
 
       <ContactSheet open={sheetOpen} onClose={() => setSheetOpen(false)} />
     </>

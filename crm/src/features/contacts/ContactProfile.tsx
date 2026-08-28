@@ -19,6 +19,7 @@ import {
 } from '../../lib/queries/contacts'
 import { canEdit, useTeamMember } from '../auth/useTeamMember'
 import { useCapture } from '../capture/QuickCapture'
+import { MergeFromProfile } from '../dataquality'
 import { ContactSheet } from './ContactSheet'
 import { DetailsTab } from './DetailsTab'
 import { GivingTab } from './GivingTab'
@@ -58,6 +59,7 @@ export function ContactProfile({ id }: { id: string }) {
   const [taskOpen, setTaskOpen] = useState(false)
   const [meetOpen, setMeetOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
+  const [mergeOpen, setMergeOpen] = useState(false)
 
   const { openCapture } = useCapture()
   const teamMember = useTeamMember()
@@ -182,6 +184,8 @@ export function ContactProfile({ id }: { id: string }) {
             onTask={() => setTaskOpen(true)}
             onMeet={() => setMeetOpen(true)}
             onArchive={() => void archive()}
+            onMerge={() => setMergeOpen(true)}
+            canMerge={teamMember.data?.role === 'admin'}
           />
         }
       />
@@ -281,6 +285,16 @@ export function ContactProfile({ id }: { id: string }) {
       />
       {/* Mounted only while open so the draft always starts from the saved row. */}
       {editOpen ? <ContactSheet open onClose={() => setEditOpen(false)} contact={contact} /> : null}
+      <MergeFromProfile
+        open={mergeOpen}
+        onClose={() => setMergeOpen(false)}
+        contact={contact}
+        onMerged={(winnerId) => {
+          toast.push('Records merged', { tone: 'good' })
+          // The loser is now a tombstone; land on whichever record survived.
+          if (winnerId !== contact.id) navigate(`/contacts/${winnerId}`)
+        }}
+      />
     </div>
   )
 }

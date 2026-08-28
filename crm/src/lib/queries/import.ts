@@ -204,7 +204,9 @@ export function useCommitImport() {
 
       const { data: batchData, error: batchError } = await supabase
         .from('import_batches')
-        .insert({ filename, started_by: startedBy, contact_count: 0, donation_count: 0 })
+        // `status` has a default, but a batch row that does not say what it is
+        // makes the undo rule depend on a column the client never wrote.
+        .insert({ filename, started_by: startedBy, contact_count: 0, donation_count: 0, status: 'committed' })
         .select('*')
         .single()
       if (batchError) throw new Error((batchError as Failed).message)
