@@ -42,6 +42,11 @@ export function Sheet({
   const panelRef = useRef<HTMLDivElement | null>(null)
   const returnFocusRef = useRef<HTMLElement | null>(null)
   const titleId = useId()
+  // The trap effect must run only on open/close: an inline onClose changes
+  // identity on every parent render, and re-running the effect steals focus
+  // from whatever field the user is typing in.
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
 
   const focusables = useCallback((): HTMLElement[] => {
     const panel = panelRef.current
@@ -62,7 +67,7 @@ export function Sheet({
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.stopPropagation()
-        onClose()
+        onCloseRef.current()
         return
       }
       if (event.key !== 'Tab') return
@@ -93,7 +98,7 @@ export function Sheet({
       document.body.style.overflow = previousOverflow
       returnFocusRef.current?.focus?.()
     }
-  }, [open, onClose, focusables])
+  }, [open, focusables])
 
   if (!open) return null
 
