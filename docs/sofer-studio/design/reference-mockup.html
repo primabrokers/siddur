@@ -1,0 +1,1017 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sofer Studio — Reference Mockup · ALL DATA SAMPLE</title>
+<style>
+:root{
+  --klaf:#F2E7CE; --klaf-seam:#DFC99F; --dyo:#241E14;
+  --bench:#1A211E; --panel:#242F2B; --panel2:#1C2622;
+  --teal:#3E8E81; --teal-bright:#57B7A8; --teal-on-klaf:#2C6B60;
+  --shem:#C79A3F; --madder:#B04A38; --ok:#7FA653;
+  --txt:rgba(242,231,206,.92); --txt2:rgba(242,231,206,.62); --txt3:rgba(242,231,206,.38);
+  --hair:rgba(242,231,206,.14); --hair-klaf:rgba(36,30,20,.28);
+  --font-he:"Frank Ruhl Libre","David Libre","SBL Hebrew","Ezra SIL","Noto Serif Hebrew",serif;
+  --font-disp:"Fraunces","Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --font-mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --pitch:26px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bench);color:var(--txt);font:15px/1.45 var(--font-disp);-webkit-font-smoothing:antialiased}
+:focus-visible{outline:2px solid var(--teal-bright);outline-offset:2px;border-radius:3px}
+::selection{background:rgba(62,142,129,.45)}
+h1,h2,h3,p{margin:0}
+button{font-family:inherit}
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.he{font-family:var(--font-he)}
+.unit{font:11px var(--font-mono);color:var(--txt2)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* ---------- app bar ---------- */
+.appbar{display:flex;align-items:center;gap:14px;height:48px;padding:0 14px;border-bottom:1px solid var(--hair);background:#161C1A}
+.wordmark{font:600 19px var(--font-disp);letter-spacing:.01em;white-space:nowrap}
+.wordmark .he{color:var(--shem);font-size:16px;margin-left:8px}
+.appbar .grow{flex:1}
+.searchbox{display:flex;align-items:center;background:var(--panel2);border:1px solid rgba(242,231,206,.18);border-radius:6px;height:34px;min-width:240px}
+.searchbox input{flex:1;background:none;border:0;color:var(--txt);font:13px var(--font-mono);padding:0 10px;height:100%;outline:none}
+.searchbox .kbd{	font:10px var(--font-mono);color:var(--txt3);border:1px solid var(--hair);border-radius:3px;padding:1px 5px;margin-right:8px}
+select.profile{background:var(--panel2);color:var(--txt);border:1px solid rgba(242,231,206,.18);border-radius:6px;height:34px;font:600 12px var(--font-disp);padding:0 8px}
+.ribbon{font:700 10px var(--font-mono);letter-spacing:.18em;color:var(--dyo);background:var(--shem);border-radius:3px;padding:3px 8px;white-space:nowrap}
+.lineref{font:12px var(--font-mono);color:var(--teal-bright);white-space:nowrap}
+
+/* chips */
+.chip{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:10px;font:700 10px var(--font-disp);letter-spacing:.1em;text-transform:uppercase;white-space:nowrap}
+.chip.locked{background:var(--klaf);color:var(--dyo)}
+.chip.teal{background:var(--teal);color:#0E1714}
+.chip.teal-o{border:1px solid var(--teal);color:var(--teal-bright)}
+.chip.ok{background:var(--ok);color:#131A10}
+.chip.err{background:var(--madder);color:#FFF}
+.chip.warn{border:1px solid var(--madder);color:#E08A7B}
+.chip.shemc{background:rgba(199,154,63,.16);color:var(--shem);border:1px solid rgba(199,154,63,.5)}
+.chip.sample{border:1px dashed var(--txt3);color:var(--txt3)}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:36px;padding:0 14px;border-radius:6px;font:600 13px var(--font-disp);cursor:pointer;border:1px solid transparent}
+.btn-primary{background:var(--teal);color:#0E1714;border-color:var(--teal)}
+.btn-primary:hover{background:var(--teal-bright)}
+.btn-ghost{background:transparent;border-color:rgba(242,231,206,.25);color:var(--txt)}
+.btn-ghost:hover{border-color:var(--teal);color:var(--teal-bright)}
+.btn-danger{background:transparent;border-color:var(--madder);color:#E08A7B}
+.btn[disabled]{opacity:.38;cursor:not-allowed}
+.btn.small{height:30px;padding:0 10px;font-size:12px}
+
+/* ---------- sargel rule (signature) ---------- */
+#sargel{position:relative;height:28px;background:linear-gradient(#212B26,#1A211E);border-bottom:1px solid var(--hair);overflow:hidden;cursor:default}
+#sargel .tick{position:absolute;bottom:0;width:1px;background:rgba(87,183,168,.38)}
+#sargel .tick.five{background:rgba(87,183,168,.6)}
+#sargel .tick.cm{background:rgba(87,183,168,.85)}
+#sargel .tlab{position:absolute;top:2px;font:9px var(--font-mono);color:var(--txt3);transform:translateX(2px)}
+#sargel-window{position:absolute;top:0;bottom:0;left:0;width:0;display:none;background:rgba(87,183,168,.16);border-right:2px solid var(--teal-bright);transition:width .24s ease-out}
+#sargel-flag{position:absolute;top:2px;display:none;font:700 10px var(--font-mono);color:var(--teal-bright);background:#101614;border:1px solid var(--teal);border-radius:3px;padding:1px 6px;white-space:nowrap}
+#sargel .zero{position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--teal)}
+
+/* ---------- bench grid ---------- */
+.bench{display:grid;grid-template-columns:320px minmax(460px,1fr) 360px;gap:12px;padding:12px;align-items:start}
+.rail{min-width:0}
+
+/* panels */
+.panel{background:var(--panel);border:1px solid var(--hair);border-radius:10px;margin-bottom:12px;overflow:hidden}
+.panel-head{display:flex;align-items:center;gap:10px;padding:11px 14px 9px;cursor:pointer;user-select:none}
+.panel-head .num{font:700 11px var(--font-mono);color:var(--teal-bright);border:1px solid var(--teal);border-radius:4px;padding:2px 6px}
+.panel-head h2{font:560 19px var(--font-disp);letter-spacing:.01em}
+.panel-head .he-name{font:400 15px var(--font-he);color:var(--txt2)}
+.panel-head .chev{margin-left:auto;color:var(--txt2);transition:transform .16s ease-out;font-size:12px}
+.panel.collapsed .chev{transform:rotate(-90deg)}
+.panel .sirtut{height:4px;border-top:1px solid var(--hair);border-bottom:1px solid rgba(0,0,0,.4)}
+.panel-body{padding:12px 14px 14px}
+.panel.collapsed .panel-body,.panel.collapsed .sirtut{display:none}
+.eyebrow{font:600 11px var(--font-disp);letter-spacing:.14em;text-transform:uppercase;color:var(--teal-bright);margin:0 0 8px}
+.caption{font:11px var(--font-disp);color:var(--txt2);margin-top:8px}
+.caption.sample-note{color:var(--shem);opacity:.85}
+
+/* mm input */
+.mmgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mmfield{display:flex;flex-direction:column;gap:4px}
+.mmfield.wide{grid-column:1/-1}
+.mmfield>label{font:600 10px var(--font-disp);letter-spacing:.12em;text-transform:uppercase;color:var(--txt2)}
+.mmbox{display:flex;align-items:stretch;background:var(--panel2);border:1px solid rgba(242,231,206,.18);border-radius:6px;height:44px;overflow:hidden}
+.mmbox input{flex:1;min-width:0;background:none;border:0;color:var(--txt);font:15px var(--font-mono);padding:0 8px 0 10px;outline:none}
+.mmbox .unit{display:flex;align-items:center;padding-right:8px}
+.mmbox .step{display:flex;flex-direction:column;border-left:1px solid var(--hair)}
+.mmbox .step button{flex:1;width:32px;background:none;border:0;color:var(--txt2);cursor:pointer;font:9px var(--font-mono)}
+.mmbox .step button:hover{color:var(--teal-bright);background:rgba(62,142,129,.12)}
+.mmbox:focus-within{border-color:var(--teal);box-shadow:0 0 0 2px rgba(87,183,168,.3)}
+.mmbox.err{border-color:var(--madder);box-shadow:0 0 0 2px rgba(176,74,56,.3)}
+.field-note{font:11px var(--font-mono);color:var(--txt2);margin-top:4px}
+.field-note.ok{color:var(--ok)}
+.field-note.bad{color:#E08A7B}
+
+/* warning banner */
+.warnbar{display:flex;gap:10px;align-items:flex-start;background:rgba(176,74,56,.14);border:1px solid var(--madder);border-radius:8px;padding:10px 12px;margin-bottom:12px;font:12px var(--font-disp)}
+.warnbar .glyph{color:#E08A7B;font-weight:700}
+
+/* tables */
+.tbl{width:100%;border-collapse:collapse;font:13px var(--font-mono)}
+.tbl th{font:600 10px var(--font-disp);letter-spacing:.1em;text-transform:uppercase;color:var(--txt2);text-align:left;padding:6px 8px;border-bottom:1px solid var(--hair);position:sticky;top:0;background:var(--panel)}
+.tbl td{padding:5px 8px;border-bottom:1px solid rgba(242,231,206,.07);color:var(--txt)}
+.tbl tr:hover td{background:rgba(223,201,159,.05)}
+.tbl .ltr{font:400 20px var(--font-he);color:var(--txt)}
+.tbl .tot{font-weight:700;color:var(--teal-bright)}
+.tbl .strike{text-decoration:line-through;color:var(--txt3)}
+.tbl .capcell{cursor:pointer;border-radius:4px}
+.tbl .capcell:hover{outline:1px dashed var(--teal)}
+
+/* derived block */
+.derived{margin-top:12px;border-top:4px double var(--hair);padding-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px 14px}
+.ditem .dl{font:11px var(--font-disp);color:var(--txt2)}
+.ditem .dv{font:15px var(--font-mono);color:var(--txt)}
+.ditem .df{font:10px var(--font-mono);color:var(--txt3)}
+.ditem .fx{color:var(--teal-bright);font-style:normal;margin-right:4px}
+.bignum{grid-column:1/-1;border:1px solid var(--teal);border-radius:8px;padding:10px 12px;background:rgba(62,142,129,.08)}
+.bignum .dl{font:600 11px var(--font-disp);letter-spacing:.14em;text-transform:uppercase;color:var(--teal-bright)}
+.bignum .dv{font:700 30px var(--font-mono);color:var(--teal-bright)}
+.bignum .dv .unit{font-size:14px;color:var(--teal-bright);opacity:.7}
+
+/* ---------- tikkun ---------- */
+.tikkun-col{min-width:0}
+.sheetbar{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.sheetbar h2{font:560 19px var(--font-disp)}
+.sheetbar .he-name{font:15px var(--font-he);color:var(--txt2)}
+.sheet-wrap{display:flex;gap:0}
+.vrule{flex:none;width:16px;border-radius:4px 0 0 4px;background:var(--panel2);border:1px solid var(--hair);border-right:0;position:relative;overflow:hidden}
+.vrule .ticks{position:absolute;inset:28px 0 0;background:repeating-linear-gradient(to bottom,rgba(87,183,168,.55) 0 1px,transparent 1px var(--pitch))}
+.vrule .cap{position:absolute;top:6px;left:0;right:0;text-align:center;font:9px var(--font-mono);color:var(--txt3);writing-mode:vertical-rl}
+.sheet{position:relative;flex:1;min-width:0;background:var(--klaf);color:var(--dyo);border-radius:0 4px 4px 0;box-shadow:inset 0 0 70px rgba(36,30,20,.14),0 14px 44px rgba(0,0,0,.5);padding:14px 8px 18px;overflow-x:auto}
+.sheet::after{content:"SAMPLE TEXT — EXCERPT";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;transform:rotate(-22deg);font:700 58px var(--font-disp);letter-spacing:.08em;color:rgba(36,30,20,.055);pointer-events:none;white-space:nowrap}
+.amud-head-row{display:flex;flex-direction:row}
+.amudim{display:flex;flex-direction:row;align-items:stretch}
+.amud{flex:none;width:300px;padding:0 20px;position:relative;background:repeating-linear-gradient(to bottom,transparent 0 calc(var(--pitch) - 1px),var(--hair-klaf) calc(var(--pitch) - 1px) var(--pitch))}
+.amud-head{flex:none;width:300px;text-align:center;font:11px var(--font-mono);color:rgba(36,30,20,.55);padding:0 20px 6px}
+.seam-head{flex:none;width:16px}
+.seam{flex:none;width:16px;background:repeating-linear-gradient(to bottom,var(--klaf-seam) 0 7px,rgba(223,201,159,.25) 7px 13px);border-left:1px dashed rgba(36,30,20,.35);border-right:1px dashed rgba(36,30,20,.35)}
+.line{height:var(--pitch);line-height:var(--pitch);direction:rtl;text-align:right;font:400 17px var(--font-he);white-space:nowrap;position:relative;cursor:pointer;border-radius:2px}
+.line:hover{background:rgba(223,201,159,.5)}
+.line.sel{box-shadow:inset 3px 0 0 var(--teal-on-klaf);background:rgba(62,142,129,.12)}
+.line .lineno{position:absolute;left:-16px;top:0;font:400 10px var(--font-he);color:rgba(36,30,20,.42);user-select:none}
+.shem{background:rgba(199,154,63,.35);border-bottom:1px solid var(--shem);border-radius:2px;padding:0 1px;cursor:help}
+.large-b{font-size:1.62em;line-height:.6;vertical-align:-6px}
+.unusual-mark{outline:1.5px solid var(--teal-on-klaf);outline-offset:1px;border-radius:2px}
+.dotted{background-image:radial-gradient(circle,var(--dyo) .9px,transparent 1.1px);background-size:5px 3px;background-position:top center;background-repeat:repeat-x;padding-top:3px}
+.tag{position:relative}
+.tag::before{content:"";position:absolute;top:-2px;left:18%;width:64%;height:5px;background-image:linear-gradient(var(--dyo),var(--dyo)),linear-gradient(var(--dyo),var(--dyo)),linear-gradient(var(--dyo),var(--dyo));background-size:1.4px 5px;background-position:0 0,50% 0,100% 0;background-repeat:no-repeat;opacity:0}
+body.taggin-on .tag::before{opacity:.9}
+@keyframes flashline{0%{background:rgba(199,154,63,.7)}100%{background:rgba(223,201,159,0)}}
+.line.flash{animation:flashline .9s ease-out 1}
+.amudnav{display:flex;align-items:center;gap:10px;margin-top:10px}
+.amudnav .pos{font:12px var(--font-mono);color:var(--txt2)}
+
+/* ---------- shemos ---------- */
+.shemrow{display:grid;grid-template-columns:4px 1fr auto;gap:10px;padding:9px 0;border-top:1px solid rgba(242,231,206,.07);align-items:center}
+.shemrow .spine{border-radius:2px;align-self:stretch}
+.shemrow.certain .spine{background:var(--shem)}
+.shemrow.unsure .spine{background:repeating-linear-gradient(to bottom,var(--madder) 0 4px,transparent 4px 8px)}
+.shemrow .tok{font:400 20px var(--font-he);direction:rtl;text-align:right}
+.shemrow .pos{font:11px var(--font-mono);color:var(--txt2);text-align:left}
+.shemrow .acts{display:flex;gap:6px;grid-column:2/4;justify-content:flex-end}
+.unsat{margin-top:10px;border:1px solid var(--madder);border-radius:8px;padding:10px 12px;background:rgba(176,74,56,.1)}
+.unsat h3{font:700 11px var(--font-disp);letter-spacing:.12em;text-transform:uppercase;color:#E08A7B;margin-bottom:6px}
+.unsat .mono{font-size:12px;color:var(--txt)}
+
+/* passages */
+.pcard{border:1px solid var(--hair);border-radius:8px;padding:10px 12px;margin-bottom:10px;background:var(--panel2)}
+.pcard .prow{display:flex;align-items:center;gap:10px}
+.pcard h3{font:600 14px var(--font-disp)}
+.pcard .he-sub{font:14px var(--font-he);color:var(--txt2)}
+.pcard select{width:100%;margin-top:8px;background:var(--panel);color:var(--txt);border:1px solid rgba(242,231,206,.18);border-radius:6px;height:32px;font:12px var(--font-mono);padding:0 8px}
+.pcard .src{font:10px var(--font-mono);color:var(--txt3);margin-top:6px}
+.pglyph{flex:none;width:74px;height:40px;border:1px solid var(--hair);border-radius:5px;background:var(--klaf);display:flex;align-items:center;justify-content:center;overflow:hidden}
+.switch{position:relative;width:40px;height:22px;flex:none}
+.switch input{position:absolute;opacity:0;inset:0;cursor:pointer;margin:0}
+.switch .track{position:absolute;inset:0;border-radius:11px;background:var(--panel);border:1px solid var(--hair);transition:background .16s}
+.switch .knob{position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:var(--txt2);transition:left .16s,background .16s}
+.switch input:checked~.track{background:rgba(62,142,129,.35);border-color:var(--teal)}
+.switch input:checked~.knob{left:21px;background:var(--teal-bright)}
+.blocker{margin-top:8px;font:11px var(--font-disp);color:#E08A7B;border:1px dashed var(--madder);border-radius:6px;padding:6px 8px}
+.kinds{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px}
+.kindchip{font:600 10px var(--font-disp);letter-spacing:.08em;text-transform:uppercase;border:1px solid var(--hair);border-radius:9px;padding:2px 8px;color:var(--txt2)}
+.kindchip.on{border-color:var(--teal);color:var(--teal-bright)}
+.stepper{display:inline-flex;align-items:center;border:1px solid var(--hair);border-radius:6px;overflow:hidden}
+.stepper button{width:26px;height:26px;background:var(--panel2);border:0;color:var(--txt2);cursor:pointer;font:12px var(--font-mono)}
+.stepper button:hover{color:var(--teal-bright)}
+.stepper .val{min-width:64px;text-align:center;font:12px var(--font-mono);padding:0 6px}
+.ovr{font:700 9px var(--font-disp);letter-spacing:.1em;color:var(--shem);text-transform:uppercase}
+
+/* validation */
+.vsum{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.vrow{display:grid;grid-template-columns:14px 96px 1fr auto;gap:8px;align-items:center;padding:7px 6px;border-top:1px solid rgba(242,231,206,.07);cursor:pointer;border-radius:4px}
+.vrow:hover{background:rgba(223,201,159,.05)}
+.vrow.err{background:rgba(176,74,56,.12)}
+.vrow .g{font-size:11px}
+.vrow.err .g{color:#E08A7B}
+.vrow.warn .g{color:var(--shem)}
+.vrow.clean .g{color:var(--ok)}
+.vrow .ref{font:11px var(--font-mono);color:var(--txt2)}
+.vrow .what{font:12px var(--font-disp)}
+.vrow .delta{font:12px var(--font-mono);color:var(--txt)}
+
+/* ---------- lower bench drawer ---------- */
+.drawer{margin:0 12px 14px;background:var(--panel);border:1px solid var(--hair);border-radius:10px;overflow:hidden}
+.drawer-tabs{display:flex;gap:2px;padding:6px 8px;border-bottom:1px solid var(--hair);align-items:center;flex-wrap:wrap}
+.dtab{height:32px;padding:0 14px;border:0;border-radius:6px;background:transparent;color:var(--txt2);font:600 12px var(--font-disp);cursor:pointer;display:inline-flex;align-items:center;gap:7px}
+.dtab .num{font:700 10px var(--font-mono);color:var(--teal-bright)}
+.dtab:hover{color:var(--txt)}
+.dtab.active{background:var(--panel2);color:var(--txt);box-shadow:inset 0 -2px 0 var(--teal)}
+.drawer-body{padding:14px;min-height:230px}
+.dpanel{display:none}
+.dpanel.active{display:block}
+
+/* saved layouts */
+.slgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px}
+.slcard{border:1px solid var(--hair);border-radius:8px;overflow:hidden;background:var(--panel2)}
+.slcard.locked{border-left:3px solid var(--klaf)}
+.slthumb{height:52px;background:var(--klaf);position:relative;overflow:hidden}
+.slthumb::before{content:"";position:absolute;inset:8px 14px;background:repeating-linear-gradient(to bottom,rgba(36,30,20,.5) 0 1px,transparent 1px 7px)}
+.slthumb::after{content:"";position:absolute;top:0;bottom:0;left:45%;width:8px;background:repeating-linear-gradient(to bottom,var(--klaf-seam) 0 5px,transparent 5px 9px)}
+.slbody{padding:10px 12px}
+.slbody h3{font:600 14px var(--font-disp);margin-bottom:4px}
+.slbody .snap{font:10px var(--font-mono);color:var(--txt3);margin:6px 0 8px;line-height:1.6}
+.slbody .acts{display:flex;gap:6px;flex-wrap:wrap}
+
+/* progress */
+.aggwrap{margin-bottom:14px}
+.aggbar{display:flex;height:12px;border-radius:6px;overflow:hidden;border:1px solid var(--hair)}
+.aggbar .seg-p{background:var(--ok)}
+.aggbar .seg-c{background:var(--teal)}
+.aggbar .seg-w{background:transparent;border-right:1px dashed var(--teal);box-shadow:inset 0 0 0 1px rgba(62,142,129,.4)}
+.agglegend{display:flex;gap:16px;font:11px var(--font-mono);color:var(--txt2);margin-top:6px;flex-wrap:wrap}
+.amudgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(30px,1fr));gap:4px;margin-top:10px}
+.acell{height:24px;border-radius:4px;font:10px var(--font-mono);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--txt3);border:1px solid var(--hair)}
+.acell.w{border-color:var(--teal);color:var(--teal-bright)}
+.acell.c{background:var(--teal);color:#0E1714;border-color:var(--teal)}
+.acell.p{background:var(--ok);color:#131A10;border-color:var(--ok)}
+.acell.sel{outline:2px solid var(--teal-bright);outline-offset:1px}
+.linedots{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px}
+.ldot{width:20px;height:20px;border-radius:50%;border:1px solid var(--hair);cursor:pointer;font:8px var(--font-mono);color:transparent;display:flex;align-items:center;justify-content:center}
+.ldot.w{border-color:var(--teal)}
+.ldot.c{background:var(--teal)}
+.ldot.p{background:var(--ok)}
+.locknote{margin-top:12px;font:11px var(--font-disp);color:var(--txt2);border-top:1px solid var(--hair);padding-top:8px}
+
+/* diff */
+.diffhead{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.drow{display:grid;grid-template-columns:120px 1fr auto;gap:10px;padding:7px 6px;border-top:1px solid rgba(242,231,206,.07);align-items:center;font:12px}
+.drow .ref{font:11px var(--font-mono);color:var(--txt2)}
+.drow .move{font:12px var(--font-mono)}
+.drow .from{color:#E08A7B}
+.drow .to{color:var(--teal-bright)}
+.dchip{font:600 10px var(--font-disp);letter-spacing:.08em;text-transform:uppercase;border-radius:9px;padding:2px 8px}
+.dchip.moved{border:1px solid var(--shem);color:var(--shem)}
+.dchip.rebroken{border:1px solid var(--madder);color:#E08A7B}
+.dchip.same{border:1px solid var(--hair);color:var(--txt3)}
+.difffoot{display:flex;gap:10px;align-items:center;margin-top:12px;border-top:1px solid var(--hair);padding-top:12px;flex-wrap:wrap}
+.difffoot label{font:12px var(--font-disp);color:var(--txt2);display:flex;gap:8px;align-items:center}
+
+/* compare */
+.cmp-hair{font:11px var(--font-mono);color:var(--txt2);border-top:1px solid var(--hair);border-bottom:1px solid var(--hair);padding:6px 2px;margin-bottom:12px}
+.cmp{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.cmpcol{background:var(--panel2);border:1px solid var(--hair);border-radius:8px;padding:12px}
+.cmpcol h3{font:600 15px var(--font-disp)}
+.cmpcol .hmm{font:11px var(--font-mono);color:var(--txt2);margin-bottom:10px}
+.cmpcol .row{display:flex;justify-content:space-between;font:12px var(--font-mono);padding:4px 0;border-top:1px solid rgba(242,231,206,.07)}
+.cmpcol .row b{color:var(--txt)}
+.cmpcol .metres{font:700 24px var(--font-mono);color:var(--teal-bright);margin-top:8px}
+.cmpcol .delta{font:11px var(--font-mono);color:var(--txt3)}
+.cmpmini .mrow{display:flex;justify-content:space-between;font:11px var(--font-mono);padding:5px 0;border-top:1px solid rgba(242,231,206,.07)}
+.cmpmini .mrow b{color:var(--teal-bright)}
+
+/* search result */
+.sres{margin-top:10px;border:1px solid var(--hair);border-radius:8px;padding:10px 12px;background:var(--panel2);display:none}
+.sres .verse{font:400 17px var(--font-he);direction:rtl;text-align:right;margin-bottom:6px}
+.sres .pos{font:11px var(--font-mono);color:var(--teal-bright);margin-bottom:8px}
+.sres .empty{font:12px var(--font-disp);color:var(--txt2)}
+
+/* mobile tabs */
+.mobile-tabs{display:none}
+
+/* toast */
+#toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(20px);background:#101614;border:1px solid var(--teal);color:var(--txt);font:13px var(--font-disp);border-radius:8px;padding:10px 16px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:50}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* kbd legend */
+.kbdlegend{padding:0 14px 16px;font:10px var(--font-mono);color:var(--txt3)}
+.kbdlegend kbd{border:1px solid var(--hair);border-radius:3px;padding:0 4px;font:inherit}
+
+/* ---------- responsive ---------- */
+@media (max-width:1439px){.bench{grid-template-columns:300px minmax(420px,1fr) 330px}}
+@media (max-width:1023px){
+  .mobile-tabs{display:flex;gap:2px;position:sticky;top:0;z-index:20;background:#161C1A;border-bottom:1px solid var(--hair);padding:4px 6px}
+  .mtab{flex:1;min-height:44px;border:0;border-radius:6px;background:transparent;color:var(--txt2);font:600 12px var(--font-disp);cursor:pointer}
+  .mtab.active{background:var(--panel2);color:var(--teal-bright);box-shadow:inset 0 -2px 0 var(--teal)}
+  .bench{display:block;padding:10px}
+  body[data-tab] .panel,body[data-tab] .tikkun-col,body[data-tab] .drawer{display:none}
+  body[data-tab="klaf"] .tikkun-col{display:block}
+  body[data-tab="measure"] .panel[data-tab="measure"]{display:block}
+  body[data-tab="shemos"] .panel[data-tab="shemos"]{display:block}
+  body[data-tab="checks"] .panel[data-tab="checks"]{display:block}
+  body[data-tab="bench"] .drawer{display:block}
+  body[data-tab="bench"] .panel[data-tab="bench"]{display:block}
+  .drawer{margin:0 10px 12px}
+  .searchbox{min-width:0;width:130px}
+  .appbar .hidep{display:none}
+  .cmp{grid-template-columns:1fr}
+  .sheet::after{font-size:34px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{transition:none !important;animation:none !important}
+}
+</style>
+</head>
+<body data-tab="klaf">
+
+<header class="appbar">
+  <div class="wordmark">Sofer Studio <span class="he" lang="he">כלי הסופר</span></div>
+  <span class="ribbon" title="Everything on this screen is sample data">ALL DATA SAMPLE</span>
+  <span class="lineref" id="appbar-ref">Amud 1 · line —</span>
+  <div class="grow"></div>
+  <div class="searchbox hidep">
+    <input id="search-top" type="search" placeholder="Search: בראשית א:ד · Gen 1:4" aria-label="Search by verse reference">
+    <span class="kbd">/</span>
+  </div>
+  <select class="profile hidep" aria-label="Active profile">
+    <option>Ktav Ari — 4.0mm (SAMPLE)</option>
+    <option>Beit Yosef — 4.0mm (SAMPLE)</option>
+    <option>Chabad — 4.2mm (SAMPLE)</option>
+  </select>
+  <span class="chip locked" title="Layout locked: writing began 2026-08-12">▪ Locked · 08-12</span>
+  <button class="btn btn-primary small" id="savebtn">Save layout</button>
+</header>
+
+<div id="sargel" aria-hidden="true"><div class="zero"></div><div id="sargel-window"></div><div id="sargel-flag"></div></div>
+
+<nav class="mobile-tabs" aria-label="Workbench sections">
+  <button class="mtab active" data-go="klaf">Klaf</button>
+  <button class="mtab" data-go="measure">Measure</button>
+  <button class="mtab" data-go="shemos">Shemos</button>
+  <button class="mtab" data-go="checks">Checks</button>
+  <button class="mtab" data-go="bench">Bench</button>
+</nav>
+
+<main class="bench">
+
+  <!-- LEFT RAIL -->
+  <aside class="rail rail-left">
+
+    <section class="panel" data-tab="measure" data-panel="1" id="p-cal">
+      <div class="panel-head" role="button" tabindex="0" aria-expanded="true">
+        <span class="num">01</span><h2>Calibration</h2><span class="he-name" lang="he">כיול אותיות</span><span class="chev">▾</span>
+      </div>
+      <div class="sirtut"></div>
+      <div class="panel-body">
+        <div class="warnbar" id="nib-warn"><span class="glyph">▲</span><span>Kav <b class="mono" id="nib-warn-val">0.26mm</b> is below your <b class="mono" id="nib-warn-min">0.30mm</b> minimum nib — widths will lie on parchment.</span></div>
+        <div class="mmgrid">
+          <div class="mmfield"><label for="c-height">Letter height</label>
+            <div class="mmbox"><input id="c-height" class="mm" type="text" inputmode="decimal" value="4.00" aria-label="Master letter height in millimetres"><span class="unit">mm</span>
+            <span class="step"><button data-step="0.1" aria-label="increase">▲</button><button data-step="-0.1" aria-label="decrease">▼</button></span></div>
+            <div class="field-note">scaled from 6.00mm reference</div>
+          </div>
+          <div class="mmfield"><label for="c-stroke">Kav / stroke</label>
+            <div class="mmbox err" id="strokebox"><input id="c-stroke" class="mm" type="text" inputmode="decimal" value="0.26" aria-label="Stroke thickness in millimetres"><span class="unit">mm</span>
+            <span class="step"><button data-step="0.05" aria-label="increase">▲</button><button data-step="-0.05" aria-label="decrease">▼</button></span></div>
+            <div class="field-note bad" id="stroke-note">below minimum nib</div>
+          </div>
+          <div class="mmfield"><label for="c-minnib">Min practical nib</label>
+            <div class="mmbox"><input id="c-minnib" class="mm" type="text" inputmode="decimal" value="0.30" aria-label="Minimum practical nib size in millimetres"><span class="unit">mm</span>
+            <span class="step"><button data-step="0.05" aria-label="increase">▲</button><button data-step="-0.05" aria-label="decrease">▼</button></span></div>
+          </div>
+        </div>
+        <p class="eyebrow" style="margin-top:14px">Letter width table</p>
+        <div style="max-height:300px;overflow:auto">
+        <table class="tbl" id="letter-tbl" aria-label="Per-letter calibrated widths, sample data">
+          <thead><tr><th>Letter</th><th>Skeleton</th><th>+Stroke</th><th>Total</th><th>Cap ×</th><th>Stretch</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        </div>
+        <p class="caption">Skeleton widths <b>exclude</b> stroke; stroke is added once here and never again. Click a cap cell to cycle its override.</p>
+        <p class="caption sample-note">SAMPLE widths — production values come from the sofer's measured calibration.</p>
+      </div>
+    </section>
+
+    <section class="panel" data-tab="measure" data-panel="2" id="p-geo">
+      <div class="panel-head" role="button" tabindex="0" aria-expanded="true">
+        <span class="num">02</span><h2>Column geometry</h2><span class="he-name" lang="he">מידות העמוד</span><span class="chev">▾</span>
+      </div>
+      <div class="sirtut"></div>
+      <div class="panel-body">
+        <div class="mmgrid">
+          <div class="mmfield"><label for="g-pitch">Sirtut pitch</label><div class="mmbox"><input id="g-pitch" class="mm geo" type="text" inputmode="decimal" value="8.00"><span class="unit">mm</span><span class="step"><button data-step="0.5">▲</button><button data-step="-0.5">▼</button></span></div></div>
+          <div class="mmfield"><label for="g-lw">Line width</label><div class="mmbox"><input id="g-lw" class="mm geo" type="text" inputmode="decimal" value="130.0"><span class="unit">mm</span><span class="step"><button data-step="1">▲</button><button data-step="-1">▼</button></span></div>
+            <div class="field-note ok" id="minguard">3 × <bdi lang="he" class="he">למשפחותיכם</bdi> = <span id="minguard-val">118.4</span>mm ≤ <span id="minguard-lw">130.0</span>mm ✓</div>
+          </div>
+          <div class="mmfield"><label for="g-top">Top margin</label><div class="mmbox"><input id="g-top" class="mm geo" type="text" inputmode="decimal" value="30.0"><span class="unit">mm</span><span class="step"><button data-step="1">▲</button><button data-step="-1">▼</button></span></div></div>
+          <div class="mmfield"><label for="g-bottom">Bottom margin</label><div class="mmbox"><input id="g-bottom" class="mm geo" type="text" inputmode="decimal" value="25.0"><span class="unit">mm</span><span class="step"><button data-step="1">▲</button><button data-step="-1">▼</button></span></div></div>
+          <div class="mmfield"><label for="g-gap">Column gap</label><div class="mmbox"><input id="g-gap" class="mm geo" type="text" inputmode="decimal" value="12.0"><span class="unit">mm</span><span class="step"><button data-step="1">▲</button><button data-step="-1">▼</button></span></div></div>
+          <div class="mmfield"><label for="g-outer">Outer margin</label><div class="mmbox"><input id="g-outer" class="mm geo" type="text" inputmode="decimal" value="20.0"><span class="unit">mm</span><span class="step"><button data-step="1">▲</button><button data-step="-1">▼</button></span></div></div>
+        </div>
+        <div class="derived" aria-live="polite">
+          <div class="ditem"><div class="dl"><i class="fx">ƒ</i>Lines per column</div><div class="dv mono" id="d-lines">42</div><div class="df">fixed by mesorah (SAMPLE)</div></div>
+          <div class="ditem"><div class="dl"><i class="fx">ƒ</i>Column height</div><div class="dv mono" id="d-colh">336.0 <span class="unit">mm</span></div><div class="df" id="d-colh-f">42 × 8.00 = 336.0</div></div>
+          <div class="ditem"><div class="dl"><i class="fx">ƒ</i>Amud height</div><div class="dv mono" id="d-amudh">391.0 <span class="unit">mm</span></div><div class="df" id="d-amudh-f">336.0 + 30.0 + 25.0</div></div>
+          <div class="ditem"><div class="dl"><i class="fx">ƒ</i>Amud width</div><div class="dv mono" id="d-amudw">142.0 <span class="unit">mm</span></div><div class="df" id="d-amudw-f">130.0 + 12.0 gap</div></div>
+          <div class="ditem"><div class="dl"><i class="fx">ƒ</i>Amudim / yeria</div><div class="dv mono">3</div><div class="df">yeria usable width ÷ amud width</div></div>
+          <div class="ditem"><div class="dl"><i class="fx">ƒ</i>Total amudim · yerios</div><div class="dv mono">245 · <span id="d-yerios">82</span></div><div class="df">last yeria carries 2 of 3 amudim</div></div>
+          <div class="bignum"><div class="dl"><i class="fx">ƒ</i> Total klaf length</div><div class="dv" id="d-klaf">34.9 <span class="unit">m</span></div><div class="df" id="d-klaf-f">245 × 142.0mm + 12.0mm = 34,802mm</div></div>
+        </div>
+        <p class="caption sample-note">SAMPLE totals — production derives these from the loaded corpus and exact measurement rules.</p>
+      </div>
+    </section>
+
+    <section class="panel" data-tab="measure" data-panel="10" id="p-search">
+      <div class="panel-head" role="button" tabindex="0" aria-expanded="true">
+        <span class="num">10</span><h2>Search</h2><span class="he-name" lang="he">חיפוש</span><span class="chev">▾</span>
+      </div>
+      <div class="sirtut"></div>
+      <div class="panel-body">
+        <div class="searchbox" style="min-width:0;width:100%">
+          <input id="search-rail" type="search" placeholder="בראשית א:ד · Gen 1:4 · free text" aria-label="Search by verse reference">
+        </div>
+        <div class="sres" id="search-result" aria-live="polite"></div>
+        <p class="caption">Verses spanning lines report a line range. Jump scrolls the sheet and selects the lines.</p>
+      </div>
+    </section>
+
+    <section class="panel cmpmini" data-tab="bench" data-panel="11" id="p-cmpmini">
+      <div class="panel-head" role="button" tabindex="0" aria-expanded="true">
+        <span class="num">11</span><h2>Compare</h2><span class="he-name" lang="he">השוואה</span><span class="chev">▾</span>
+      </div>
+      <div class="sirtut"></div>
+      <div class="panel-body">
+        <div class="mrow"><span>Ktav Ari 4.0mm</span><b>245 am · 82 y · 34.9m</b></div>
+        <div class="mrow"><span>Beit Yosef 4.0mm</span><b>238 · 80 · 33.9m</b></div>
+        <div class="mrow"><span>Chabad 4.2mm</span><b>251 · 84 · 36.1m</b></div>
+        <p class="caption">Same source + geometry. Full table in the Bench drawer (tab 11).</p>
+      </div>
+    </section>
+  </aside>
+
+  <!-- TIKKUN -->
+  <section class="tikkun-col" data-tab="klaf" id="p-tikkun" tabindex="-1" aria-label="Tikkun preview">
+    <div class="sheetbar">
+      <span class="num" style="font:700 11px var(--font-mono);color:var(--teal-bright);border:1px solid var(--teal);border-radius:4px;padding:2px 6px">03</span>
+      <h2>Tikkun</h2><span class="he-name" lang="he">תקן הסופר</span>
+      <span class="chip sample">Sample excerpt · Bereishis 1:1–8 · 14 of 42 lines shown</span>
+      <div class="grow" style="flex:1"></div>
+      <span class="caption" style="margin:0">hover a line → the sargel wakes</span>
+    </div>
+    <div class="sheet-wrap">
+      <div class="vrule" aria-hidden="true"><span class="cap">mm</span><div class="ticks"></div></div>
+      <div class="sheet" role="document" aria-label="Tikkun preview, sample text">
+        <div class="amud-head-row" id="amud-heads"></div>
+        <div class="amudim" id="amudim"></div>
+      </div>
+    </div>
+    <div class="amudnav">
+      <button class="btn btn-ghost small" id="amud-prev">‹ Prev amud</button>
+      <span class="pos mono" id="amud-pos">Amudim 1–2 of 245 (SAMPLE excerpt)</span>
+      <button class="btn btn-ghost small" id="amud-next">Next amud ›</button>
+    </div>
+  </section>
+
+  <!-- RIGHT RAIL -->
+  <aside class="rail rail-right">
+
+    <section class="panel" data-tab="shemos" data-panel="4" id="p-shemos">
+      <div class="panel-head" role="button" tabindex="0" aria-expanded="true">
+        <span class="num">04</span><h2>Protected names</h2><span class="he-name" lang="he">שמות הקודש</span><span class="chev">▾</span>
+      </div>
+      <div class="sirtut"></div>
+      <div class="panel-body">
+        <p class="eyebrow">Certain</p>
+        <div class="shemrow certain"><span class="spine"></span><div class="tok" lang="he">אֱלֹהִים</div><div class="pos">Amud 1 · lines 1–8</div>
+          <div class="acts"><span class="chip shemc">certain</span><button class="btn btn-ghost small" data-showshem>Show on sheet</button></div></div>
+        <div class="shemrow certain"><span class="spine"></span><div class="tok" lang="he">יְהוָה</div><div class="pos">Amud 34 · line 9</div>
+          <div class="acts"><span class="chip shemc">certain</span><button class="btn btn-ghost small" data-toast="Amud 34 is beyond the sample excerpt">Show on sheet</button></div></div>
+        <p class="eyebrow" style="margin-top:14px">Needs review</p>
+        <div class="shemrow unsure"><span class="spine"></span><div class="tok" lang="he">אֵל שַׁדַּי</div><div class="pos">Amud 58 · line 21</div>
+          <div class="acts"><span class="chip warn">uncertain</span><button class="btn btn-ghost small" data-toast="Approved (SAMPLE)">Approve</button><button class="btn btn-ghost small" data-toast="Dismissed (SAMPLE)">Dismiss</button></div>
+          <div class="caption" style="grid-column:2/4">Pattern match only — the sofer decides.</div></div>
+        <div class="shemrow unsure"><span class="spine"></span><div class="tok" lang="he">וּלְאֵל</div><div class="pos">Amud 12 · line 30</div>
+          <div class="acts"><span class="chip warn">uncertain</span><button class="btn btn-ghost small" data-toast="Approved (SAMPLE)">Approve</button><button class="btn btn-ghost small" data-toast="Dismissed (SAMPLE)">Dismiss</button></div>
+          <div class="caption" style="grid-column:2/4">Prefixed token — classification needs the sofer's eye.</div></div>
+        <div class="unsat">
+          <h3>▲ Unsatisfiable</h3>
+          <div class="mono" lang="he" style="direction:rtl;text-align:right;font-family:var(--font-he);font-size:17px">יְהוָה צְבָאוֹת</div>
+          <div class="mono" style="margin-top:4px">token 138.2mm &gt; line <span class="minguard-lw2">130.0</span>mm — cannot be split or truncated.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" data-tab="shemos" data-panel="5" id="p-pass">
+      <div class="panel-head" role="button" tabindex="0" aria-expanded="true">
+        <span class="num">05</span><h2>Passages &amp; unusual letters</h2><span class="he-name" lang="he">פרשיות ואותיות</span><span class="chev">▾</span>
+      </div>
+      <div class="sirtut"></div>
+      <div class="panel-body">
+        <div class="pcard">
+          <div class="prow"><label class="switch"><input type="checkbox" checked data-toast-on="Shiras HaYam pattern enabled (SAMPLE)" data-toast-off="Pattern off — passage would wrap normally (SAMPLE)"><span class="track"></span><span class="knob"></span></label>
+            <div><h3>Shiras HaYam</h3><span class="he-sub" lang="he">שירת הים</span></div>
+            <div class="pglyph" aria-hidden="true"><svg width="62" height="30"><g fill="#2C6B60"><rect x="2" y="2" width="18" height="5"/><rect x="24" y="2" width="18" height="5"/><rect x="46" y="2" width="14" height="5"/><rect x="8" y="11" width="18" height="5"/><rect x="30" y="11" width="18" height="5"/><rect x="2" y="20" width="18" height="5"/><rect x="24" y="20" width="18" height="5"/><rect x="46" y="20" width="14" height="5"/></g></svg></div></div>
+          <select aria-label="Shiras HaYam scheme"><option>Ariach al gabei leveinah — SAMPLE</option><option>Ariach al gabei ariach — SAMPLE</option></select>
+          <div class="src">Scheme: brick-over-brick · v1 · source: SAMPLE — production requires an identified source.</div>
+        </div>
+        <div class="pcard">
+          <div class="prow"><label class="switch"><input type="checkbox" data-toast-on="Ha'azinu scheme enabled (SAMPLE)" data-toast-off="Ha'azinu disabled (SAMPLE)"><span class="track"></span><span class="knob"></span></label>
+            <div><h3>Ha'azinu</h3><span class="he-sub" lang="he">האזינו</span></div>
+            <div class="pglyph" aria-hidden="true"><svg width="62" height="30"><g fill="#2C6B60"><rect x="4" y="2" width="22" height="26" rx="1" fill="none" stroke="#2C6B60"/><rect x="34" y="2" width="22" height="26" rx="1" fill="none" stroke="#2C6B60"/><rect x="8" y="6" width="14" height="2"/><rect x="8" y="12" width="14" height="2"/><rect x="8" y="18" width="14" height="2"/><rect x="38" y="6" width="14" height="2"/><rect x="38" y="12" width="14" height="2"/><rect x="38" y="18" width="14" height="2"/></g></svg></div></div>
+          <select aria-label="Ha'azinu scheme"><option>Two columns · 70 lines — SAMPLE</option></select>
+          <div class="blocker">Verified pattern source missing — normal wrapping NOT applied. (SAMPLE demo of the blocker state)</div>
+        </div>
+        <div class="pcard">
+          <div class="prow"><label class="switch"><input type="checkbox" checked data-toast-on="Inverted nuns enabled (SAMPLE)" data-toast-off="Inverted nuns disabled (SAMPLE)"><span class="track"></span><span class="knob"></span></label>
+            <div><h3>Vayehi Binso'a</h3><span class="he-sub" lang="he">ויהי בנסוע · נון הפוכה</span></div>
+            <div class="pglyph" aria-hidden="true"><span lang="he" style="font:400 22px var(--font-he);color:#241E14"><span style="display:inline-block;transform:scaleX(-1)">ן</span>&nbsp;·&nbsp;<span style="display:inline-block;transform:scaleX(-1)">ן</span></span></div></div>
+          <select aria-label="Vayehi Binso'a scheme"><option>Inverted-nun bracket · R. Shabtai Sofer v1 — SAMPLE</option><option>85-letter bracket · space-separated — SAMPLE</option></select>
+          <div class="src">Exempt from ordinary wrapping · pattern carries source + version.</div>
+        </div>
+
+        <p class="eyebrow" style="margin-top:12px">Unusual letter occurrences</p>
+        <div class="kinds" id="kind-filter">
+          <button class="kindchip on">large</button><button class="kindchip on">small</button><button class="kindchip on">dotted</button><button class="kindchip on">broken</button><button class="kindchip on">suspended</button>
+        </div>
+        <table class="tbl">
+          <thead><tr><th>Kind</th><th>Letter</th><th>Position</th><th>Width override</th></tr></thead>
+          <tbody>
+            <tr><td><span class="dchip moved">large</span></td><td class="ltr">בּ</td><td class="ref mono">ברא׳ א:א · A1 L1</td><td><span class="stepper"><button data-d="-0.1">−</button><span class="val" data-auto="auto 6.4mm">auto 6.4mm</span><button data-d="0.1">+</button></span></td></tr>
+            <tr><td><span class="dchip moved">dotted</span></td><td class="ltr">וירא</td><td class="ref mono">ברא׳ א:ד · A1 L4</td><td><span class="stepper"><button data-d="-0.1">−</button><span class="val" data-auto="auto">auto</span><button data-d="0.1">+</button></span></td></tr>
+            <tr><td><span class="dchip moved">small</span></td><td class="ltr">ק</td><td class="ref mono">ויקרא א:א · A61 L7</td><td><span class="stepper"><button data-d="-0.1">−</button><span class="val" data-auto="auto">auto</span><button data-d="0.1">+</button></span></td></tr>
+            <tr><td><span class="dchip moved">suspended</span></td><td class="ltr">ע</td><td class="ref mono">שופטים · A198 L33</td><td><span class="stepper"><button data-d="-0.1">−</button><span class="val" data-auto="auto">auto</span><button data-d="0.1">+</button></span></td></tr>
+          </tbody>
+        </table>
+        <p class="caption">Overrides are per-occurrence and never lose source identity.</p>
+        <label style="display:flex;gap:10px;align-items:center;margin-top:10px;font:13px var(--font-disp);cursor:pointer">
+          <span class="switch"><input type="checkbox" id="taggin-toggle"><span class="track"></span><span class="knob"></span></span>
+          Show taggin <span class="caption" style="margin:0">— display only; never changes measurements.</span>
+        </label>
+      </div>
+    </section>
+
+    <section class="panel" data-tab="checks" data-panel="6" id="p-valid">
+      <div class="panel-head" role="button" tabindex="0" aria-expanded="true">
+        <span class="num">06</span><h2>Validation</h2><span class="he-name" lang="he">בדיקות</span><span class="chev">▾</span>
+      </div>
+      <div class="sirtut"></div>
+      <div class="panel-body">
+        <div class="vsum"><span class="chip err">▲ 2 errors</span><span class="chip warn">● 3 warnings</span><span class="chip teal-o">✓ 41 lines clean</span></div>
+        <div class="vrow err" data-jump="17" role="button" tabindex="0"><span class="g">▲</span><span class="ref">A2 · L18</span><span class="what">Overfull</span><span class="delta">+1.8mm over</span></div>
+        <div class="vrow err" data-toast="Amud 3 is beyond the sample excerpt"><span class="g">▲</span><span class="ref">A3 · L12</span><span class="what">Shem too wide</span><span class="delta">138.2 &gt; 130.0mm</span></div>
+        <div class="vrow warn" data-jump="5" role="button" tabindex="0"><span class="g">●</span><span class="ref">A1 · L6</span><span class="what">Underfull</span><span class="delta">−4.2mm short</span></div>
+        <div class="vrow warn" data-toast="Amud 5 is beyond the sample excerpt"><span class="g">●</span><span class="ref">A5 · L9</span><span class="what">Conflicting bounds</span><span class="delta">min gap 0.4 &gt; max word 0.3</span></div>
+        <div class="vrow warn" data-jump="0" role="button" tabindex="0"><span class="g">●</span><span class="ref">A1 · L1</span><span class="what">Letter count &gt; max</span><span class="delta">52 &gt; 50</span></div>
+        <div class="vrow clean"><span class="g">✓</span><span class="ref">Global</span><span class="what">Min column width · 3× <bdi lang="he" class="he">למשפחותיכם</bdi></span><span class="delta"><span id="v-guard">118.4 ≤ 130.0</span></span></div>
+        <p class="caption">Click a row to jump to the line on the sheet. Hard errors block export.</p>
+      </div>
+    </section>
+  </aside>
+</main>
+
+<!-- LOWER BENCH -->
+<section class="drawer" data-tab="bench" id="drawer">
+  <div class="drawer-tabs" role="tablist">
+    <button class="dtab active" data-dpanel="d-saved" role="tab"><span class="num">07</span>Saved layouts</button>
+    <button class="dtab" data-dpanel="d-progress" role="tab"><span class="num">08</span>Progress</button>
+    <button class="dtab" data-dpanel="d-diff" role="tab"><span class="num">09</span>Diff</button>
+    <button class="dtab" data-dpanel="d-compare" role="tab"><span class="num">11</span>Compare profiles</button>
+  </div>
+
+  <div class="drawer-body">
+    <div class="dpanel active" id="d-saved">
+      <div class="slgrid">
+        <div class="slcard locked"><div class="slthumb"></div><div class="slbody">
+          <div style="display:flex;gap:8px;align-items:center"><h3>Main — writing copy</h3><span class="chip locked">Locked</span></div>
+          <div class="snap">source rev a3f9 · profile Ari-4.0 · geom 42×8.0 · patterns v1 · 2 overrides<br>writing began 2026-08-12 · immutable snapshot</div>
+          <div class="acts"><button class="btn btn-ghost small" data-toast="Opening locked layout read-only (SAMPLE)">Open</button><button class="btn btn-primary small" data-toast="Candidate created from locked snapshot (SAMPLE)">Duplicate as candidate</button><button class="btn btn-ghost small" data-toast="Added to comparison (SAMPLE)">Compare</button></div>
+        </div></div>
+        <div class="slcard"><div class="slthumb"></div><div class="slbody">
+          <div style="display:flex;gap:8px;align-items:center"><h3>Kav 0.30 experiment</h3><span class="chip teal">Candidate</span></div>
+          <div class="snap">source rev a3f9 · profile Ari-4.0 · kav 0.35→0.30 · geom 42×8.0 · patterns v1</div>
+          <div class="acts"><button class="btn btn-ghost small" data-toast="Opening candidate (SAMPLE)">Open</button><button class="btn btn-ghost small" data-toast="Showing diff against locked layout">Show diff</button><button class="btn btn-danger small" data-toast="Candidate discarded (SAMPLE)">Discard</button></div>
+        </div></div>
+        <div class="slcard"><div class="slthumb"></div><div class="slbody">
+          <div style="display:flex;gap:8px;align-items:center"><h3>Beit Yosef alt</h3><span class="chip teal-o">Draft</span></div>
+          <div class="snap">source rev a3f9 · profile BY-4.0 · geom 42×8.0 · patterns v1 · 0 overrides</div>
+          <div class="acts"><button class="btn btn-ghost small" data-toast="Opening draft (SAMPLE)">Open</button><button class="btn btn-ghost small" data-toast="Added to comparison (SAMPLE)">Compare</button></div>
+        </div></div>
+      </div>
+      <p class="caption sample-note">SAMPLE cards — locked layouts are immutable; duplication is the only mutation path.</p>
+    </div>
+
+    <div class="dpanel" id="d-progress">
+      <div class="aggwrap">
+        <div class="aggbar" role="img" aria-label="Lines: proofread 22 percent, checked 22 percent, written 17 percent more">
+          <div class="seg-p" style="width:22%"></div><div class="seg-c" style="width:22%"></div><div class="seg-w" style="width:17%"></div>
+        </div>
+        <div class="agglegend"><span>■ proofread 22%</span><span>■ checked 44% cum.</span><span>▨ written 61% cum.</span><span>· line-level aggregation, amud identity stable</span></div>
+      </div>
+      <div class="amudgrid" id="amudgrid" aria-label="Amud progress grid, sample"></div>
+      <p class="eyebrow" style="margin-top:14px">Amud <span id="prog-amud">17</span> · line strip <span class="caption" style="display:inline;margin:0">(click a dot to cycle written → checked → proofread)</span></p>
+      <div class="linedots" id="linedots"></div>
+      <p class="locknote">▪ Progress identity is stable — calibration changes create candidates, they never touch written lines.</p>
+    </div>
+
+    <div class="dpanel" id="d-diff">
+      <div class="diffhead">
+        <span class="chip locked">Locked · 2026-08-12</span><span style="color:var(--txt3)">vs</span><span class="chip teal">Candidate · kav 0.35 → 0.30mm</span>
+        <span class="caption" style="margin:0 0 0 auto">SAMPLE diff</span>
+      </div>
+      <div class="drow"><span class="ref">ברא׳ ב:ד · A3</span><span class="move"><span class="from">L12</span> → <span class="to">L14</span></span><span class="dchip moved">moved</span></div>
+      <div class="drow"><span class="ref">ברא׳ ב:ז · A3</span><span class="move"><span class="from">L19–20</span> → <span class="to">L21–23</span> · re-broken at וַיִּפַּח</span><span class="dchip rebroken">re-broken</span></div>
+      <div class="drow"><span class="ref">ברא׳ ג:א–ד · A4</span><span class="move">11 lines unchanged</span><span class="dchip same">unchanged</span></div>
+      <div class="drow"><span class="ref">ברא׳ ג:ה · A4</span><span class="move"><span class="from">L9</span> → <span class="to">L8</span></span><span class="dchip moved">moved</span></div>
+      <div class="drow"><span class="ref">ברא׳ ג:ו–כד · A4–5</span><span class="move">38 lines unchanged</span><span class="dchip same">unchanged</span></div>
+      <div class="difffoot">
+        <label><input type="checkbox" id="diff-verify"> 21 unchanged written lines verified</label>
+        <button class="btn btn-primary" id="adopt-btn" disabled>Adopt candidate layout</button>
+        <button class="btn btn-ghost" data-toast="Candidate discarded (SAMPLE)">Discard candidate</button>
+        <button class="btn btn-ghost" data-toast="Diff exported (SAMPLE)">Export diff</button>
+      </div>
+    </div>
+
+    <div class="dpanel" id="d-compare">
+      <div class="cmp-hair">Source rev a3f9 · Geometry 42 × 8.0mm · line 130.0mm — each column is an independent full layout, not a rescale. SAMPLE totals.</div>
+      <div class="cmp">
+        <div class="cmpcol"><h3>Ktav Ari</h3><div class="hmm">letter height 4.00mm · kav 0.26</div>
+          <div class="row"><span>Total amudim</span><b>245</b></div><div class="row"><span>Yerios</span><b>82</b></div>
+          <div class="metres">34.9 <span class="unit">m</span></div><div class="delta">baseline</div></div>
+        <div class="cmpcol"><h3>Beit Yosef</h3><div class="hmm">letter height 4.00mm · kav 0.30</div>
+          <div class="row"><span>Total amudim</span><b>238</b></div><div class="row"><span>Yerios</span><b>80</b></div>
+          <div class="metres">33.9 <span class="unit">m</span></div><div class="delta">−7 amudim · −1.0m vs Ari</div></div>
+        <div class="cmpcol"><h3>Chabad</h3><div class="hmm">letter height 4.20mm · kav 0.28</div>
+          <div class="row"><span>Total amudim</span><b>251</b></div><div class="row"><span>Yerios</span><b>84</b></div>
+          <div class="metres">36.1 <span class="unit">m</span></div><div class="delta">+6 amudim · +1.2m vs Ari</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<p class="kbdlegend">Keys: <kbd>1</kbd>–<kbd>=</kbd> jump to panels 01–11 · <kbd>`</kbd> bench drawer · <kbd>/</kbd> search · <kbd>Esc</kbd> back to sheet · arrows move in the letter table</p>
+<div id="toast" role="status"></div>
+
+<script>
+(function(){
+"use strict";
+var $=function(s,c){return (c||document).querySelector(s)};
+var $$=function(s,c){return Array.prototype.slice.call((c||document).querySelectorAll(s))};
+var RM=window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* toast */
+var toastT=null;
+function toast(msg){var t=$("#toast");t.textContent=msg;t.classList.add("show");clearTimeout(toastT);toastT=setTimeout(function(){t.classList.remove("show")},1800)}
+document.addEventListener("click",function(e){var b=e.target.closest("[data-toast]");if(b)toast(b.getAttribute("data-toast"))});
+
+/* ---------- Sargel rule ---------- */
+var sargel=$("#sargel"),swin=$("#sargel-window"),sflag=$("#sargel-flag"),pxmm=2;
+var MAXMM=420;
+function buildSargel(){
+  $$(".tick",sargel).forEach(function(n){n.remove()});$$(".tlab",sargel).forEach(function(n){n.remove()});
+  var w=sargel.clientWidth;pxmm=w/MAXMM;
+  for(var mm=0;mm<=MAXMM;mm++){
+    var d=document.createElement("div");d.className="tick"+(mm%10===0?" cm":(mm%5===0?" five":""));
+    d.style.left=(mm*pxmm)+"px";d.style.height=mm%10===0?"13px":(mm%5===0?"9px":"5px");sargel.appendChild(d);
+    if(mm%50===0){var l=document.createElement("div");l.className="tlab";l.style.left=(mm*pxmm)+"px";l.textContent=mm;sargel.appendChild(l)}
+  }
+}
+function wakeSargel(mm,label){
+  var w=Math.min(mm,MAXMM)*pxmm;swin.style.display="block";swin.style.width=w+"px";
+  sflag.style.display="block";sflag.textContent=label;
+  var fx=Math.min(w+6,sargel.clientWidth-90);sflag.style.left=Math.max(4,fx)+"px";
+}
+function sleepSargel(){swin.style.display="none";sflag.style.display="none"}
+window.addEventListener("resize",buildSargel);buildSargel();
+
+/* mm inputs: wake sargel + validation-ish */
+function num(inp){var v=parseFloat(inp.value);return isFinite(v)?v:0}
+$$(".mm").forEach(function(inp){
+  inp.addEventListener("focus",function(){wakeSargel(num(inp),(inp.value||"0")+"mm")});
+  inp.addEventListener("blur",sleepSargel);
+  inp.addEventListener("mouseenter",function(){wakeSargel(num(inp),(inp.value||"0")+"mm")});
+  inp.addEventListener("mouseleave",function(){if(document.activeElement!==inp)sleepSargel()});
+  inp.addEventListener("input",function(){if(document.activeElement===inp)wakeSargel(num(inp),(inp.value||"0")+"mm")});
+});
+$$(".step button").forEach(function(b){
+  b.addEventListener("click",function(){
+    var inp=b.closest(".mmbox").querySelector("input");
+    var d=parseFloat(b.getAttribute("data-step"));if(window.event&&window.event.shiftKey)d*=10;
+    var v=Math.round((num(inp)+d)*100)/100;if(v<0)v=0;
+    inp.value=v.toFixed(d<0.1?2:1);
+    inp.dispatchEvent(new Event("input"));recalcAll();
+    toast(inp.id+": "+inp.value+"mm (SAMPLE)");
+  });
+});
+
+/* ---------- calibration table ---------- */
+var REF=6.0;
+var LETTERS=[
+ ["א",3.9,1.6],["ב",4.0,1.6],["ג",2.2,null],["ד",3.8,1.8],["ה",3.6,1.8],["ו",1.4,null],["ז",1.6,null],
+ ["ח",3.8,1.8],["ט",3.4,1.5],["י",1.2,null],["כ",3.2,1.5],["ל",3.4,1.6],["מ",4.2,1.6],["נ",1.8,null],
+ ["ס",3.6,1.4],["ע",3.0,1.4],["פ",3.4,1.5],["צ",1.9,null],["ק",3.6,1.5],["ר",3.2,1.6],["ש",4.6,1.6],["ת",4.0,1.8]
+];
+var CAPCYCLE=[1.2,1.4,1.5,1.6,1.8];
+function totals(){var h=num($("#c-height")),s=num($("#c-stroke")),scale=h/REF;var m={};
+  LETTERS.forEach(function(L){m[L[0]]=L[1]*scale+s});return {map:m,stroke:s,scale:h/REF}}
+function renderLetters(){
+  var t=totals(),tb=$("#letter-tbl tbody");tb.innerHTML="";
+  LETTERS.forEach(function(L){
+    var tr=document.createElement("tr");
+    var skel=(L[1]*t.scale).toFixed(2), tot=t.map[L[0]].toFixed(2);
+    var cap=L[2]===null?"—":L[2].toFixed(1)+"×";
+    tr.innerHTML="<td class='ltr' lang='he'>"+L[0]+"</td><td>"+skel+"</td><td>"+t.stroke.toFixed(2)+"</td><td class='tot'>"+tot+"</td>"+
+      (L[2]===null?"<td class='strike'>"+cap+"</td><td>—</td>":"<td class='capcell' data-cap='"+L[2]+"'>"+cap+"</td><td style='color:var(--teal-bright)'>✓</td>");
+    tb.appendChild(tr);
+  });
+  $$(".capcell",tb).forEach(function(c){
+    c.addEventListener("click",function(){
+      var cur=parseFloat(c.getAttribute("data-cap"));
+      var nx=CAPCYCLE[(CAPCYCLE.indexOf(cur)+1)%CAPCYCLE.length]||1.8;
+      c.setAttribute("data-cap",nx);c.textContent=nx.toFixed(1)+"×";
+      var row=c.parentElement;var L=LETTERS.filter(function(x){return x[0]===row.querySelector(".ltr").textContent})[0];if(L)L[2]=nx;
+      toast("Stretch cap override: "+nx.toFixed(1)+"× (hard max 1.8×) — SAMPLE");
+    });
+  });
+  updateGuard();
+}
+function updateGuard(){
+  var t=totals();
+  var word="למשפחותיכם",sum=0;
+  for(var i=0;i<word.length;i++){var ch=word[i];if(t.map[ch]!=null)sum+=t.map[ch];else if(ch==="ך")sum+=t.map["כ"]*0.9}
+  var need=sum*3, lw=num($("#g-lw"));
+  $("#minguard-val").textContent=need.toFixed(1);
+  $("#minguard-lw").textContent=lw.toFixed(1);
+  var g=$("#minguard"),ok=need<=lw;
+  g.className="field-note "+(ok?"ok":"bad");
+  g.innerHTML="3 × <bdi lang='he' class='he'>למשפחותיכם</bdi> = "+need.toFixed(1)+"mm "+(ok?"≤":"&gt;")+" "+lw.toFixed(1)+"mm "+(ok?"✓":"✗ — column too narrow by "+(need-lw).toFixed(1)+"mm");
+  $("#v-guard").textContent=need.toFixed(1)+(ok?" ≤ ":" > ")+lw.toFixed(1);
+  $$(".minguard-lw2").forEach(function(n){n.textContent=lw.toFixed(1)});
+}
+function nibCheck(){
+  var s=num($("#c-stroke")),mn=num($("#c-minnib")),bad=s<mn;
+  $("#nib-warn").style.display=bad?"flex":"none";
+  $("#strokebox").className="mmbox"+(bad?" err":"");
+  $("#stroke-note").className="field-note "+(bad?"bad":"ok");
+  $("#stroke-note").textContent=bad?"below minimum nib":"within nib range";
+  $("#nib-warn-val").textContent=s.toFixed(2)+"mm";$("#nib-warn-min").textContent=mn.toFixed(2)+"mm";
+}
+
+/* ---------- geometry derived ---------- */
+function recalcGeo(){
+  var pitch=num($("#g-pitch")),top=num($("#g-top")),bot=num($("#g-bottom")),gap=num($("#g-gap")),lw=num($("#g-lw"));
+  var lines=42,colh=lines*pitch,amudh=colh+top+bot,amudw=lw+gap,amudim=245;
+  var klafmm=amudim*amudw+gap, yerios=Math.ceil(amudim/3);
+  $("#d-colh").innerHTML=colh.toFixed(1)+" <span class='unit'>mm</span>";
+  $("#d-colh-f").textContent="42 × "+pitch.toFixed(2)+" = "+colh.toFixed(1);
+  $("#d-amudh").innerHTML=amudh.toFixed(1)+" <span class='unit'>mm</span>";
+  $("#d-amudh-f").textContent=colh.toFixed(1)+" + "+top.toFixed(1)+" + "+bot.toFixed(1);
+  $("#d-amudw").innerHTML=amudw.toFixed(1)+" <span class='unit'>mm</span>";
+  $("#d-amudw-f").textContent=lw.toFixed(1)+" + "+gap.toFixed(1)+" gap";
+  $("#d-yerios").textContent=yerios;
+  $("#d-klaf").innerHTML=(klafmm/1000).toFixed(1)+" <span class='unit'>m</span>";
+  $("#d-klaf-f").textContent="245 × "+amudw.toFixed(1)+"mm + "+gap.toFixed(1)+"mm = "+klafmm.toLocaleString()+"mm";
+  document.documentElement.style.setProperty("--pitch",Math.max(18,Math.min(44,pitch*3.25))+"px");
+  updateGuard();
+}
+["c-height","c-stroke","c-minnib"].forEach(function(id){$("#"+id).addEventListener("input",function(){renderLetters();nibCheck()})});
+$$(".geo").forEach(function(i){i.addEventListener("input",recalcGeo)});
+function recalcAll(){renderLetters();nibCheck();recalcGeo()}
+
+/* ---------- tikkun ---------- */
+var LINES=[
+ {t:"בראשית ברא אלהים את השמים ואת הארץ",ref:"ברא׳ א:א",first:true},
+ {t:"והארץ היתה תהו ובהו וחשך על פני תהום",ref:"ברא׳ א:ב"},
+ {t:"ורוח אלהים מרחפת על פני המים",ref:"ברא׳ א:ב"},
+ {t:"ויאמר אלהים יהי אור ויהי אור",ref:"ברא׳ א:ג"},
+ {t:"וירא אלהים את האור כי טוב ויבדל אלהים",ref:"ברא׳ א:ד",dot:"וירא"},
+ {t:"בין האור ובין החשך",ref:"ברא׳ א:ד"},
+ {t:"ויקרא אלהים לאור יום ולחשך קרא לילה",ref:"ברא׳ א:ה"},
+ {t:"ויהי ערב ויהי בקר יום אחד",ref:"ברא׳ א:ה"},
+ {t:"ויאמר אלהים יהי רקיע בתוך המים",ref:"ברא׳ א:ו"},
+ {t:"ויהי מבדיל בין מים למים",ref:"ברא׳ א:ו"},
+ {t:"ויעש אלהים את הרקיע ויבדל בין המים",ref:"ברא׳ א:ז"},
+ {t:"אשר מתחת לרקיע ובין המים אשר מעל לרקיע",ref:"ברא׳ א:ז"},
+ {t:"ויהי כן ויקרא אלהים לרקיע שמים",ref:"ברא׳ א:ח"},
+ {t:"ויהי ערב ויהי בקר יום שני",ref:"ברא׳ א:ח"}
+];
+var HNUM=["א׳","ב׳","ג׳","ד׳","ה׳","ו׳","ז׳","ח׳","ט׳","י׳","י״א","י״ב","י״ג","י״ד"];
+var TAGLETTERS="שעטנזגץ";
+function heMarkup(L,globalIdx){
+  var t=L.t;
+  if(L.first)t=t.replace(/^ב/,"<span class='large-b unusual-mark' title='Large bet — unusual letter (SAMPLE)'>ב</span>");
+  t=t.split("אלהים").join("<span class='shem' title='Shem · אלהים · whole token kept on one line'>אלהים</span>");
+  if(L.dot)t=t.replace(L.dot,"<span class='dotted unusual-mark' title='Dotted word — unusual letters (SAMPLE)'>"+L.dot+"</span>");
+  var out="",inTag=false;
+  for(var i=0;i<t.length;i++){
+    var ch=t[i];
+    if(ch==="<")inTag=true;
+    if(!inTag&&TAGLETTERS.indexOf(ch)>=0)out+="<span class='tag'>"+ch+"</span>";
+    else out+=ch;
+    if(ch===">")inTag=false;
+  }
+  return out;
+}
+function buildTikkun(){
+  var heads=$("#amud-heads"),wrap=$("#amudim");heads.innerHTML="";wrap.innerHTML="";
+  var perAmud=7;
+  for(var a=0;a<2;a++){
+    var h=document.createElement("div");h.className="amud-head";h.textContent="Amud "+(a+1)+" · עמוד "+(a===0?"א׳":"ב׳");heads.appendChild(h);
+    if(a===0){var sh=document.createElement("div");sh.className="seam-head";heads.appendChild(sh)}
+    var col=document.createElement("div");col.className="amud";
+    for(var i=0;i<perAmud;i++){
+      var idx=a*perAmud+i,L=LINES[idx];
+      var d=document.createElement("div");d.className="line";d.setAttribute("lang","he");
+      d.setAttribute("aria-label","Amud "+(a+1)+", line "+(i+1)+", "+L.ref);
+      d.setAttribute("data-idx",idx);d.setAttribute("data-amud",a+1);d.setAttribute("data-line",i+1);d.setAttribute("data-ref",L.ref);
+      d.innerHTML="<span class='lineno'>"+HNUM[i]+"</span>"+heMarkup(L,idx);
+      col.appendChild(d);
+    }
+    wrap.appendChild(col);
+    if(a===0){var sm=document.createElement("div");sm.className="seam";sm.title="Column seam — stitching (SAMPLE)";wrap.appendChild(sm)}
+  }
+  $$(".line").forEach(function(line){
+    line.addEventListener("mouseenter",function(){
+      var depth=(parseInt(line.getAttribute("data-line"),10))*num($("#g-pitch"));
+      wakeSargel(depth,"L"+line.getAttribute("data-line")+" · "+depth.toFixed(0)+"mm from top");
+    });
+    line.addEventListener("mouseleave",function(){sleepSargel()});
+    line.addEventListener("click",function(){selectLine(line)});
+  });
+}
+function selectLine(line){
+  $$(".line.sel").forEach(function(l){l.classList.remove("sel")});
+  line.classList.add("sel");
+  $("#appbar-ref").textContent="Amud "+line.getAttribute("data-amud")+" · line "+line.getAttribute("data-line")+" · "+line.getAttribute("data-ref");
+}
+function flashLine(idx){
+  var l=document.querySelector(".line[data-idx='"+idx+"']");if(!l)return;
+  l.scrollIntoView({block:"center",behavior:RM?"auto":"smooth"});
+  l.classList.remove("flash");void l.offsetWidth;l.classList.add("flash");
+}
+$("#amud-prev").addEventListener("click",function(){toast("Already at first amud (SAMPLE excerpt)")});
+$("#amud-next").addEventListener("click",function(){toast("Amud 3+ is beyond the sample excerpt")});
+
+/* shem show on sheet */
+document.addEventListener("click",function(e){
+  var b=e.target.closest("[data-showshem]");if(!b)return;
+  var s=$(".shem");if(s){s.scrollIntoView({block:"center",behavior:RM?"auto":"smooth"});
+    $$(".shem").forEach(function(x){var l=x.closest(".line");l.classList.remove("flash");void l.offsetWidth;l.classList.add("flash")})}
+});
+
+/* validation jump rows */
+$$(".vrow[data-jump]").forEach(function(r){
+  function go(){flashLine(parseInt(r.getAttribute("data-jump"),10))}
+  r.addEventListener("click",go);
+  r.addEventListener("keydown",function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault();go()}});
+});
+
+/* switches */
+$$(".switch input").forEach(function(s){
+  s.addEventListener("change",function(){
+    var m=s.getAttribute(s.checked?"data-toast-on":"data-toast-off");if(m)toast(m);
+  });
+});
+
+/* kind chips + override steppers */
+$$("#kind-filter .kindchip").forEach(function(k){k.addEventListener("click",function(){k.classList.toggle("on")})});
+$$(".stepper").forEach(function(st){
+  var val=st.querySelector(".val");
+  st.addEventListener("click",function(e){
+    var b=e.target.closest("button");if(!b)return;
+    var cur=val.getAttribute("data-v");var base=cur?parseFloat(cur):6.0;
+    var v=Math.round((base+parseFloat(b.getAttribute("data-d")))*10)/10;
+    val.setAttribute("data-v",v);val.innerHTML=v.toFixed(1)+"mm <span class='ovr'>override</span>";
+    toast("Occurrence width override "+v.toFixed(1)+"mm (SAMPLE)");
+  });
+});
+
+/* taggin */
+$("#taggin-toggle").addEventListener("change",function(){
+  document.body.classList.toggle("taggin-on",this.checked);
+  toast(this.checked?"Taggin shown — display only, measurements unchanged":"Taggin hidden");
+});
+
+/* ---------- panel collapse ---------- */
+$$(".panel-head").forEach(function(h){
+  function toggle(){var p=h.closest(".panel");p.classList.toggle("collapsed");h.setAttribute("aria-expanded",p.classList.contains("collapsed")?"false":"true")}
+  h.addEventListener("click",function(e){if(e.target.closest("button,input,select"))return;toggle()});
+  h.addEventListener("keydown",function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault();toggle()}});
+});
+
+/* ---------- drawer tabs ---------- */
+$$(".dtab").forEach(function(t){
+  t.addEventListener("click",function(){
+    $$(".dtab").forEach(function(x){x.classList.remove("active")});t.classList.add("active");
+    $$(".dpanel").forEach(function(p){p.classList.remove("active")});
+    $("#"+t.getAttribute("data-dpanel")).classList.add("active");
+  });
+});
+
+/* ---------- progress ---------- */
+var STATUS=["","w","c","p"];
+function seeded(n){var x=Math.sin(n*127.1)*43758.5453;return x-Math.floor(x)}
+var amudStatus=[];
+(function(){for(var i=1;i<=245;i++){var r=seeded(i);amudStatus[i]=i>40?0:(r<0.3?3:(r<0.62?2:1))}})();
+function buildGrid(){
+  var g=$("#amudgrid");g.innerHTML="";
+  for(var i=1;i<=245;i++){
+    var c=document.createElement("button");var st=amudStatus[i];
+    c.className="acell"+(st===3?" p":st===2?" c":st===1?" w":"");
+    c.textContent=i;
+    var label=st===3?"proofread":st===2?"checked":st===1?"written":"not started";
+    c.setAttribute("aria-label","Amud "+i+": "+label);c.setAttribute("aria-valuetext",label);
+    c.title="Amud "+i+" · 42 lines · "+label;
+    (function(cell,am){cell.addEventListener("click",function(){
+      $$(".acell.sel").forEach(function(x){x.classList.remove("sel")});cell.classList.add("sel");
+      $("#prog-amud").textContent=am;buildLineDots(am);
+    })})(c,i);
+    g.appendChild(c);
+  }
+}
+function buildLineDots(am){
+  var w=$("#linedots");w.innerHTML="";
+  for(var i=1;i<=42;i++){
+    var r=seeded(am*100+i);var st=r<0.3?3:(r<0.62?2:(r<0.85?1:0));
+    var d=document.createElement("button");d.className="ldot "+STATUS[st];d.textContent=i;
+    d.setAttribute("aria-label","Line "+i+": "+(["not started","written","checked","proofread"])[st]);
+    d.setAttribute("data-st",st);
+    d.addEventListener("click",function(){
+      var s=(parseInt(this.getAttribute("data-st"),10)+1)%4;
+      if(s===1&&this.getAttribute("data-st")==="3"&&!confirm("Regress this line from proofread to written?"))return;
+      this.setAttribute("data-st",s);this.className="ldot "+STATUS[s];
+      this.setAttribute("aria-label","Line "+this.textContent+": "+(["not started","written","checked","proofread"])[s]);
+    });
+    w.appendChild(d);
+  }
+}
+buildGrid();buildLineDots(17);
+var firstSel=$("#amudgrid .acell:nth-child(17)");if(firstSel)firstSel.classList.add("sel");
+
+/* ---------- diff ---------- */
+$("#diff-verify").addEventListener("change",function(){$("#adopt-btn").disabled=!this.checked});
+$("#adopt-btn").addEventListener("click",function(){toast("Candidate adopted — locked snapshot updated (SAMPLE)")});
+
+/* ---------- compare save ---------- */
+$("#savebtn").addEventListener("click",function(){toast("Layout saved (SAMPLE)")});
+
+/* ---------- search ---------- */
+var RESULTS=[
+ {keys:["בראשית א:ד","gen 1:4","1:4","א:ד"],verse:"וירא אלהים את האור כי טוב ויבדל",pos:"Amud 1 · lines 4–5",jump:3},
+ {keys:["בראשית א:א","gen 1:1","1:1","א:א"],verse:"בראשית ברא אלהים את השמים ואת הארץ",pos:"Amud 1 · line 1",jump:0},
+ {keys:["בראשית א:ח","gen 1:8","1:8","א:ח"],verse:"ויהי ערב ויהי בקר יום שני",pos:"Amud 2 · line 7",jump:13}
+];
+function doSearch(q){
+  var box=$("#search-result");q=(q||"").trim().toLowerCase();
+  if(!q){box.style.display="none";return}
+  var hit=RESULTS.filter(function(r){return r.keys.some(function(k){return k.toLowerCase()===q||q.indexOf(k.toLowerCase())===0})})[0];
+  if(hit){
+    box.innerHTML="<div class='verse' lang='he'>"+hit.verse+"</div><div class='pos'>"+hit.pos+" · spans shown as range</div><button class='btn btn-primary small' id='srjump'>Jump to lines</button>";
+    box.style.display="block";
+    $("#srjump").addEventListener("click",function(){flashLine(hit.jump);selectLine(document.querySelector(".line[data-idx='"+hit.jump+"']"));toast("Jumped to "+hit.pos)});
+  }else{
+    box.innerHTML="<div class='empty'>No verse matches — try chapter:verse like ג:יב or Gen 1:4.</div>";
+    box.style.display="block";
+  }
+}
+[["#search-top"],["#search-rail"]].forEach(function(pair){
+  var el=$(pair[0]);
+  el.addEventListener("keydown",function(e){if(e.key==="Enter")doSearch(el.value)});
+  el.addEventListener("search",function(){doSearch(el.value)});
+});
+
+/* ---------- mobile tabs ---------- */
+$$(".mtab").forEach(function(t){
+  t.addEventListener("click",function(){
+    $$(".mtab").forEach(function(x){x.classList.remove("active")});t.classList.add("active");
+    document.body.setAttribute("data-tab",t.getAttribute("data-go"));
+  });
+});
+
+/* ---------- keyboard ---------- */
+var PANELKEYS={ "1":"p-cal","2":"p-geo","3":"p-tikkun","4":"p-shemos","5":"p-pass","6":"p-valid","7":"d-saved","8":"d-progress","9":"d-diff","0":"p-search","-":"p-cmpmini","=":"d-compare"};
+document.addEventListener("keydown",function(e){
+  var tag=(e.target.tagName||"").toLowerCase();
+  var typing=tag==="input"||tag==="textarea"||tag==="select";
+  if(e.key==="Escape"){$("#p-tikkun").focus({preventScroll:true});$("#p-tikkun").scrollIntoView({behavior:RM?"auto":"smooth"});return}
+  if(typing)return;
+  if(e.key==="/"){e.preventDefault();var s=$("#search-top")||$("#search-rail");s.focus();return}
+  if(e.key==="`"){e.preventDefault();var d=$("#drawer");d.scrollIntoView({behavior:RM?"auto":"smooth"});toast("Bench drawer");return}
+  var id=PANELKEYS[e.key];
+  if(id){e.preventDefault();var el=document.getElementById(id);
+    if(el){el.scrollIntoView({behavior:RM?"auto":"smooth",block:"start"});
+      if(el.classList.contains("panel")){el.classList.remove("collapsed");el.style.outline="2px solid var(--teal-bright)";setTimeout(function(){el.style.outline=""},700)}
+      else{var dp=el.closest(".dpanel");if(dp){$$(".dtab").forEach(function(t){if(t.getAttribute("data-dpanel")===dp.id)t.click()})}}
+    }}
+});
+
+buildTikkun();recalcAll();
+})();
+</script>
+</body>
+</html>

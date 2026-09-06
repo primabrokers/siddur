@@ -1,0 +1,9 @@
+Stam Ashkenaz CLM, unmodified, Culmus 0.140
+Copyright (c) 2007-2010 Yoram Gnat.
+
+Binary source: https://sourceforge.net/projects/culmus/files/culmus/0.140/culmus-0.140.tar.gz
+Editable source: https://sourceforge.net/projects/culmus/files/culmus/0.140/culmus-src-0.140.tar.gz
+
+The corresponding StamAshkenazCLM.sfd source is included beside the TTF.
+See LICENSE and GNU-GPL for the GPL v2 terms and font embedding exception.
+This screen font does not certify letter forms, calibration, or a kosher scroll.

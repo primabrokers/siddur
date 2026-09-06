@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#1A211E" />
+  <title>Sofer Studio — Sefer Torah layout planner</title>
+
+  <!-- F-28: no external font CDN — system STaM-like Hebrew + UI fallback stacks keep the app fully offline. -->
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+
+    <!-- ============================ APP BAR ============================ -->
+    <header class="app-bar" id="appbar">
+      <div class="wordmark" id="wordmark">
+        <span class="mark">Sofer Studio</span>
+        <span class="sub" lang="he" dir="rtl">סופר סטודיו</span>
+      </div>
+
+      <span class="eyebrow" id="app-status" role="status" aria-live="polite">loading…</span>
+
+      <span class="spacer"></span>
+
+      <label class="field t--1" style="flex-direction:row;align-items:center;gap:6px">
+        <span class="muted">source</span>
+        <select id="source-select" class="select-input" aria-label="Torah source"></select>
+      </label>
+
+      <label class="field t--1" style="flex-direction:row;align-items:center;gap:6px">
+        <span class="muted">profile</span>
+        <select id="profile-select" class="select-input" aria-label="Calibration profile"></select>
+      </label>
+
+      <label class="field t--1" style="flex-direction:row;align-items:center;gap:6px">
+        <span class="muted">geometry</span>
+        <select id="geometry-select" class="select-input" aria-label="Column geometry"></select>
+      </label>
+
+      <span class="app-lock" id="app-lock"></span>
+
+      <button class="btn btn-primary" id="btn-compute" type="button">Compute layout</button>
+      <button class="btn btn-ghost" id="btn-lock" type="button">Lock</button>
+      <a class="btn btn-ghost account-link" href="/_prima_auth/change-password">Change password</a>
+
+      <div class="app-field">
+        <div class="mm-input">
+          <input type="search" id="search-input" placeholder="/ search (e.g. בראשית א:ד)" aria-label="Search verses" />
+          <span class="unit"></span>
+        </div>
+      </div>
+    </header>
+
+    <!-- ======================== SARGEL RULE ============================ -->
+    <div id="sargel" aria-hidden="true">
+      <div class="ticks" id="sargel-ticks"></div>
+      <div class="window" id="sargel-window" hidden><span class="flag" id="sargel-flag"></span></div>
+    </div>
+
+    <!-- ====================== PHONE TAB BAR ============================ -->
+    <nav class="phone-tabs" id="phone-tabs" aria-label="Panel navigation">
+      <button type="button" data-phone-panel="tikkun" aria-selected="true">Klaf</button>
+      <button type="button" data-phone-panel="measure" aria-selected="false">Measure</button>
+      <button type="button" data-phone-panel="shemos" aria-selected="false">Holy names</button>
+      <button type="button" data-phone-panel="checks" aria-selected="false">Checks</button>
+      <button type="button" data-phone-panel="bench" aria-selected="false">Bench</button>
+    </nav>
+
+    <!-- ========================= WORKBENCH ============================ -->
+    <main class="workbench" id="workbench">
+
+      <!-- LEFT RAIL -->
+      <aside class="rail rail-left" id="rail-left">
+
+        <section class="panel" id="panel-calibration" data-panel="calibration" data-section="01">
+          <header class="panel-head" tabindex="0" role="button" aria-expanded="true">
+            <span class="pnum t--1 mono">01</span>
+            <span class="ptitle">
+              <span class="en">Setup measurements</span>
+              <span class="he" lang="he" dir="rtl">כיול · אותיות</span>
+            </span>
+            <span class="chev" aria-hidden="true">⌄</span>
+          </header>
+          <div class="panel-body" id="calibration-body"></div>
+        </section>
+
+        <section class="panel" id="panel-geometry" data-panel="geometry" data-section="02">
+          <header class="panel-head" tabindex="0" role="button" aria-expanded="true">
+            <span class="pnum t--1 mono">02</span>
+            <span class="ptitle">
+              <span class="en">Column geometry</span>
+              <span class="he" lang="he" dir="rtl">מידות העמוד</span>
+            </span>
+            <span class="chev" aria-hidden="true">⌄</span>
+          </header>
+          <div class="panel-body" id="geometry-body"></div>
+        </section>
+
+        <section class="panel" id="panel-search" data-panel="search" data-section="10">
+          <header class="panel-head" tabindex="0" role="button" aria-expanded="true">
+            <span class="pnum t--1 mono">10</span>
+            <span class="ptitle">
+              <span class="en">Search</span>
+              <span class="he" lang="he" dir="rtl">חיפוש</span>
+            </span>
+            <span class="chev" aria-hidden="true">⌄</span>
+          </header>
+          <div class="panel-body" id="search-body"></div>
+        </section>
+
+        <section class="panel" id="panel-compare-mini" data-panel="compare-mini" data-section="11">
+          <header class="panel-head" tabindex="0" role="button" aria-expanded="true">
+            <span class="pnum t--1 mono">11</span>
+            <span class="ptitle">
+              <span class="en">Compare (mini)</span>
+              <span class="he" lang="he" dir="rtl">השוואת פרופילים</span>
+            </span>
+            <span class="chev" aria-hidden="true">⌄</span>
+          </header>
+          <div class="panel-body" id="compare-mini-body"></div>
+        </section>
+
+      </aside>
+
+      <!-- CENTRE: TIKKUN -->
+      <section class="tikkun-region" id="tikkun-region">
+        <section class="panel tikkun-panel" id="panel-tikkun" data-panel="tikkun" data-section="03">
+          <header class="panel-head" tabindex="0" role="button" aria-expanded="true">
+            <span class="pnum t--1 mono">03</span>
+            <span class="ptitle">
+              <span class="en">Tikkun preview</span>
+              <span class="he" lang="he" dir="rtl">תקן הסופר</span>
+            </span>
+            <span class="spacer" style="flex:1"></span>
+            <span class="t--2 mono muted" id="tikkun-ref"></span>
+            <span class="chev" aria-hidden="true">⌄</span>
+          </header>
+          <div class="panel-body tikkun-panel" style="padding:0" id="tikkun-body">
+            <div class="print-note" id="print-note"></div>
+            <div class="tikkun-scroll" id="tikkun-scroll" role="document" aria-label="Tikkun preview"></div>
+            <div class="stretch-inspector" id="stretch-inspector" hidden></div>
+          </div>
+        </section>
+      </section>
+
+      <!-- RIGHT RAIL -->
+      <aside class="rail rail-right" id="rail-right">
+
+        <section class="panel" id="panel-shemos" data-panel="shemos" data-section="04">
+          <header class="panel-head" tabindex="0" role="button" aria-expanded="true">
+            <span class="pnum t--1 mono">04</span>
+            <span class="ptitle">
+              <span class="en">Holy names</span>
+              <span class="he" lang="he" dir="rtl">שמות קודש</span>
+            </span>
+            <span class="chev" aria-hidden="true">⌄</span>
+          </header>
+          <div class="panel-body" id="shemos-body"></div>
+        </section>
+
+        <section class="panel" id="panel-passages" data-panel="passages" data-section="05">
+          <header class="panel-head" tabindex="0" role="button" aria-expanded="true">
+            <span class="pnum t--1 mono">05</span>
+            <span class="ptitle">
+              <span class="en">Passages &amp; unusual letters</span>
+              <span class="he" lang="he" dir="rtl">אותיות מוזרות ופרשיות</span>
+            </span>
+            <span class="chev" aria-hidden="true">⌄</span>
+          </header>
+          <div class="panel-body" id="passages-body"></div>
+        </section>
+
+        <section class="panel" id="panel-validation" data-panel="validation" data-section="06">
+          <header class="panel-head" tabindex="0" role="button" aria-expanded="true">
+            <span class="pnum t--1 mono">06</span>
+            <span class="ptitle">
+              <span class="en">Validation</span>
+              <span class="he" lang="he" dir="rtl">בדיקות</span>
+            </span>
+            <span class="chev" aria-hidden="true">⌄</span>
+          </header>
+          <div class="panel-body" id="validation-body"></div>
+        </section>
+
+      </aside>
+    </main>
+
+    <!-- ====================== LOWER BENCH DRAWER ======================= -->
+    <footer class="lower-bench is-collapsed" id="lower-bench">
+      <nav class="drawer-tabs" id="drawer-tabs" role="tablist" aria-label="Lower bench">
+        <button class="dt" type="button" role="tab" data-drawer="layouts" aria-selected="true">07 Saved layouts <span class="count" id="layouts-count"></span></button>
+        <button class="dt" type="button" role="tab" data-drawer="progress" aria-selected="false">08 Progress</button>
+        <button class="dt" type="button" role="tab" data-drawer="diff" aria-selected="false">09 Diff</button>
+        <button class="dt" type="button" role="tab" data-drawer="compare" aria-selected="false">11 Compare</button>
+        <span class="chev" id="drawer-chev" aria-hidden="true">⌄</span>
+      </nav>
+      <div class="drawer-body" id="drawer-body">
+        <div class="drawer-pane is-active" id="pane-layouts" role="tabpanel"><div id="layouts-body"></div><div id="export-controls" class="export-controls"></div></div>
+        <div class="drawer-pane" id="pane-progress" role="tabpanel"><div id="progress-body"></div></div>
+        <div class="drawer-pane" id="pane-diff" role="tabpanel"><div id="diff-body"></div></div>
+        <div class="drawer-pane" id="pane-compare" role="tabpanel"><div id="compare-body"></div></div>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- First-run modal (filled by first-run.js) -->
+  <div class="modal-backdrop" id="first-run-modal" hidden></div>
+
+  <!-- Toast -->
+  <div id="toast" hidden role="status" aria-live="polite"></div>
+
+  <noscript><p style="padding:20px;color:#e8b4aa">Sofer Studio requires JavaScript.</p></noscript>
+
+  <!-- Classic scripts, order matters (core first) -->
+  <script src="core.js"></script>
+  <script src="api.js"></script>
+  <script src="calibration.js"></script>
+  <script src="geometry.js"></script>
+  <script src="tikkun.js"></script>
+  <script src="shemos.js"></script>
+  <script src="passages.js"></script>
+  <script src="validation.js"></script>
+  <script src="layouts.js"></script>
+  <script src="progress.js"></script>
+  <script src="diff.js"></script>
+  <script src="stretch.js"></script>
+  <script src="search.js"></script>
+  <script src="compare.js"></script>
+  <script src="export.js"></script>
+  <script src="first-run.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

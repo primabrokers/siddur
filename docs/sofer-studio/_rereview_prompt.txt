@@ -1,0 +1,57 @@
+You are Claude Opus 5, re-reviewing Sofer Studio after DeepSeek V4 Pro repairs. Your previous review (docs/sofer-studio/REVIEW_FINDINGS.md) found 36 findings (13 CRITICAL, 13 MAJOR, 10 MINOR). DeepSeek has made two repair passes. Verify which findings are genuinely fixed and which remain.
+
+## Your Task
+1. Read docs/sofer-studio/REVIEW_FINDINGS.md for the original findings
+2. Read the ACTUAL current code under sofer-studio/ — do NOT trust the repair summary
+3. For each finding F-01 through F-36, verify if it is FIXED, PARTIALLY FIXED, or NOT FIXED
+4. Run the test suite: cd sofer-studio && node tests/run-all.js
+5. Write your re-review to docs/sofer-studio/RE_REVIEW_FINDINGS.md with:
+   - Updated verdict (GO/CONDITIONAL GO/NO-GO)
+   - Per-finding status table: ID | Original Severity | Status | Evidence
+   - Any NEW findings introduced by the repairs
+   - Remaining blockers (if any)
+
+## Key Areas to Verify (read the actual code, don't just check tests pass)
+
+1. **F-01**: Does applyStretch now reject when totalApplied > base_leftover_mm? Is stretched_width_mm persisted?
+2. **F-02**: Do known special passages (Exodus 15, Deut 32, Num 10:35-36) produce blockers without selected pattern? Is there a study_preview opt-in?
+3. **F-03**: Does handleAdoptCandidate server-verify line content/geometry before carrying progress?
+4. **F-04**: Does stretch/auto-suggest use persisted line + snapshot profile instead of recomputeFullLines?
+5. **F-05**: Does search parse structured refs and match on book/chapter/verse? No endsWith?
+6. **F-06**: Does renderPattern consume from head (queue.shift) not findIndex?
+7. **F-07**: Are segment gaps emitted as positioned items? First segment gap included? Overrides applied?
+8. **F-08**: Is default maxInterWordGap strictly below small-letter width unconditionally?
+9. **F-09**: Is setuma at START of line detected?
+10. **F-10**: Does frontend stretch UI use server cap_mm (absolute mm) not multiplier?
+11. **F-11**: Does tikkun render measured word boxes and items, not font-flow text?
+12. **F-12**: Does tikkun use backend isShem metadata, not client reclassification?
+13. **F-13**: Does activatePhonePanel add show-panel class?
+14. **F-14**: Are drawer tabs readable (background set)?
+15. **F-15**: Are compare/candidate async with computeLayoutAsync?
+16. **F-16**: Does UI consume real progress (poll/SSE) and paginate lines?
+17. **F-17**: Is PDF disabled honestly (501)?
+18. **F-18**: Is qere/ketiv warning honest (not claiming unperformed normalization)?
+19. **F-20**: Is built-in study-text picker in the UI?
+20. **F-21**: Does diff report measurement changes?
+21. **F-22**: Does adopted layout preserve summary?
+22. **F-23**: Does profile update guard against locked layout reference?
+23. **F-24**: Does auto-suggest prefer line-end and flag unjustifiable?
+24. **F-25**: Is unusual-letter edit UI wired to API?
+25. **F-26**: Do large/small/broken/suspended types reach output?
+26. **F-27**: Does compute fetch canonical layout? Does tikkun use snapshot geometry?
+27. **F-28**: Are external font CDN links removed?
+28. **F-29**: Is chumash option available? Is partial_corpus labeled?
+29. **F-30**: Is Host port enforced?
+30. **F-31**: Is line_key content-derived? Is explicit lock confirmation required?
+31. **F-32**: Is עליון uncertain?
+32. **F-33**: Does frontend fetch full profile (with letter_widths)?
+33. **F-34**: Is skeleton-mm column and units/mm toggle present?
+34. **F-35**: Are min_letter_height_mm and strokeWarning separate?
+35. **F-36**: Are engine errors 422 not 500?
+
+## Rules
+- Do NOT write product files
+- Do NOT modify any code under sofer-studio/ (except docs/sofer-studio/)
+- Read the ACTUAL code to verify — passing tests alone are insufficient
+- Be honest about what's fixed and what isn't
+- Write ONLY to docs/sofer-studio/RE_REVIEW_FINDINGS.md

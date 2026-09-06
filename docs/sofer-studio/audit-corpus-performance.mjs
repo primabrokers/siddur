@@ -1,0 +1,18 @@
+import {readFileSync} from 'node:fs';
+import {pathToFileURL} from 'node:url';
+const repo='/var/lib/deepseek-harness/workspaces/siddur-small-sefer-torah-20260830/';
+const root=repo+'sofer-studio/';
+const {processSource}=await import(pathToFileURL(root+'engine/source.js'));
+const {normalizeProfile}=await import(pathToFileURL(root+'engine/profile.js'));
+const {computeLayout,normalizeGeometry}=await import(pathToFileURL(root+'engine/layout.js'));
+const names=['Genesis','Exodus','Leviticus','Numbers','Deuteronomy'];
+const books=names.map(name=>({name,chapters:JSON.parse(readFileSync(repo+'docs/sofer-studio/source-data/'+name+'.json','utf8')).versions[0].text}));
+const t0=performance.now();
+const source=processSource({name:'Full five-book study corpus — performance only',format:'json',text:JSON.stringify({books})});
+const t1=performance.now();
+const p=normalizeProfile({letter_height_mm:3,reference_height_mm:3,unit_mm:.3,stroke_mm:.1});
+const g=normalizeGeometry({line_width_mm:100,baseline_pitch_mm:4,lines_per_amud:42,amudim_per_yeria:3});
+let progressCallbacks=0;
+const result=computeLayout(source,p,g,{onProgress:()=>progressCallbacks++});
+const t2=performance.now();
+console.log(JSON.stringify({note:'Performance fixture ONLY; study corpus with unresolved qere and missing authoritative annotations. These counts are not a certified layout.',sourceLetters:source.letter_count,verses:source.verse_count,sourceMs:Math.round(t1-t0),layoutMs:Math.round(t2-t1),lines:result.lines.length,progressCallbacks,heapMb:Math.round(process.memoryUsage().heapUsed/1048576)}));

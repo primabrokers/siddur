@@ -102,3 +102,10 @@ Attribution: zmanim and candle-lighting data by [Hebcal](https://www.hebcal.com)
 - Auth + syncing the mockup's settings/alarms/rules to the `luach_*` tables
 - Smart Tachanun / Yaaleh V'yavo siddur logic driven by the calendar engine
 - Open Siddur Project patches for Sefard/Edot translation gaps (per-section, license-tagged)
+
+## Sofer Studio
+
+The separate Sefer Torah layout application is in [sofer-studio](sofer-studio/README.md).
+Its source now includes the live STAM v11 font/input fixes. It uses its own
+SQLite database and VPS deployment, not this repository's GitHub Pages site.
+The existing Siddur/Vecker application and deployment inputs are unchanged.

@@ -1,0 +1,126 @@
+You are DeepSeek V4 Pro, the implementation engineer for Sofer Studio. The first implementation wave is complete but has MATERIAL defects found by independent controller audit and browser QA. You must fix ALL of the following issues. Read the existing code, understand it, then make targeted corrections.
+
+## Read These Files First
+1. docs/sofer-studio/API_CONTRACT.md — frozen contracts (updated with corrections)
+2. docs/sofer-studio/IMPLEMENTATION_AUDIT_CASES.md — detailed audit cases
+3. docs/sofer-studio/EARLY_ENGINE_AUDIT.md — Shem coverage issue
+4. ORIGINAL_FULL_BRIEF.md — full product requirements
+
+## You own: sofer-studio/server/, sofer-studio/engine/, sofer-studio/db/, sofer-studio/tests/, sofer-studio/server.js, sofer-studio/package.json
+## Also fix: sofer-studio/public/ files for frontend issues listed below
+
+## DEFECTS TO FIX (all must be fixed)
+
+### ENGINE DEFECTS
+
+**E1. Shem coverage (engine/shem.js)**
+Missing names: יה, אהיה, אלוה, אלהיכם, אלהיהם, באלהיכם, ובאלהיכם, and all suffixed forms of elohim (אלהיכם, אלהיהם, אלהינו, אלהיך, אלהי, etc.). Add these per Yesodei HaTorah 6:2-4. Conservative: uncertain flag for homographic forms, but still protected (never split/stretched). Add source-annotation overrides. Add meaningful failing test cases.
+
+**E2. Stretch duplicate/idempotency (engine/layout.js applyStretch)**
+- Duplicate decisions for same occurrence each below cap can sum above cap. Must aggregate per occurrence BEFORE cap checking.
+- Applying same decision twice subtracts from already-reduced leftover. Must always recompute from immutable BASE width.
+- Repeated replacement of decision set must be idempotent.
+- Manual requests must obey active position filters.
+- Unknown/Shem/overcap requests must fail ATOMICALLY (not partial success).
+- Test: duplicate 1mm for one occurrence with 1.5mm cap must reject or aggregate then enforce total cap.
+
+**E3. Pattern integration (engine/layout.js)**
+- computeLayout NEVER calls resolvePatternsForSource or renderPattern. Must integrate: when patterns are selected, verses in pattern ranges use renderPattern, not ordinary wrapping.
+- renderPattern currently has words:[], shem:false, drops positions/segments/gaps, adds trailing word gap. Must preserve real source tokens, occurrence IDs, Shem flags, and slot segment geometry.
+- Ensure exact source coverage (no omissions, duplicates, substitutions). Reject unsupported data clearly.
+- Known source ranges must NOT silently wrap when patterns selected.
+
+**E4. Marker positioning (engine/layout.js buildWordUnits)**
+- buildWordUnits skips every inline marker then emits only verse.after at end. For "אב {ס} גד" the boundary must remain BETWEEN those words, not at verse end.
+- setuma at start currently pushes gap with currentWidth=0. Test gap measured exactly once, not supplemented by unintended word gaps.
+
+**E5. Unusual letter mapping (engine/layout.js, engine/source.js, engine/text.js)**
+- processSource drops occurrence_index. Must preserve it.
+- resolveOverrides resets letter counts for EACH WORD and defaults to matching ALL occurrences of same base. One selected occurrence must affect ONLY that occurrence using stable source occurrence ID.
+- Repeated same letters in multiple words of one verse must be a test case.
+- U+05C4 (U+05C4 = Hebrew dot above/left) and U+05C5 dots are stripped in text.js before metadata extraction. Must preserve metadata from RAW source FIRST, then strip for working view.
+
+**E6. Source object import (engine/source.js)**
+- Preserves only joined verse text as original/hash, losing structured refs/metadata. Must retain canonical complete object plus original transport string, OR reject object form and require exact raw JSON string.
+- Add specific qere/ketiv warning when bracketed alternatives detected.
+- Do not certify bracketed study text.
+
+**E7. Chunked progress (engine/layout.js)**
+- onProgress callbacks in synchronous loop do NOT yield event loop. For full ~305k letter workload, implement actual yielding (setImmediate/queueMicrotask chunks or worker_thread). UI progress must reflect actual progress.
+
+**E8. max_inter_word_gap enforcement (engine/validate.js)**
+- 99mm max against 1.2mm small letter produces no error. Must enforce configured max strictly below calibrated small-letter width, even if current word gap itself is smaller. Reject impossible combinations.
+
+### SERVER/SECURITY DEFECTS
+
+**S1. Input validation (server/handlers.js, server/store.js)**
+- POST /profiles with letter_height_mm=-3 returns 200. Must reject negative, nonfinite, out-of-range for ALL physical inputs (letter_height, stroke, unit_mm, min_nib, all 27 letter widths, caps, gap bounds, geometry settings, pattern schemas).
+- Do NOT silently coerce invalid input to defaults. Return 400 with clear error message.
+
+**S2. Origin validation (server/security.js)**
+- Origin:http://localhost:9999 returns 200 (different port). Origin:null returns 200. Must validate exact same-origin scheme+host+port. Token is additional protection, not permission to ignore Origin contract.
+
+**S3. Non-stretchable serialization (server/store.js)**
+- GET /profiles/:id/export returns non_stretchable:{} because internal Set serialized directly. Must serialize as JSON array on ALL API/export/snapshot boundaries. Empty override arrays must work correctly without reintroducing defaults on duplicate/restore.
+
+**S4. Layout line data persistence (server/store.js, server/handlers.js)**
+- GET /layouts/:id lines lack words/items/letter measures and per-token Shem metadata. Must persist and restore FULL line data: words (with letters, occurrence IDs, Shem flags), items (including setuma gaps), letter measures, pattern segments/annotations, stretch positions.
+- Cannot reconstruct from changed global calibration. Test: save layout, change profile, reload layout — original data must be intact.
+
+**S5. Stretch at HTTP boundary (server/handlers.js)**
+- Duplicate 1mm decisions for same letter with 1.5mm cap return 200. Must reject or aggregate per occurrence then enforce total cap atomically at HTTP boundary too (not just engine helper).
+
+### FRONTEND DEFECTS
+
+**F1. Calibration panel overflow (public/calibration.js, public/styles.css)**
+- Second column of controls clipped horizontally at 1280px. Fix CSS grid min-width, panel breakpoints, flex wrapping. Test real desktop AND phone widths.
+- Profile-name input and bottom tabs have white backgrounds with nearly white text — unreadable. Fix form/button color tokens.
+
+**F2. Units mismatch (public/calibration.js)**
+- calibration.js calls letter_widths "skeleton mm" and shows Total א=2.10mm for default width 2.4/ref6/H4.5/stroke.3. Backend stores letter_widths in UNITS with unit_mm=0.5 => engine total=1.20mm.
+- Must use ONE canonical schema and measurement path. Editable units/mm as requested.
+- max_stretch is backend absolute mm but UI labels caps as ×. Reconcile: show caps in mm.
+- Unit setting (unit_mm) must be visible and editable in the UI.
+
+**F3. Geometry min-width guard (public/geometry.js)**
+- Reports 3×למשפחותיכם=9.00mm with saved QA profile, incorrectly green. Was 0mm before saving profile, also green.
+- Must derive threshold from SAME full calibrated profile as backend, including 2 word gaps.
+- NEVER show passed guard from missing data. If no profile loaded, show "no profile" warning, not green checkmark.
+
+**F4. Compute/layout state sync (public/app.js)**
+- Compute says layout UUID/1amud but header still says NO LAYOUT, dropdowns remain —none— until reload.
+- Must normalize compute/layout IDs and update shared selection/state consistently after compute.
+
+**F5. Tikkun text overflow (public/tikkun.js, public/styles.css)**
+- Text line runs out of parchment horizontally. Preserve measured per-letter boxes/gaps and use explicit fitting/scroll scale. Do not clip text.
+- Tikkun must match same measured layout used for export, including after saved-layout reopen/restart.
+
+**F6. Shem uncertainty (public/shemos.js)**
+- Lists אלהים under "Certain" while backend marks it uncertain. Per-token classification is being lost/recomputed in frontend.
+- Must preserve canonical uncertainty from backend response. Use backend shem metadata, don't recompute.
+
+**F7. Pattern status label (public/passages.js)**
+- Claims "normal wrapping NOT applied" merely because data missing, but backend wraps those passages when no patterns selected.
+- Claims must reflect REAL blockers and actual behavior. If no pattern selected, say "normal wrapping (no pattern selected)". If pattern selected but data missing, show the actual backend blocker. Never decorative status labels.
+
+### SOURCE DATA INTEGRATION
+- Pinned Sefaria v3 responses are under docs/sofer-studio/source-data/{Genesis,Exodus,Leviticus,Numbers,Deuteronomy}.json + manifest.json
+- 5,846 verses total. Raw Hebrew letter count 305,172 (includes ketiv+qere alternatives).
+- Ketiv/Qere present as bracketed alternatives: "הוצא [היצ]". Must detect and warn. Preview-only ketiv policy can drop bracketed qere with recorded normalization, but unresolved variants = visible blockers.
+- Preserve raw originals. Do not certify as scribal corpus.
+- Add a built-in source import option that loads from these files (read from docs/sofer-studio/source-data/ or embed reference). Label honestly as study text, not certified.
+
+### TESTING
+- Add test cases for EVERY fix above. Run ALL tests and ensure they pass.
+- Add tests for: Shem coverage (יה, אהיה, אלוה, suffixed forms), stretch duplicate rejection, pattern integration, marker positioning, unusual letter per-occurrence, source object preservation, input validation, origin validation, non-stretchable serialization, layout line persistence, max_inter_word_gap enforcement.
+- Run: cd sofer-studio && node tests/run-all.js
+
+## Process
+1. Read each affected file
+2. Make targeted fixes (modular, bounded writes)
+3. Run node --check on changed files
+4. Run full test suite
+5. Fix any test failures
+6. Report what was fixed, test results, and any remaining limitations
+
+Start now. Fix ALL defects.

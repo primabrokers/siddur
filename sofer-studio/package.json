@@ -1,0 +1,22 @@
+{
+  "name": "sofer-studio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sofer Studio — small Sefer Torah layout planning application",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "test": "node tests/run-all.js",
+    "test:engine": "node tests/engine.test.js",
+    "test:layout": "node tests/layout.test.js",
+    "test:security": "node tests/security.test.js",
+    "test:persistence": "node tests/persistence.test.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.0.0"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

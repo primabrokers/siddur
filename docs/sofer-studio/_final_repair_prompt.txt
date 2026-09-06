@@ -1,0 +1,64 @@
+You are DeepSeek V4 Pro. Opus 5 re-reviewed Sofer Studio and gave CONDITIONAL GO. All 13 original CRITICALs are fixed. There are 3 new frontend blockers (N-01, N-02, N-03) and 5 strongly recommended residuals. Fix ALL of them.
+
+## Read docs/sofer-studio/RE_REVIEW_FINDINGS.md for full details with file:line evidence.
+
+## BLOCKING FIXES (must fix all 3)
+
+**N-01: Validation panel false clean (CRITICAL)**
+- public/validation.js:55 tests Array.isArray(layout.validation) but API returns object {valid, spacing_errors, lines[]}
+- Panel always shows "No validation issues — every line passed" + hardcoded "41 lines clean"
+- Fix: Read real shape. Iterate layout.validation.lines, emit rows for errors (severity "error") and warnings (severity "warning"), plus rows for layout.validation.spacing_errors. Derive clean count from lines.filter(l => l.valid).length. Never hardcode count.
+
+**N-02: Stretch UI has no candidate data (MAJOR)**
+- handleGetLayout (server/handlers.js:426-440) returns raw store lines without publicLine(l, profile)
+- Canonical GET /api/layouts/:id response has no stretch_candidates
+- app.js stores that response, stretch.js renders "No candidate data" for every line
+- Fix: In handleGetLayout, load snapshot profile and map lines through publicLine(l, profile) so stretch_candidates with cap_mm are present. Also handle paginated path.
+
+**N-03: passages.js ReferenceError (MAJOR)**
+- public/passages.js calls API.getSource(srcId) but never declares var API or assigns API = ctx.api
+- Under 'use strict' this throws ReferenceError, disabling unusual-letter editor
+- Fix: Add var API; with other module locals, and API = ctx.api; as first line of init(ctx)
+
+## STRONGLY RECOMMENDED FIXES
+
+**R-F27: Tikkun uses live geometry instead of snapshot**
+- GET /api/layouts/:id has no geometry field; tikkun.js falls through to live SS.activeGeometry()
+- Fix: Return geometry (from snapshot) on GET /api/layouts/:id, OR read layout.snapshot.geometry in tikkun.js for baseline_pitch_mm, letter_height_mm, line_width_mm. Never use live selector for a loaded layout.
+
+**R-F17: PDF button still enabled**
+- Backend returns 501 but public/export.js still renders enabled PDF button and claims all exports use same layout
+- Fix: Disable PDF button (greyed out, tooltip "PDF not yet supported — use browser print"), qualify the claim
+
+**R-F33: Profile list omits letter_widths, geometry guard always unverifiable**
+- listProfiles returns only summary; SS.activeProfile() reads from list; geometry guard can't verify
+- Fix: Either have listProfiles return full records, or cache full active profile in state when selected (fetch GET /api/profiles/:id on profile change)
+
+**R-F02: Study preview export not blocked server-side, passages chip wrong**
+- GET .../export still returns 200 for study_preview layouts (only client refuses)
+- passages.js:116 still shows neutral chip "normal wrapping (no pattern selected)" instead of error
+- Fix: Server-side: refuse export for study_preview layouts (return 403 or stamp). Change passages.js chip to error state showing the real blocker message.
+
+**N-04: max_inter_word_gap_factor not persistable**
+- Engine reads it but geometries table has no column, store doesn't bind it, no UI
+- Fix: Add column (migration), bind in insertGeometry, validate (0 < f < 1), expose in geometry panel spacing block
+
+**N-05: Diff panel mislabels change types and drops deltas**
+- diff.js labelMap covers moved/rebroken/unchanged/new/removed but server emits line_changed/measurement_changed/line_added/line_removed
+- ch.deltas never rendered; changedLineIds keys on ch.line_id which server never sends (sends line_index)
+- Fix: Map real type strings to readable labels, render ch.deltas for measurement_changed, resolve changed lines by line_index, surface refused_line_ids from adopt response
+
+## ALSO FIX
+- F-19 residual: Add small_letter_reference and vavei_haamudim controls to geometry panel
+- F-29 residual: Fix the chumash picker letter count discrepancy (manifest says 305,172 but import yields 304,850 — show actual import count or explain)
+
+## Process
+1. Read each affected file
+2. Make targeted fixes (modular, bounded writes)
+3. Run node --check on changed files
+4. Add/update tests for N-01, N-02, N-03 at minimum
+5. Run full test suite: cd sofer-studio && node tests/run-all.js
+6. Fix failures
+7. Report what was fixed, test results, remaining limitations
+
+Start now. Fix ALL items.

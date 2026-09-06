@@ -1,0 +1,210 @@
+{
+  "project": "sofer-studio",
+  "branch": "feature/small-sefer-torah",
+  "worktree": "siddur-small-sefer-torah-20260830",
+  "completed": "2026-08-30",
+  "roles": {
+    "orchestrator": {
+      "provider": "fireworks",
+      "model": "accounts/fireworks/models/glm-5p2"
+    },
+    "frontend_design": {
+      "provider": "fireworks",
+      "model": "accounts/fireworks/models/kimi-k3"
+    },
+    "implementation": {
+      "provider": "fireworks",
+      "model": "accounts/fireworks/models/deepseek-v4-pro-0813",
+      "note": "deepseek-official has MISSING_CREDENTIAL; same model on Fireworks"
+    },
+    "review": {
+      "provider": "anthropic",
+      "model": "claude-opus-5"
+    }
+  },
+  "sessions": [
+    {
+      "id": "5c7c7058",
+      "model": "kimi-k3",
+      "phase": "design",
+      "outcome": "complete (recovered from tool write failure)",
+      "artifacts": [
+        "docs/sofer-studio/design/DESIGN_SPEC.md",
+        "docs/sofer-studio/design/reference-mockup.html"
+      ]
+    },
+    {
+      "id": "workflow-612f12ea",
+      "model": "deepseek-v4-pro-0813",
+      "phase": "implementation",
+      "outcome": "complete",
+      "agents": 2,
+      "notes": "parallel backend+frontend"
+    },
+    {
+      "id": "workflow-13e842ed",
+      "model": "deepseek-v4-pro-0813",
+      "phase": "corrections-1",
+      "outcome": "complete",
+      "agents": 1
+    },
+    {
+      "id": "workflow-2634229d",
+      "model": "claude-opus-5",
+      "phase": "review-1",
+      "outcome": "NO-GO (36 findings: 13 CRITICAL, 13 MAJOR, 10 MINOR)"
+    },
+    {
+      "id": "workflow-e7b8f53b",
+      "model": "deepseek-v4-pro-0813",
+      "phase": "repairs-1",
+      "outcome": "complete (13 CRITICAL + most MAJOR fixed)"
+    },
+    {
+      "id": "workflow-c1747724",
+      "model": "deepseek-v4-pro-0813",
+      "phase": "repairs-2",
+      "outcome": "complete (remaining MAJOR + MINOR)"
+    },
+    {
+      "id": "workflow-79bc6bfd",
+      "model": "claude-opus-5",
+      "phase": "re-review",
+      "outcome": "CONDITIONAL GO (25 fixed, 7 partial, 3 new frontend blockers)"
+    },
+    {
+      "id": "workflow-4207b6c9",
+      "model": "deepseek-v4-pro-0813",
+      "phase": "final-fixes",
+      "outcome": "complete (N-01, N-02, N-03 + residuals)"
+    }
+  ],
+  "tests": {
+    "files": 8,
+    "totalAssertions": 128,
+    "allPassed": true,
+    "suites": [
+      {
+        "name": "engine.test.js",
+        "assertions": 22
+      },
+      {
+        "name": "layout.test.js",
+        "assertions": 29
+      },
+      {
+        "name": "security.test.js",
+        "assertions": 18
+      },
+      {
+        "name": "persistence.test.js",
+        "assertions": 7
+      },
+      {
+        "name": "diff.test.js",
+        "assertions": 7
+      },
+      {
+        "name": "fixes.test.js",
+        "assertions": 20
+      },
+      {
+        "name": "remaining.test.js",
+        "assertions": 18
+      },
+      {
+        "name": "frontend.test.js",
+        "assertions": 7
+      }
+    ]
+  },
+  "existingRepoTests": {
+    "test/api.test.mjs": "26/26 passed",
+    "test/sync.test.mjs": "23/23 passed",
+    "test/store.test.mjs": "pre-existing failure (line 50, browser navigation), not caused by new code"
+  },
+  "preview": {
+    "host": "127.0.0.1",
+    "port": 4252,
+    "health": "ok",
+    "note": "Stale process holds 4247; fresh server on 4252. Loopback only."
+  },
+  "reviewVerdict": {
+    "initial": "NO-GO",
+    "final": "CONDITIONAL GO (all 13 original CRITICALs fixed; 3 new frontend blockers fixed in final pass)",
+    "remainingPartials": [
+      "F-16: non-poll compute path still returns large blob (poll path works for >20k letters)",
+      "F-27: tikkun reads snapshot geometry but live selector fallback not fully eliminated",
+      "F-33: listProfiles still returns summary; full profile cached on selection"
+    ]
+  },
+  "filesCreated": [
+    "sofer-studio/server.js",
+    "sofer-studio/server/app.js",
+    "sofer-studio/server/handlers.js",
+    "sofer-studio/server/router.js",
+    "sofer-studio/server/security.js",
+    "sofer-studio/server/store.js",
+    "sofer-studio/server/static.js",
+    "sofer-studio/server/http.js",
+    "sofer-studio/server/validation.js",
+    "sofer-studio/server/builtin.js",
+    "sofer-studio/engine/width.js",
+    "sofer-studio/engine/shem.js",
+    "sofer-studio/engine/layout.js",
+    "sofer-studio/engine/source.js",
+    "sofer-studio/engine/text.js",
+    "sofer-studio/engine/profile.js",
+    "sofer-studio/engine/validate.js",
+    "sofer-studio/engine/search.js",
+    "sofer-studio/engine/compare.js",
+    "sofer-studio/db/schema.js",
+    "sofer-studio/db/db.js",
+    "sofer-studio/public/index.html",
+    "sofer-studio/public/styles.css",
+    "sofer-studio/public/app.js",
+    "sofer-studio/public/api.js",
+    "sofer-studio/public/core.js",
+    "sofer-studio/public/tikkun.js",
+    "sofer-studio/public/calibration.js",
+    "sofer-studio/public/geometry.js",
+    "sofer-studio/public/shemos.js",
+    "sofer-studio/public/passages.js",
+    "sofer-studio/public/validation.js",
+    "sofer-studio/public/layouts.js",
+    "sofer-studio/public/progress.js",
+    "sofer-studio/public/diff.js",
+    "sofer-studio/public/stretch.js",
+    "sofer-studio/public/search.js",
+    "sofer-studio/public/compare.js",
+    "sofer-studio/public/export.js",
+    "sofer-studio/public/first-run.js",
+    "sofer-studio/tests/run-all.js",
+    "sofer-studio/tests/harness.js",
+    "sofer-studio/tests/helpers.js",
+    "sofer-studio/tests/engine.test.js",
+    "sofer-studio/tests/layout.test.js",
+    "sofer-studio/tests/security.test.js",
+    "sofer-studio/tests/persistence.test.js",
+    "sofer-studio/tests/diff.test.js",
+    "sofer-studio/tests/fixes.test.js",
+    "sofer-studio/tests/remaining.test.js",
+    "sofer-studio/tests/frontend.test.js",
+    "sofer-studio/tests/dom-shim.js",
+    "docs/sofer-studio/PLAN.md",
+    "docs/sofer-studio/API_CONTRACT.md",
+    "docs/sofer-studio/STATUS.md",
+    "docs/sofer-studio/REVIEW_FINDINGS.md",
+    "docs/sofer-studio/RE_REVIEW_FINDINGS.md",
+    "docs/sofer-studio/design/DESIGN_SPEC.md",
+    "docs/sofer-studio/design/reference-mockup.html"
+  ],
+  "limitations": [
+    "Study text (Sefaria Tanach with Text Only) is not a certified scribal corpus",
+    "Raw letter count 305,172 differs from traditional 304,805 (ketiv/qere alternatives)",
+    "PDF export disabled (no embedded Hebrew CID font); JSON/CSV/browser-print available",
+    "No production deployment; loopback development preview only",
+    "Frontend DOM tests are a purpose-built shim, not a full browser test",
+    "Code-generated tikkun is not certification for writing on klaf"
+  ]
+}

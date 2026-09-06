@@ -1,0 +1,61 @@
+{
+  "retrievedAt": "2026-08-30T21:04:02.438Z",
+  "description": "Pinned raw Sefaria API responses for planning. Consonantal study text; NOT a certified sofer corpus. No claimed complete unusual-letter, Shem classification, paragraph or fixed-pattern metadata. Preserve source originals. Do not infer production readiness from verse or letter counts.",
+  "versions": [
+    {
+      "book": "Genesis",
+      "chapters": 50,
+      "verseCount": 1533,
+      "letterCount": 78143,
+      "sha256": "b9d4d4570d4bae386d5b7bc57a472cf4940ebf1fef4ab987e404c91b1c244771",
+      "url": "https://www.sefaria.org/api/v3/texts/Genesis.1-50?version=hebrew%7CTanach%20with%20Text%20Only&fill_in_missing_segments=0",
+      "versionTitle": "Tanach with Text Only",
+      "license": "Public Domain",
+      "versionSource": "http://www.tanach.us/Tanach.xml"
+    },
+    {
+      "book": "Exodus",
+      "chapters": 40,
+      "verseCount": 1210,
+      "letterCount": 63595,
+      "sha256": "9d42a510d2a3f90b70eb8a45d7dc8cc2f9c61f395035604216b2142877ed2245",
+      "url": "https://www.sefaria.org/api/v3/texts/Exodus.1-40?version=hebrew%7CTanach%20with%20Text%20Only&fill_in_missing_segments=0",
+      "versionTitle": "Tanach with Text Only",
+      "license": "Public Domain",
+      "versionSource": "http://www.tanach.us/Tanach.xml"
+    },
+    {
+      "book": "Leviticus",
+      "chapters": 27,
+      "verseCount": 859,
+      "letterCount": 44812,
+      "sha256": "c3cc5ecd06f5cf3ad89686592b66bd5bdf2d3d858d7924b9d2a5c7a137537d86",
+      "url": "https://www.sefaria.org/api/v3/texts/Leviticus.1-27?version=hebrew%7CTanach%20with%20Text%20Only&fill_in_missing_segments=0",
+      "versionTitle": "Tanach with Text Only",
+      "license": "Public Domain",
+      "versionSource": "http://www.tanach.us/Tanach.xml"
+    },
+    {
+      "book": "Numbers",
+      "chapters": 36,
+      "verseCount": 1288,
+      "letterCount": 63588,
+      "sha256": "28adb15a110259008ca936e113153a373252b8ac68c80d0ff291c2a4f94e7793",
+      "url": "https://www.sefaria.org/api/v3/texts/Numbers.1-36?version=hebrew%7CTanach%20with%20Text%20Only&fill_in_missing_segments=0",
+      "versionTitle": "Tanach with Text Only",
+      "license": "Public Domain",
+      "versionSource": "http://www.tanach.us/Tanach.xml"
+    },
+    {
+      "book": "Deuteronomy",
+      "chapters": 34,
+      "verseCount": 956,
+      "letterCount": 55034,
+      "sha256": "ae3e5a408842846b67d8b85cbd5f5dcf583c703cbbcd241fa520c168add951e3",
+      "url": "https://www.sefaria.org/api/v3/texts/Deuteronomy.1-34?version=hebrew%7CTanach%20with%20Text%20Only&fill_in_missing_segments=0",
+      "versionTitle": "Tanach with Text Only",
+      "license": "Public Domain",
+      "versionSource": "http://www.tanach.us/Tanach.xml"
+    }
+  ]
+}

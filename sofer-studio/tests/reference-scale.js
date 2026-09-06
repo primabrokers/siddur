@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {loadReferenceSource} from '../server/reference.js';
+import {computeLayout,normalizeGeometry} from '../engine/layout.js';
+import {normalizeProfile} from '../engine/profile.js';
+import {openDatabase} from '../db/db.js';
+import * as store from '../server/store.js';
+import {planBookStretch} from '../server/stretch-book.js';
+const db=openDatabase(':memory:');db.pragma('max_page_count=65536');
+const source=loadReferenceSource('all'),sid=store.insertSource(db,source);source.reference=source.canonical.reference;
+const p=store.insertProfile(db,normalizeProfile({})),g=store.insertGeometry(db,normalizeGeometry({line_width_mm:180,lines_per_amud:42,max_letters_per_line:0}));
+const result=computeLayout(source,p,g),id=store.saveLayout(db,{source_id:sid,profile_id:p.id,geometry_id:g.id,source_hash:source.revision_hash,profile_snapshot:p,geometry_snapshot:g},result);
+assert.equal(result.lines.length,10290);
+const saved=store.getLayoutLines(db,id);assert.equal(saved.length,10290);
+const plan=planBookStretch(store.getLayoutRow(db,id),saved,p);
+assert(plan.entries.length>0);assert(plan.lines.every(l=>!l.fixed_pattern));
+console.log(JSON.stringify({lines:saved.length,letters:result.summary.total_letters,proposed_lines:plan.summary.proposed_lines,overfull:result.summary.overfull_lines,db_mb:db.pragma('page_count',{simple:true})*4096/1048576,heap_mb:process.memoryUsage().heapUsed/1048576,rss_mb:process.memoryUsage().rss/1048576}));db.close();

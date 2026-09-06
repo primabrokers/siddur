@@ -1,0 +1,73 @@
+You are DeepSeek V4 Pro. The first repair pass fixed most CRITICAL/MAJOR findings but several items remain. Fix ALL of these:
+
+## Read docs/sofer-studio/REVIEW_FINDINGS.md for full context.
+
+## Remaining Fixes
+
+**R1. F-15: /api/compare and candidate creation still synchronous**
+- compareProfiles calls sync computeLayout; handleCreateCandidate also sync
+- Fix: Make compareProfiles async using computeLayoutAsync; make handleCompare and handleCreateCandidate async and await; router already awaits handlers
+- Test: concurrent /api/health served within bounded time during large compare
+
+**R2. F-16: Frontend progress doesn't consume paginated/SSE endpoint**
+- Backend pagination exists (GET /api/layouts/:id?from=&limit=) but UI doesn't use it
+- Fix: After compute, fetch layout with pagination for large corpora; show real progress during compute via polling or SSE; don't load all lines at once for full Torah
+
+**R3. F-21: Diff doesn't report measurement changes**
+- computeLineDiff only compares tokens; calibration change preserving boundaries produces empty diff
+- Fix: Compare width_mm, leftover_mm, base_leftover_mm, per-word width_mm with tolerance; emit measurement_changed type with deltas
+- Test: stroke change preserving boundaries produces non-empty diff
+
+**R4. F-22: Adopted layout summary still empty**
+- saveCandidate doesn't store summary; handleAdoptCandidate passes {} as summary
+- Fix: Store candidate's computed.summary, validation, amud_annotations in saveCandidate; copy onto adopted layout
+- Test: total_amudim and klaf_length_m survive adoption
+
+**R5. F-24: Auto-suggest doesn't prefer line-end, doesn't flag unjustifiable**
+- Even distribution, ranking unused for amounts; excess leftover silently dropped
+- Fix: Weight by rank (greedy from line-end, capped per letter, rebalance); enforce minimum increment; when leftover > totalCap return {unjustifiable: true, shortfall_mm}
+- Test: line-end candidate gets more than non-line-end; excess leftover flagged
+
+**R6. F-25: Frontend unusual-letter edit UI not wired**
+- Backend GET /api/sources/:id and override exist; no edit form
+- Fix: Render unusual letter occurrences from source data; on edit, POST override to layout annotations and recompute; show id, ref, type
+
+**R7. F-26: Large/small/broken/suspended types not in output**
+- Only dotted detected; type not carried to layout line or publicLine
+- Fix: Carry annotation type and occurrence_id through buildOverrideMap/wordOverrides into words[].override as {id, mm, type}; surface in publicLine and exports; render distinct visual per type in tikkun
+
+**R8. F-31: Line IDs not unique across layouts, auto-lock without confirmation**
+- Fix: Add content-derived line_key (hash of tokens + measured widths + occurrence ids); use line_key for progress decisions; require explicit lock confirmation (lock:true flag) before first "written" locks
+- Test: same line_id in different layouts has different line_key; explicit lock required
+
+**R9. F-32: עליון mislabelled certain**
+- Fix: Demote עליון to certain: false in shem.js
+
+**R10. F-34: No skeleton-mm column, no units/mm toggle on line width**
+- Fix: Add skeleton-mm column (units × unit_mm × scale) in calibration table; add units/mm toggle on line-width field in geometry, synced via unit_mm
+
+**R11. F-35: nibSizeWarning conflates letter height and nib**
+- Fix: Add min_letter_height_mm to normalizeProfile, profiles table, fullProfileFrom; make nibSizeWarning compare letter height against min_letter_height_mm; add separate strokeWarning comparing stroke_mm against min_nib_mm
+
+**R12. F-36: 500 errors with stack traces**
+- Fix: Convert engine validation throws (deriveGeometry overlap, pattern coverage) to HttpError(422) at handler boundary; log without full path-bearing stack
+
+**R13. F-30: Host port not enforced**
+- Fix: Enforce port when present in Host header, using effectivePort from app.js
+
+**R14. F-19: Setuma gap and spacing limits not configurable in UI**
+- Fix: Add UI controls for setuma_gap_mm, setuma_reference_letter, min_inter_letter_gap_mm, min_inter_word_gap_mm, max_inter_word_gap_mm in geometry panel
+
+**R15. F-29: Single book not labeled partial_corpus**
+- Fix: Set partial_corpus=true when source is not all 5 books; label in UI, compare, exports; document 305,172 vs 304,805
+
+## Process
+1. Read each affected file
+2. Make targeted fixes (modular, bounded writes)
+3. Run node --check on changed files
+4. Add/update tests for EVERY fix
+5. Run full test suite: cd sofer-studio && node tests/run-all.js
+6. Fix failures
+7. Report what was fixed, test results, remaining limitations
+
+Start now. Fix ALL remaining items.

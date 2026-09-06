@@ -1,0 +1,159 @@
+You are DeepSeek V4 Pro. Opus 5 independently reviewed Sofer Studio and found 36 findings (13 CRITICAL, 13 MAJOR, 10 MINOR). The full review is in docs/sofer-studio/REVIEW_FINDINGS.md. You must fix ALL CRITICAL and MAJOR findings, and as many MINOR as practical. Read the review file for full evidence and fix instructions.
+
+## Read These Files
+1. docs/sofer-studio/REVIEW_FINDINGS.md — full findings with file:line evidence and fix instructions
+2. docs/sofer-studio/API_CONTRACT.md — frozen contracts
+3. docs/sofer-studio/CORRECTION_ACCEPTANCE_CLARIFICATION.md (if exists) — special passage blocking rule
+
+## You own ALL of sofer-studio/ (engine, server, db, public, tests, package.json)
+
+## CRITICAL FINDINGS TO FIX (all 13)
+
+**F-01: Stretch can exceed physical line**
+- applyStretch enforces per-letter cap but NOT total remaining width
+- Fix: After building applied, compute totalApplied and reject atomically when totalApplied > base_leftover_mm + TOL
+- Persist stretched_width_mm = width_mm + totalApplied; make validateLine check it
+- Tests: sum-over-leftover rejected, sum-equal-to-leftover accepted, line valid after export
+
+**F-02: Known special passages silently wrap normally**
+- resolvePatternsForSource returns empty blockers when no patterns selected
+- Fix: Add known-special-range registry (Exodus 15:1-18 Shiras Hayam, Deut 32:1-43 Ha'azinu, Num 10:35-36 Vayehi Binso'a)
+- For every known range with no selected verified pattern, emit a blocker
+- handleComputeLayout already 422s on blockers — that path works
+- Add "study preview only" opt-in that marks layout study_preview=true, watermarks tikkun, makes export refuse/stamp
+- Change passages.js chip from benign to error state
+- CRITICAL: Known special passages must NEVER silently use normal wrapping. Absence of pattern = blocker, not permission.
+
+**F-03: Progress carries to changed lines on adoption**
+- handleAdoptCandidate trusts client verified_unchanged_lines with no server check
+- Fix: Server must independently verify each line: compare candidate vs parent on tokens (deep equal), width_mm, leftover_mm, letter_occurrence_ids, items geometry
+- Carry status ONLY when all match within tolerance
+- Return refused ids in response
+- Test: changed line supplied as "verified" must reset to pending
+
+**F-04: Stretch/auto-suggest reflows against live profile**
+- recomputeFullLines reloads live profile/geometry, ignores snapshot, drops patterns
+- Fix: DELETE recomputeFullLines from stretch/auto-suggest paths
+- Load PERSISTED line via store.getLayoutLines and SNAPSHOT profile from layout.snapshot.profile
+- Do NOT reflow on stretch edit
+- Tests: stretch after live-profile change returns 200 and edits saved line; stretch on patterned layout preserves fixed_pattern lines
+
+**F-05: Verse search broken, returns false positives**
+- searchVerse uses endsWith matching, Genesis 1:4 returns 0, 1:4 returns 5 spurious
+- Fix: Parse query into structured {book?, chapter, verse} (accept Hebrew gematria, Arabic, English/Hebrew book names)
+- Match on verse.book/chapter/verse fields (already stored)
+- Remove both endsWith clauses
+- Normalize builtin book name to plain book name (Genesis/בראשית), not Sefaria range title
+- Tests: exact ref, gematria ref, multi-line verse range, negative case (1:4 does not match 5:4)
+
+**F-06: Pattern does not preserve source reading order**
+- renderPattern uses queue.findIndex, allowing reordering
+- Fix: Consume strictly from head: queue.shift(), check (wu.consonant||wu.text) !== tok → throw
+- Tests: reversed-token pattern rejected, repeated word accepted
+
+**F-07: Pattern discards segment gaps and overrides**
+- Segment gap_before_mm added to width but not emitted as positioned item; first segment gap skipped; interWordGap added on top; override hardcoded []
+- Fix: Emit {type:'segment_gap', width_mm} for EVERY segment gap including first; stop adding interWordGap across segment boundary; thread overrideByOccId into renderPattern; use measureWord with override map; carry override on items; preserve verse/ref on words
+- Test: numeric width AND rendered item positions after persistence
+
+**F-08: maxInterWordGap default is equality, not strict**
+- Default max = small-letter width, check gated on explicit value, equality passes
+- Fix: Make default max strictly below reference (e.g. smallLetterWidth * 0.95 or configurable factor); apply >= smallLetterWidth rejection unconditionally
+- Tests: default-path equality rejected, exact-equality explicit case rejected
+
+**F-09: Setuma at START of line not detected**
+- makeLine checks only last item for setumaAtEdge
+- Fix: setumaAtEdge = hasSetuma && (!words.length || firstItem.type === 'setuma_gap' || lastItem.type === 'setuma_gap')
+- Test: leading setuma asserts validation error
+
+**F-10: Frontend stretch UI uses wrong unit convention**
+- capFor() treats max_stretch as multiplier; backend uses absolute mm
+- Fix: Delete capFor; expose stretchCandidatesOf output (cap_mm, letter, word_final, line_end) on publicLine; UI renders only that; remove deriveCandidates; show "no candidate data" state; label caps "mm"
+
+**F-11: Tikkun is font-flow text, not measured boxes**
+- appendLineContent splits text into words, uses text nodes; no per-letter/word boxes, no gap elements, no setuma rendering, hasStretchIn returns false
+- Fix: Render from line.words[] and line.items[]; one positioned box per word with width:width_mm; one element per items[] entry (setuma_gap, segment_gap); per-letter spans for stretch/override letters; annotate stretch in mm and units
+
+**F-12: Tikkun reclassifies Shem in browser instead of using backend metadata**
+- appendLineContent calls SS.shem.classifyWord instead of using line.words[].isShem
+- Fix: Drive highlighting from line.words[i].isShem / .uncertain / .shem.canonical; keep classifyWord only for legacy fallback with "no backend metadata" label
+
+**F-13: Phone workflow broken by missing CSS class**
+- styles.css hides panels below 1024px unless rail has .show-panel, but activatePhonePanel never adds it
+- Fix: In activatePhonePanel, add/remove show-panel on #rail-left/#rail-right; per-panel visibility for left rail (calibration vs geometry vs search)
+- Verify at 390x844 that Measure shows calibration and full workflow is reachable
+
+## MAJOR FINDINGS TO FIX (all 13)
+
+**F-14: Lower-bench tabs white-on-white**
+- Fix: Add background:transparent to .drawer-tabs .dt; phone breakpoint horizontal scroll not flex-wrap
+
+**F-15: /api/compare fully synchronous**
+- Fix: Make compareProfiles async with computeLayoutAsync; make handleCompare and handleCreateCandidate async; test concurrent health during large compare
+
+**F-16: UI progress doesn't reflect real progress**
+- Fix: Expose progress via SSE or polled status endpoint; paginate/lazily fetch lines (GET /api/layouts/:id?from=&limit=)
+
+**F-17: PDF structurally malformed, no Hebrew**
+- Fix: Disable PDF honestly — return 501 with message, disable button, state PDF cannot render Hebrew faithfully while JSON/CSV/browser-print remain trustworthy
+
+**F-18: Qere/ketiv warning claims normalization not performed**
+- Fix: Either implement recorded ketiv-only view (drop bracketed tokens from working view, keep raw, record resolution) OR state honestly that alternatives remain unresolved and block writing-ready output
+- Do NOT claim a normalization that wasn't performed
+
+**F-20: No built-in study-text picker in UI**
+- Fix: Add api.listBuiltinSources(); render five books as picker with verse/letter counts, sha256, "study text — not certified" label; wire to importSource({builtin: book})
+
+**F-21: Diff only compares tokens, misses measurement changes**
+- Fix: Compare width_mm, leftover_mm, base_leftover_mm, per-word width_mm; emit measurement_changed type with deltas; test with stroke change preserving boundaries
+
+**F-22: Adopted layout summary is empty**
+- Fix: Store candidate's computed.summary, validation, amud_annotations, pattern_ids/annotations in saveCandidate; copy onto adopted layout; test totals survive
+
+**F-23: Profile referenced by locked layout can be mutated**
+- Fix: Guard handleUpdateProfile with isProfileReferencedByLockedLayout → 409; wire isGeometryReferencedByLockedLayout; direct-API tests
+
+**F-24: Auto-suggest doesn't prefer line-end, doesn't flag unjustifiable**
+- Fix: Weight distribution by rank (greedy from line-end outward, capped per letter, rebalance); enforce configurable minimum increment; when leftover > totalCap return {unjustifiable: true, shortfall_mm}
+
+**F-25: Unusual-letter occurrence edits are inert**
+- Fix: Read from source unusual_letters (add GET /api/sources/:id); join with line.words[].override; on edit POST override and recompute; show id, ref, type
+
+**F-26: Only dotted type produced, no large/small/broken/suspended**
+- Fix: Carry annotation type and occurrence_id through buildOverrideMap/wordOverrides into words[].override as {id, mm, type}; surface in publicLine and exports; render distinct visual per type
+
+**F-27: Compute/layout state doesn't fully sync, tikkun uses live geometry**
+- Fix: After compute, fetch GET /api/layouts/:id and store canonical shape; tikkun takes geometry from layout.snapshot.geometry, not live selector
+
+## MINOR FINDINGS (fix as many as practical)
+
+**F-28: Google Fonts CDN** — self-host or drop, remove preconnects
+**F-29: No full-Chumash source** — add {builtin:'chumash'} concatenating all 5 books; add partial_corpus flag; document 305,172 vs 304,805
+**F-30: Host port not enforced** — enforce port when present
+**F-31: Auto-lock without confirmation, line_ids not unique** — add content-derived line_key; require explicit lock confirmation
+**F-32: עליון mislabelled certain** — demote to uncertain
+**F-33: Profile list omits letter_widths** — fetch full profile on active change or return full in list
+**F-34: No per-letter mm equivalent, no units/mm toggle on line width** — add skeleton-mm column, units/mm toggle
+**F-35: nibSizeWarning conflates letter height and nib** — add min_letter_height_mm to profile; separate warnings
+**F-36: 500 errors with stack traces** — convert engine throws to HttpError(422) at handler boundary
+
+## Process
+1. Read each affected file
+2. Make targeted fixes (modular, bounded writes)
+3. Run node --check on changed files
+4. Add tests for EVERY fix
+5. Run full test suite: cd sofer-studio && node tests/run-all.js
+6. Fix any failures
+7. Report what was fixed, test results, and remaining limitations
+
+## Critical Rules
+- Do NOT regress any verified-good behavior (width fixture, stroke, klaf length, Shem coverage, async yield, etc.)
+- Known special passages must NEVER silently wrap normally
+- Stretch must never exceed physical line width
+- Progress must never carry to changed lines
+- PDF must not ship as malformed
+- All exports must use same measured layout
+- Preserve original Hebrew exactly
+- Label study text honestly, never certified
+
+Start now. Fix ALL findings systematically.
