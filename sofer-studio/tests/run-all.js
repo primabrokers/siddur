@@ -1,8 +1,9 @@
 // tests/run-all.js — run every test file in order and report a summary.
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { readdirSync } from 'node:fs';
 
-const files = ['engine.test.js', 'layout.test.js', 'security.test.js', 'persistence.test.js', 'diff.test.js', 'fixes.test.js', 'remaining.test.js', 'frontend.test.js', 'stam-input.test.js', 'stam-web-import.test.js', 'stam-annotations.test.js'];
+const files = readdirSync(new URL('.', import.meta.url)).filter(name => name.endsWith('.test.js')).sort();
 let failures = 0;
 
 for (const f of files) {

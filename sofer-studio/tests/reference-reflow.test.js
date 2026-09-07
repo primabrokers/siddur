@@ -11,13 +11,12 @@ const source=book=>{const d=loadReferenceSource(book);d.reference=d.canonical.re
 const letters=r=>r.lines.flatMap(l=>l.words.flatMap(w=>w.letters.map(x=>x.id)));
 const markers=r=>r.lines.flatMap(l=>{let previous='';const out=[];for(const it of l.items){if(it.type==='word')previous=it.letters.at(-1).id;else if(it.type==='setuma_gap')out.push(['ס',previous]);}if(l.petucha_end)out.push(['פ',l.words.at(-1).letters.at(-1).id]);return out;});
 
-test('62 average units use column width divided by units, stroke once, with explicit relative widths',()=>{
-  const profile=effectiveProfile(p(62),geometry);
-  assert.equal(profile.average_unit_mm,180/62);
-  const mean=HEBREW_LETTERS.reduce((n,ch)=>n+totalWidth(ch,profile),0)/27;
-  assert(Math.abs(mean-180/62)<1e-10);
-  assert(totalWidth('א',profile)>totalWidth('י',profile));
-  assert.throws(()=>effectiveProfile(p(1e9),geometry),/no room/);
+test('older average-unit profiles use direct table units on recompute without mutating saved inputs',()=>{
+  const input=p(62), before=JSON.stringify(input), profile=effectiveProfile(input,geometry);
+  assert.equal(profile.unit_basis,'line_units');
+  assert.equal(profile.average_unit_mm,undefined);
+  assert(Math.abs(totalWidth('א',profile)-(2*180/62+profile.stroke_mm))<1e-10);
+  assert.equal(JSON.stringify(input),before);
 });
 
 test('changing units repaginates the reference without clipping, losing, duplicating or reordering words',async()=>{

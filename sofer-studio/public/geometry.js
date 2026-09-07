@@ -18,10 +18,13 @@
   var guardEl = null;   // min-width guard line
   var bigKlafEl = null; // big klaf number
   var layoutSummary = null;
-  var lwInUnits = false; // F-34: line width shown/entered in sofer units (mm ÷ unit_mm)
+  var lwInUnits = true; // Real physical line budget, displayed in calibrated sofer units.
 
   function currentUnitMm() {
-    var p = SS.activeProfile ? SS.activeProfile() : null;
+    var p = SS.calibration && SS.calibration.getDraft ? SS.calibration.getDraft() : SS.activeProfile ? SS.activeProfile() : null;
+    if (p && p.units_per_row != null && Number(p.units_per_row) > 0 && draft && Number(draft.line_width_mm) > 0) {
+      return Number(draft.line_width_mm) / Number(p.units_per_row);
+    }
     return (p && p.unit_mm != null && Number(p.unit_mm) > 0) ? Number(p.unit_mm) : 0.5;
   }
 
@@ -59,10 +62,10 @@
 
   function defaultDraft() {
     return {
-      _isDefault: true, id: null, name: 'Ari 42-line',
+      _isDefault: true, id: null, name: 'Ashkenaz 42-line measurement draft (not Simanim)',
       lines_per_amud: 42, baseline_pitch_mm: 8.0, top_margin_mm: 30, bottom_margin_mm: 30,
-      inter_column_gap_mm: 20, outer_margin_mm: 35, line_width_mm: 130,
-      max_letters_per_line: 32, amudim_per_yeria: 2, partial_final_yeria: 'round_up',
+      inter_column_gap_mm: 20, outer_margin_mm: 35, line_width_mm: 180,
+      max_letters_per_line: 0, amudim_per_yeria: 2, partial_final_yeria: 'round_up',
       setuma_gap_mm: null, setuma_reference_letter: 'א',
       min_inter_letter_gap_mm: 0, min_inter_word_gap_mm: 1.0, max_inter_word_gap_mm: null,
       max_inter_word_gap_factor: null, small_letter_reference: 'י', vavei_haamudim: true
@@ -119,6 +122,7 @@
     var row = util.el('div', { class: 'btn-row' }, [bSave, bNew]);
     crud.appendChild(row);
     root.appendChild(crud);
+    root.appendChild(util.el('p', {class:'profile-help',text:'This is a custom measurement draft, not the verified Simanim Layout 1. Computing it reflows text. Save a copy and adjust measurements with your sofer; do not use it as an exact printed tikkun reference.'}));
     root.appendChild(util.el('div', { class: 'sirtut' }));
 
     // lines per amud selector
@@ -142,7 +146,7 @@
     FIELDS.forEach(function (f) {
       grid.appendChild(mmField(f[1], f[0], f[2]));
     });
-    grid.appendChild(intField('Max letters / line', 'max_letters_per_line'));
+    grid.appendChild(util.el('p', {class:'profile-help full',text:'Maximum units per line is the measured line-width budget, not a count of letters. 1 unit uses your profile’s Unit size; letter widths, stroke, spaces and stretch all count towards the line width.'}));
     grid.appendChild(intField('Amudim per yeria', 'amudim_per_yeria'));
     var pfy = util.el('label', { class: 'field full' },
       [util.el('span', { text: 'Partial final yeria' }),
@@ -158,12 +162,15 @@
     var lwInput = util.qs('[data-field="line_width_mm"]', root);
     var lwField = lwInput ? lwInput.parentNode : null;
     if (lwField) {
+      lwField.parentNode.firstChild.textContent = 'Maximum units per line';
       var lwUnitSpan = util.qs('.unit', lwField);
+      lwUnitSpan.textContent = 'units';
       var lwToggle = util.el('button', { type: 'button', class: 'btn btn-ghost btn-sm', id: 'geom-lw-unit-toggle', text: lwInUnits ? 'units' : 'mm', title: 'Toggle line width between mm and sofer units' });
       lwToggle.addEventListener('click', function () {
         lwInUnits = !lwInUnits;
         lwToggle.textContent = lwInUnits ? 'units' : 'mm';
         lwUnitSpan.textContent = lwInUnits ? 'units' : 'mm';
+        lwField.parentNode.firstChild.textContent = lwInUnits ? 'Maximum units per line' : 'Maximum line width (mm)';
         syncLineWidthDisplay();
       });
       lwField.appendChild(lwToggle);
@@ -246,7 +253,14 @@
 
   function syncLineWidthDisplay() {
     var el = util.qs('[data-field="line_width_mm"]', root);
-    if (!el) return;
+    if (!el || !draft) return;
+    var profile = SS.calibration && SS.calibration.getDraft ? SS.calibration.getDraft() : SS.activeProfile ? SS.activeProfile() : null;
+    var columnMode = !!(profile && profile.units_per_row != null);
+    if (columnMode) lwInUnits = false;
+    var toggle = util.byId('geom-lw-unit-toggle');
+    if (toggle) { toggle.disabled = columnMode; toggle.textContent = lwInUnits ? 'units' : 'mm'; }
+    util.qs('.unit', el.parentNode).textContent = lwInUnits ? 'units' : 'mm';
+    el.closest('label').firstChild.textContent = columnMode ? 'Column width (mm)' : lwInUnits ? 'Maximum units per line' : 'Maximum line width (mm)';
     if (lwInUnits) el.value = util.fmt(draft.line_width_mm / currentUnitMm(), 3);
     else el.value = draft.line_width_mm;
   }
@@ -280,6 +294,7 @@
         }
         renderDerived();
         renderTotals();
+        bus.emit('geometry:draft-changed');
       });
     });
     util.byId('geom-setuma_reference_letter').addEventListener('input', function () {
@@ -325,29 +340,33 @@
     util.byId('geom-lines-custom-input').value = String(draft.lines_per_amud);
     renderDerived();
     renderTotals();
+    bus.emit('geometry:draft-changed');
   }
 
   /* ------------------------------------------------------------------ *
    * Width computation (matches engine: skeleton*scale + stroke once)
    * ------------------------------------------------------------------ */
   function profileLetterWidth(letter) {
-    var prof = SS.activeProfile ? SS.activeProfile() : null;
+    var prof = SS.calibration && SS.calibration.getDraft ? SS.calibration.getDraft() : SS.activeProfile ? SS.activeProfile() : null;
     if (!prof) return null;
     var units = (prof.letter_widths && prof.letter_widths[letter]);
     if (typeof units !== 'number' || !isFinite(units) || units <= 0) return null;
     var unitMm = (prof.unit_mm != null && isFinite(Number(prof.unit_mm))) ? Number(prof.unit_mm) : 0.5;
     var ref = prof.reference_height_mm || 3.0;
-    var stroke = prof.stroke_mm || 0;
+    var stroke = (prof.stroke_mm || 0) * Number(prof.stroke_factors && prof.stroke_factors[letter] != null ? prof.stroke_factors[letter] : 1);
     var lh = prof.letter_height_mm || 0;
     // engine: skeletonWidth = units * unit_mm * (height / reference); total = skeleton + stroke
     return units * unitMm * (lh / ref) + stroke;
   }
   function interLetterGap() {
-    var prof = SS.activeProfile ? SS.activeProfile() : null;
+    var prof = SS.calibration && SS.calibration.getDraft ? SS.calibration.getDraft() : SS.activeProfile ? SS.activeProfile() : null;
     return (prof && prof.gaps && prof.gaps.inter_letter) || 0;
   }
   function interWordGap() {
-    var prof = SS.activeProfile ? SS.activeProfile() : null;
+    var prof = SS.calibration && SS.calibration.getDraft ? SS.calibration.getDraft() : SS.activeProfile ? SS.activeProfile() : null;
+    if (prof && prof.stretch_policy && prof.stretch_policy.version === 2) {
+      return Number(prof.stretch_policy.special_widths_units.word_space) * (prof.unit_basis==='line_units' && prof.units_per_row>0 ? draft.line_width_mm/prof.units_per_row : Number(prof.unit_mm));
+    }
     return (prof && prof.gaps && prof.gaps.inter_word) || 0;
   }
   function wordWidth(word) {
@@ -482,7 +501,7 @@
       inter_column_gap_mm: draft.inter_column_gap_mm,
       outer_margin_mm: draft.outer_margin_mm,
       line_width_mm: draft.line_width_mm,
-      max_letters_per_line: draft.max_letters_per_line,
+      max_letters_per_line: 0,
       amudim_per_yeria: draft.amudim_per_yeria,
       partial_final_yeria: draft.partial_final_yeria,
       setuma_gap_mm: (draft.setuma_gap_mm != null && !Number.isNaN(draft.setuma_gap_mm)) ? draft.setuma_gap_mm : null,
@@ -512,5 +531,5 @@
     } catch (e) { /* ignore */ }
   }
 
-  SS.geometry = { init: init };
+  SS.geometry = { init: init, starter: defaultDraft, getDraft:function(){return draft;} };
 })();

@@ -24,7 +24,7 @@ export function validateProfileInput(body) {
   checkNonNegative(errs, body, 'reference_height_mm', 'reference_height_mm', { allowZero: false });
   checkNonNegative(errs, body, 'min_letter_height_mm', 'min_letter_height_mm');
   checkNonNegative(errs, body, 'units_per_row', 'units_per_row', { allowZero: false });
-  if(body.unit_basis!=null&&!['average_letter','skeleton'].includes(body.unit_basis))errs.push('unit_basis must be average_letter or skeleton');
+  if(body.unit_basis!=null&&!['line_units','average_letter','skeleton'].includes(body.unit_basis))errs.push('unit_basis must be line_units, average_letter or skeleton');
   if(body.layout_mode!=null&&!['reflow','reference'].includes(body.layout_mode))errs.push('layout_mode must be reflow or reference');
   if (body.stretch_policy != null) {
     const policy = body.stretch_policy;

@@ -32,6 +32,9 @@
   }
 
   async function request(method, path, body) {
+    // The server requires JSON on mutations even for actions with no fields
+    // (Lock/Delete). Send an empty object, not a body-less untyped POST.
+    if (!['GET', 'HEAD'].includes(method) && (body === undefined || body === null)) body = {};
     var headers = {};
     if (body !== undefined && body !== null) headers['Content-Type'] = 'application/json';
     var tok = currentToken();
@@ -135,6 +138,9 @@
   // Stretch & justification
   api.stretch = function (id, body) { return request('POST', '/layouts/' + encodeURIComponent(id) + '/stretch', body); };
   api.autoSuggest = function (id, body) { return request('POST', '/layouts/' + encodeURIComponent(id) + '/auto-suggest', body); };
+  api.stretchBook = function (id, body) { return request('POST', '/layouts/' + encodeURIComponent(id) + '/stretch-book', body); };
+  api.stretchReport = function (id) { return request('GET', '/layouts/' + encodeURIComponent(id) + '/stretch-report'); };
+  api.fitMargin = function (id,body) { return request('POST', '/layouts/' + encodeURIComponent(id) + '/fit-margin',body); };
   api.adoptCandidate = function (id, body) { return request('POST', '/layouts/' + encodeURIComponent(id) + '/adopt-candidate', body); };
 
   // Validation

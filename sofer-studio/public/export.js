@@ -1,7 +1,7 @@
 /*
  * Sofer Studio — export.js
  * Export the ACTIVE layout via the same measured layout as the preview:
- * Print (print CSS), PDF, JSON, CSV — served by GET /api/layouts/:id/export.
+ * Browser print / Save as PDF, plus JSON and CSV from the server export endpoint.
  */
 (function () {
   'use strict';
@@ -20,45 +20,70 @@
     build();
     bus.on('layout:loaded', updateState);
     bus.on('app:ready', updateState);
+    bus.on('preview:ready', updateState);
+    window.addEventListener('beforeprint', function () {
+      if (!SS.tikkun) return;
+      SS.tikkun.refreshPrintNote();
+      if (!SS.tikkun.isPrintReady()) util.byId('print-note').textContent = 'To print ALL pages, close this dialog and use the Sofer Print / Save PDF button. It prepares the complete layout first.';
+    });
+    window.addEventListener('afterprint', finishPrint);
   }
 
   function build() {
     util.clear(root);
-    var label = util.el('span', { class: 'eyebrow', text: 'Export layout' });
-    root.appendChild(label);
-
     var row = util.el('div', { class: 'btn-row' });
-    var bPrint = util.el('button', { class: 'btn btn-ghost btn-sm', text: 'Print' });
-    // F-17: PDF is not implemented server-side (501). Disable the button outright
-    // and point the sofer to browser print instead, rather than firing a request
-    // guaranteed to fail.
-    var bPdf = util.el('button', { class: 'btn btn-ghost btn-sm', id: 'export-pdf', text: 'PDF', disabled: true, title: 'PDF not yet supported — use browser print' });
-    var bJson = util.el('button', { class: 'btn btn-ghost btn-sm', text: 'JSON' });
-    var bCsv = util.el('button', { class: 'btn btn-ghost btn-sm', text: 'CSV' });
+    var bPrint = util.el('button', { class: 'btn btn-primary', text: 'Print / Save PDF' });
+    var bJson = util.el('button', { class: 'btn btn-ghost btn-sm', text: 'Download JSON', 'data-format': 'json' });
+    var bCsv = util.el('button', { class: 'btn btn-ghost btn-sm', text: 'Download CSV', 'data-format': 'csv' });
 
-    bPrint.addEventListener('click', function () {
-      // Fill the print note with scaling explanation, then print.
-      var note = util.byId('print-note');
-      var g = SS.activeGeometry ? SS.activeGeometry() : null;
-      var txt = 'Sofer Studio \u2014 measured layout. Print at 100% scale; verify one amud against a ruler and adjust the printer scale factor to match ' +
-        ((g && g.line_width_mm) ? util.mm(g.line_width_mm) + ' line width.' : 'the configured line width.');
-      if (g && g.lines_per_amud) txt += ' ' + g.lines_per_amud + ' lines \u00d7 ' + util.mm(g.baseline_pitch_mm) + ' pitch.';
-      note.textContent = txt;
-      window.print();
-    });
+    bPrint.addEventListener('click', printLayout);
     bJson.addEventListener('click', function () { doExport('json'); });
     bCsv.addEventListener('click', function () { doExport('csv'); });
 
-    row.appendChild(bPrint); row.appendChild(bPdf); row.appendChild(bJson); row.appendChild(bCsv);
+    row.appendChild(bPrint);
     root.appendChild(row);
-    root.appendChild(util.el('div', { class: 't--2 faint', text: 'Print, JSON and CSV use the same measured layout as the preview; PDF is not yet supported.' }));
+    root.appendChild(util.el('ol', { class: 'download-instructions' }, [
+      util.el('li', { text: 'Click Print / Save PDF and wait while all pages are prepared.' }),
+      util.el('li', { text: 'Choose “Save as PDF” as the destination, select All pages, then Save.' }),
+      util.el('li', { text: 'Choose paper that fits your column. For physical measurements, print at 100% and verify with a ruler.' })]));
+    var data = util.el('details', { class: 'download-data' }, [util.el('summary', { text: 'Layout data (JSON / CSV)' }),
+      util.el('p', { text: 'For backups and analysis — these files are not a visual document.' }), util.el('div', { class: 'btn-row' }, [bJson, bCsv])]);
+    root.appendChild(data);
     updateState();
   }
 
   function updateState() {
     if (!root) return;
     var has = !!state.active.layoutId;
-    util.qsa('button', root).forEach(function (b) { b.disabled = (b.id === 'export-pdf') ? true : !has; });
+    var study = !!(state.layout && state.layout.summary && state.layout.summary.study_preview);
+    util.qsa('button', root).forEach(function (b) { b.disabled = !has || study; });
+    var previewPrint = util.byId('preview-print');
+    if (previewPrint) previewPrint.disabled = !has || study || !SS.tikkun || !SS.tikkun.isReady();
+  }
+
+  var preparingPrint = false;
+  var returnView = null;
+  function finishPrint() {
+    if (SS.tikkun) SS.tikkun.finishPrint();
+    if (returnView && SS.workspace) SS.workspace.open(returnView);
+    returnView = null;
+  }
+  async function printLayout() {
+    if (preparingPrint) return;
+    if (!state.active.layoutId || !state.layout) { SS.toast('Open or compute a layout first.', 'error'); return; }
+    if (state.layout.summary && state.layout.summary.study_preview) { SS.toast('This study preview has unverified special passages. Complete their verification before export.', 'error'); return; }
+    if (!SS.tikkun || !SS.tikkun.isReady()) { SS.toast('The pages are still rendering. Please wait before printing.', 'error'); return; }
+    preparingPrint = true;
+    returnView = SS.workspace ? SS.workspace.current() : null;
+    if (SS.workspace) SS.workspace.open('layout');
+    SS.toast('Preparing all pages for printing…');
+    try {
+      if (!await SS.tikkun.preparePrint()) { SS.toast('Layout changed. Please try printing again.', 'error'); finishPrint(); return; }
+      SS.tikkun.refreshPrintNote();
+      // Browser print includes every amud, not only the page on screen.
+      window.print();
+    } catch (e) { finishPrint(); SS.toast(e.message || String(e), 'error'); }
+    finally { preparingPrint = false; }
   }
 
   async function doExport(format) {
@@ -79,5 +104,5 @@
     } catch (e) { SS.toast(e.message || String(e), 'error'); }
   }
 
-  SS.export = { init: init };
+  SS.export = { init: init, printLayout: printLayout };
 })();

@@ -1,0 +1,9 @@
+FROM prima-sofer-studio:stam-v11-final
+USER root
+COPY sofer-studio/package.json sofer-studio/package-lock.json /app/sofer-studio/
+RUN cd /app/sofer-studio && npm install --ignore-scripts --include=dev --no-audit --no-fund
+COPY sofer-studio/public /app/sofer-studio/public
+COPY sofer-studio/engine /app/sofer-studio/engine
+COPY sofer-studio/server /app/sofer-studio/server
+COPY sofer-studio/tests /app/sofer-studio/tests
+USER 1000:1000

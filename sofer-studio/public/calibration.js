@@ -24,6 +24,8 @@
 
   var draft = null;        // working profile object
   var dirty = false;
+  var loadRevision = 0;
+  var saving = false;
 
   var REF_HEIGHT_DEFAULT = 3.0;   // skeleton widths are stored at this reference height (mm)
 
@@ -67,10 +69,15 @@
     bindInputEvents();
     loadDraftFromActive();
 
-    bus.on('profileId:changed', function () { if (!dirty || confirmDiscard()) loadDraftFromActive(); });
-    bus.on('selection:changed', function () { if (!draft || draft._isDefault) loadDraftFromActive(); });
+    bus.on('profileId:changed', function () {
+      if (!dirty || confirmDiscard()) loadDraftFromActive();
+      else { state.active.profileId = draft.id || null; bus.emit('calibration:draft-changed'); }
+    });
+    bus.on('selection:changed', function () { if (!draft) loadDraftFromActive(); });
     bus.on('app:ready', function () { if (!draft) loadDraftFromActive(); });
     bus.on('profiles:list', function () { if (!draft) loadDraftFromActive(); });
+    bus.on('geometryId:changed', refreshColumnUnit);
+    bus.on('geometry:draft-changed', refreshColumnUnit);
   }
 
   function confirmDiscard() {
@@ -84,6 +91,8 @@
     // warning banner (top)
     warnEl = util.el('div', { class: 'banner warn', hidden: true });
     root.appendChild(warnEl);
+    root.appendChild(util.el('p', { class: 'profile-help', text: 'Start with your own named profile. Measure the sofer’s actual writing before saving; the initial numbers are examples, not recommended or verified measurements.' }));
+    root.appendChild(util.el('p', { id: 'cal-draft-status', class: 'profile-help', role: 'status' }));
 
     // app-bar warning chip (created once)
     appWarnEl = util.byId('app-warn');
@@ -105,7 +114,7 @@
     crud.appendChild(nameField);
 
     var btnSave = util.el('button', { class: 'btn btn-primary btn-sm', title: 'Save profile', text: 'Save' });
-    var btnNew = util.el('button', { class: 'btn btn-ghost btn-sm', title: 'New profile', text: 'New' });
+    var btnNew = util.el('button', { class: 'btn btn-ghost btn-sm', title: 'New profile', text: 'New profile' });
     var btnDup = util.el('button', { class: 'btn btn-ghost btn-sm', title: 'Duplicate active profile', text: 'Duplicate' });
     var btnImport = util.el('button', { class: 'btn btn-ghost btn-sm', title: 'Import profile JSON', text: 'Import' });
     var btnExport = util.el('button', { class: 'btn btn-ghost btn-sm', title: 'Export profile JSON', text: 'Export' });
@@ -130,22 +139,21 @@
     // Master scale controls
     root.appendChild(util.el('div', { class: 'sirtut' }));
     var master = util.el('div', { class: 'master-grid' });
-    master.appendChild(util.el('label', { class: 'field' }, [
-      util.el('span', { text: 'Units per line' }),
-      util.el('input', { type: 'number', min: '1', step: '1', 'data-field': 'units_per_row' }),
-      util.el('span', { class: 'hint', text: 'Classic reference: 62. Unit size is derived from the selected column width.' })
-    ]));
+    master.appendChild(mmField('Skeleton unit size', 'unit_mm', 0.01, 'Calculated from the column in automatic modes; editable in manual mode.'));
     master.appendChild(mmField('Letter height', 'letter_height_mm', 0.1, 'Master ktav height — scales all widths proportionally'));
-    master.appendChild(mmField('Stroke (kav)', 'stroke_mm', 0.01, 'Stroke thickness, added once per letter'));
+    master.appendChild(mmField('Stroke (kav)', 'stroke_mm', 0.01, 'Thickness of the ink stroke in mm, measured from the sofer’s writing — not letter height. The width calculation adds this once per letter.'));
     master.appendChild(mmField('Min letter height', 'min_letter_height_mm', 0.1, 'Warn when letter height falls below this'));
     master.appendChild(mmField('Min stroke width', 'min_nib_mm', 0.01, 'Warn when stroke falls below this (separate from letter height)'));
     master.appendChild(mmField('Reference height', 'reference_height_mm', 0.5, 'Height the skeleton widths are stored at'));
     root.appendChild(master);
+    buildPolicyControls();
 
     // spacing + stretch position
     var gaps = util.el('div', { class: 'master-grid' });
     gaps.appendChild(mmField('Inter-letter gap', 'gaps.inter_letter', 0.1, 'Gap between adjacent letters within a word'));
-    // Word-space width is edited beside the 27 letters in the table below.
+    var legacySpace = mmField('Inter-word gap', 'gaps.inter_word', 0.1, 'Saved spacing for earlier profiles');
+    legacySpace.id = 'cal-legacy-word-gap';
+    gaps.appendChild(legacySpace);
     var pos = util.el('label', { class: 'field full' },
       [util.el('span', { text: 'Stretch position' }),
        util.el('select', { id: 'cal-stretch-position', 'data-field': 'stretch_position' },
@@ -166,7 +174,7 @@
     // letter table
     root.appendChild(tableScaffold());
 
-    var songButton = util.el('button', { class: 'btn btn-ghost btn-sm', type: 'button', text: 'Song widths…' });
+    var songButton = util.el('button', { id: 'cal-song-widths', class: 'btn btn-ghost btn-sm', type: 'button', text: 'Song widths…' });
     songButton.addEventListener('click', openSongDialog);
     root.appendChild(songButton);
 
@@ -187,7 +195,7 @@
       util.el('th', { text: '+Stroke mm' }),
       util.el('th', { text: 'Skeleton mm' }),
       util.el('th', { text: 'Total mm' }),
-      util.el('th', { text: 'Cap %' }),
+      util.el('th', { id: 'cal-cap-heading', text: 'Cap %' }),
       util.el('th', { text: 'Stretch preference' })
     ]);
     var thead = util.el('thead', {}, thr);
@@ -244,10 +252,11 @@
       min_nib_mm: 1.0,
       reference_height_mm: REF_HEIGHT_DEFAULT,
       letter_widths: Object.assign({}, DEFAULT_WIDTHS),
+      stroke_factors: {},
       gaps: { inter_letter: 0, inter_word: 1.0 },
       non_stretchable: [],
       max_stretch: Object.assign({}, DEFAULT_MAX_STRETCH),
-      stretch_position: 'anywhere', units_per_row: 62, unit_basis: 'average_letter', layout_mode: 'reflow',
+      stretch_position: 'anywhere', units_per_row: 62, unit_basis: 'line_units', layout_mode: 'reflow',
       stretch_policy: defaultPolicy()
     };
   }
@@ -256,18 +265,22 @@
   // (letter_widths, gaps, max_stretch, non_stretchable, min_letter_height_mm, …)
   // lands in the draft exactly as persisted.
   async function loadDraftFromActive() {
+    var revision = ++loadRevision;
     var prof = SS.activeProfile ? SS.activeProfile() : null;
     if (prof && prof.id && API && typeof API.getProfile === 'function') {
       try { prof = await API.getProfile(prof.id); }
       catch (e) { /* fall back to the summary entry */ }
     }
+    if (revision !== loadRevision) return;
     if (prof) {
       draft = normalizeProfile(prof);
     } else if (!draft) {
       draft = defaultDraft();
     }
     dirty = false;
+    state.calibrationDraftDirty = false;
     renderFromDraft();
+    bus.emit('calibration:draft-changed');
   }
 
   function normalizeProfile(p) {
@@ -282,24 +295,31 @@
       min_nib_mm: toNum(p.min_nib_mm, 1.0),
       reference_height_mm: toNum(p.reference_height_mm, REF_HEIGHT_DEFAULT),
       letter_widths: Object.assign({}, DEFAULT_WIDTHS, (p.letter_widths || {})),
+      stroke_factors: Object.assign({},p.stroke_factors||{}),
       gaps: Object.assign({ inter_letter: 0, inter_word: 1.0 }, (p.gaps || {})),
       non_stretchable: Array.isArray(p.non_stretchable) ? p.non_stretchable.slice() : SS.DEFAULT_NON_STRETCH.slice(),
       max_stretch: Object.assign({}, DEFAULT_MAX_STRETCH, (p.max_stretch || {})),
-      stretch_position: p.stretch_position || 'anywhere',
-      units_per_row: toNum(p.units_per_row, 62), unit_basis: p.unit_basis || 'average_letter', layout_mode: p.layout_mode || 'reflow',
-      stretch_policy: (function () {
-        var d = defaultPolicy(), q = p.stretch_policy || {};
-        return Object.assign(d, q, {
-          version: 2,
-          caps_percent: Object.assign({}, d.caps_percent, q.caps_percent || {}),
-          special_widths_units: Object.assign({}, d.special_widths_units, q.special_widths_units || {}),
-          priorities: Object.assign({}, d.priorities, q.priorities || {}),
-          song_widths_mm: Object.assign({}, d.song_widths_mm, q.song_widths_mm || {})
-        });
-      })()
+      stretch_policy: savedPolicy(p.stretch_policy),
+      units_per_row: p.units_per_row == null ? null : Number(p.units_per_row),
+      unit_basis:['line_units','average_letter'].includes(p.unit_basis)?'line_units':'skeleton', layout_mode:p.layout_mode==='reflow'?'reflow':'reference',
+      stretch_position: p.stretch_position || 'anywhere'
     };
   }
   function toNum(v, d) { return (v === null || v === undefined || v === '') ? d : Number(v); }
+
+  // Loading or saving an earlier profile must not silently opt it into v2.
+  function savedPolicy(policy) {
+    if (!policy) return null;
+    var copy = JSON.parse(JSON.stringify(policy));
+    if (copy.version === 2) {
+      copy.priorities = Object.assign(defaultPriorities(), copy.priorities || {});
+      copy.special_widths_units = Object.assign({}, SPECIAL_DEFAULTS, copy.special_widths_units || {});
+      copy.song_widths_mm = Object.assign({ page: 0, middle: 0, side: 0 }, copy.song_widths_mm || {});
+    }
+    return copy;
+  }
+  function hasPreferences() { return !!(draft.stretch_policy && draft.stretch_policy.version === 2); }
+  function isRestricted(letter) { return draft.non_stretchable.indexOf(letter) >= 0; }
 
   /* ------------------------------------------------------------------ *
    * Rendering
@@ -339,11 +359,16 @@
     setFieldValue('gaps.inter_letter', draft.gaps.inter_letter);
     setFieldValue('gaps.inter_word', draft.gaps.inter_word);
     util.byId('cal-stretch-position').value = draft.stretch_position || 'anywhere';
+    renderPolicy();
 
     renderScaleNote();
     renderRows();
     updateWarnings();
     markSaved(!dirty && !draft._isDefault);
+    var status = util.byId('cal-draft-status');
+    if (status) status.textContent = draft.id
+      ? (dirty ? 'Unsaved changes — save before computing a layout.' : 'Saved profile — ready to choose a source and column geometry.')
+      : 'New, unsaved profile — name it, enter your measurements, then Save. Existing profiles are unchanged.';
   }
 
   function scale() {
@@ -361,7 +386,7 @@
   function computeTotal(letter) {
     var units = toNum(draft.letter_widths[letter], 0);
     var unitMm = toNum(draft.unit_mm, 0.5);
-    return units * unitMm * scale() + toNum(draft.stroke_mm, 0);
+    return units * unitMm * scale() + toNum(draft.stroke_mm, 0) * Number(draft.stroke_factors[letter]==null?1:draft.stroke_factors[letter]);
   }
 
   // F-34: skeleton mm = units × unit_mm × scale (stroke excluded).
@@ -377,9 +402,9 @@
     util.clear(tbody);
 
     SS.LETTERS.forEach(function (letter) {
-      var restricted = false;
+      var restricted = isRestricted(letter);
       var skel = draft.letter_widths[letter];
-      var cap = draft.stretch_policy.caps_percent[letter];
+      var cap = draft.stretch_policy ? (draft.stretch_policy.caps_percent[letter] || 0) : ((draft.max_stretch[letter] != null) ? draft.max_stretch[letter] : 0);
       var total = computeTotal(letter);
 
       var tr = util.el('tr', { class: restricted ? 'restricted' : '' });
@@ -399,10 +424,11 @@
         totalCell.textContent = util.fmt(computeTotal(letter));
         skelMmCell.textContent = util.fmt(skeletonMm(letter));
       });
+      skelInput.addEventListener('change',refreshColumnUnit);
       tr.appendChild(util.el('td', { class: 'num' }, skelInput));
 
       // +Stroke (same for all)
-      tr.appendChild(util.el('td', { class: 'num', text: util.fmt(draft.stroke_mm) }));
+      tr.appendChild(util.el('td', { class: 'num', text: util.fmt(draft.stroke_mm*Number(draft.stroke_factors[letter]==null?1:draft.stroke_factors[letter])) }));
 
       // Skeleton mm (units × unit_mm × scale, no stroke)
       tr.appendChild(skelMmCell);
@@ -412,18 +438,34 @@
       tr.appendChild(totalCell);
 
       // Cap (editable, hard capped)
-      var capInput = util.el('input', { class: 'cell', type: 'text', value: cap, 'aria-label': 'stretch cap percent or unlimited for ' + letter });
+      var capInput = util.el('input', { class: 'cell', type: 'number', min: '0', step: draft.stretch_policy ? '1' : '0.05', value: cap === 'unlimited' ? '' : cap, 'aria-label': 'stretch cap for ' + letter });
+      capInput.disabled = cap === 'unlimited';
       capInput.addEventListener('input', function () {
-        var raw = capInput.value.trim().toLowerCase();
-        draft.stretch_policy.caps_percent[letter] = raw === 'unlimited' ? 'unlimited' : Math.max(0, util.parseNum(raw) || 0);
+        var v = util.parseNum(capInput.value);
+        // These are absolute millimetres chosen by the sofer. Do not silently
+        // clamp an approved fitting profile to the old arbitrary 2 mm UI limit.
+        if (draft.stretch_policy) draft.stretch_policy.caps_percent[letter] = v;
+        else draft.max_stretch[letter] = v;
         markDirty();
       });
       var tdCap = util.el('td', { class: 'num cap' }, capInput);
+      if (draft.stretch_policy) {
+        var capMode = util.el('select', {'aria-label': 'stretch limit type for ' + letter}, [
+          util.el('option', {value:'percent',text:'% increase'}), util.el('option', {value:'unlimited',text:'Unlimited'})]);
+        capMode.value = cap === 'unlimited' ? 'unlimited' : 'percent';
+        capMode.addEventListener('change', function () {
+          draft.stretch_policy.caps_percent[letter] = capMode.value === 'unlimited' ? 'unlimited' : 50;
+          markDirty(); renderRows();
+        });
+        tdCap.appendChild(capMode);
+      }
       tr.appendChild(tdCap);
 
       // Numeric preference: lower numbers are used first.
       var btn = util.el('input', { class: 'cell stretch-priority', type: 'number', min: '1', step: '1',
-        value: draft.stretch_policy.priorities[letter], 'aria-label': 'stretch preference for ' + letter });
+        value: hasPreferences() ? draft.stretch_policy.priorities[letter] : '', 'aria-label': 'stretch preference for ' + letter });
+      btn.disabled = !hasPreferences();
+      if (!hasPreferences()) btn.title = 'Saved rules retained. Use requested stretch rules to enable numeric preferences.';
       btn.addEventListener('input', function () {
         draft.stretch_policy.priorities[letter] = Math.max(1, Math.round(util.parseNum(btn.value) || 1));
         markDirty();
@@ -438,23 +480,34 @@
       tbody.appendChild(tr);
     });
 
+    if (!hasPreferences()) return;
     ['word_space', 'hyphen', 'petucha', 'setuma'].forEach(function (key) {
       var minimum = key === 'petucha' || key === 'setuma' ? 20 : 0;
-      var tr = util.el('tr', { class: 'special-measurement' });
+      var tr = util.el('tr', { class: 'special-measurement', 'data-measurement': key });
       tr.appendChild(util.el('td', { class: 'let', text: SPECIAL_LABELS[key] }));
       var width = util.el('input', { class: 'cell', type: 'number', min: String(minimum), step: '0.5', value: draft.stretch_policy.special_widths_units[key] });
       width.addEventListener('input', function () {
         draft.stretch_policy.special_widths_units[key] = Math.max(minimum, util.parseNum(width.value) || minimum);
         if (key === 'hyphen') draft.stretch_policy.stam_hyphen_units = draft.stretch_policy.special_widths_units[key];
         markDirty();
+        refreshColumnUnit();
       });
       tr.appendChild(util.el('td', { class: 'num' }, width));
       tr.appendChild(util.el('td', { class: 'num', text: '—' }));
-      tr.appendChild(util.el('td', { class: 'num', text: util.fmt(draft.stretch_policy.special_widths_units[key] * draft.unit_mm * scale()) }));
-      tr.appendChild(util.el('td', { class: 'num', text: util.fmt(draft.stretch_policy.special_widths_units[key] * draft.unit_mm * scale()) }));
+      tr.appendChild(util.el('td', { class: 'num', text: util.fmt(specialWidthMm(key)) }));
+      tr.appendChild(util.el('td', { class: 'num', text: util.fmt(specialWidthMm(key)) }));
       var specialCap = key === 'word_space' ? draft.stretch_policy.word_space_percent :
         key === 'petucha' ? draft.stretch_policy.petucha_percent : key === 'setuma' ? draft.stretch_policy.setuma_percent : 0;
-      tr.appendChild(util.el('td', { class: 'num', text: String(specialCap) }));
+      var capInput = util.el('input', { class: 'cell', type: 'text', value: String(specialCap), 'aria-label': 'stretch cap for ' + key });
+      capInput.disabled = key === 'hyphen';
+      capInput.addEventListener('change', function () {
+        var raw = capInput.value.trim().toLowerCase();
+        var value = raw === 'unlimited' && key !== 'word_space' ? 'unlimited' : Math.max(0, Number(raw) || 0);
+        if (key === 'word_space') value = Math.min(50, value);
+        draft.stretch_policy[key === 'word_space' ? 'word_space_percent' : key + '_percent'] = value;
+        markDirty(); renderRows();
+      });
+      tr.appendChild(util.el('td', { class: 'num' }, capInput));
       var priority = util.el('input', { class: 'cell stretch-priority', type: 'number', min: '1', step: '1', value: draft.stretch_policy.priorities[key] });
       priority.addEventListener('input', function () { draft.stretch_policy.priorities[key] = Math.max(1, Math.round(util.parseNum(priority.value) || 1)); markDirty(); });
       tr.appendChild(util.el('td', { class: 'cap' }, priority));
@@ -462,7 +515,21 @@
     });
   }
 
+  function specialWidthMm(key) {
+    var units = Number(draft.stretch_policy.special_widths_units[key]);
+    var width = units * (draft.unit_basis==='line_units' && draft.units_per_row!=null ? columnWidth()/draft.units_per_row : Number(draft.unit_mm));
+    if (key === 'hyphen' && draft.units_per_row != null) return units * columnWidth() / draft.units_per_row;
+    if (key === 'setuma') {
+      var geometry = SS.geometry && SS.geometry.getDraft ? SS.geometry.getDraft() : SS.activeGeometry && SS.activeGeometry();
+      var minimum = geometry && geometry.setuma_gap_mm != null ? Number(geometry.setuma_gap_mm) :
+        9 * computeTotal(geometry && geometry.setuma_reference_letter || '\u05d0') + 8 * Number(draft.gaps.inter_letter);
+      return Math.max(width, minimum);
+    }
+    return width;
+  }
+
   function openSongDialog() {
+    if (!hasPreferences()) return;
     var widths = draft.stretch_policy.song_widths_mm;
     var modal = util.el('div', { class: 'modal-backdrop' });
     var box = util.el('div', { class: 'modal song-width-dialog' });
@@ -488,8 +555,8 @@
     previewEl.hidden = false;
     util.byId('cal-preview-letter').textContent = letter;
     var total = computeTotal(letter);
-    var cap = draft.stretch_policy.caps_percent[letter];
-    var priority = draft.stretch_policy.priorities[letter];
+    var cap = draft.stretch_policy ? draft.stretch_policy.caps_percent[letter] : draft.max_stretch[letter];
+    var priority = hasPreferences() ? draft.stretch_policy.priorities[letter] : 'saved rules';
     util.byId('cal-preview-meta').textContent =
       util.fmt(draft.letter_widths[letter], 1) + ' units skel \u00b7 total ' + util.mm(total) +
       ' \u00b7 preference ' + priority + ' \u00b7 cap ' + cap;
@@ -530,11 +597,16 @@
    * Dirty tracking & CRUD
    * ------------------------------------------------------------------ */
   function markDirty() {
+    ++loadRevision;
     dirty = true;
+    state.calibrationDraftDirty = true;
     updateWarnings();
     renderScaleNote();
     markSaved(false);
     bus.emit('calibration:dirty', draft);
+    bus.emit('calibration:draft-changed');
+    var status = util.byId('cal-draft-status');
+    if (status) status.textContent = 'Unsaved profile — save your measurements before computing a layout.';
   }
   function markSaved(saved) {
     var btn = util.qs('#calibration-body .btn-primary');
@@ -555,15 +627,17 @@
   function onFieldInput(ev) {
     var path = ev.target.getAttribute('data-field');
     if (!path) return;
+    if(path==='unit_mm' && draft.units_per_row!=null){refreshColumnUnit();return;}
     var v = ev.target.tagName === 'SELECT' ? ev.target.value : util.parseNum(ev.target.value);
     nestedSet(path, v);
     markDirty();
     if (path === 'unit_mm' || path === 'letter_height_mm' || path === 'reference_height_mm' || path === 'stroke_mm') {
-      renderRows(); // totals depend on these
+      if(draft.units_per_row!=null)refreshColumnUnit();else renderRows();
     }
   }
 
   function currentBody() {
+    refreshColumnUnit();
     return {
       name: draft.name || 'Profile',
       letter_height_mm: draft.letter_height_mm,
@@ -573,20 +647,24 @@
       min_nib_mm: draft.min_nib_mm,
       reference_height_mm: draft.reference_height_mm,
       letter_widths: draft.letter_widths,
+      stroke_factors:draft.stroke_factors,
       gaps: draft.gaps,
       non_stretchable: draft.non_stretchable,
       max_stretch: draft.max_stretch,
-      stretch_position: draft.stretch_position,
-      units_per_row: draft.units_per_row, unit_basis: draft.unit_basis, layout_mode: draft.layout_mode,
-      stretch_policy: draft.stretch_policy
+      stretch_policy: draft.stretch_policy,
+      units_per_row: draft.units_per_row,
+      unit_basis:draft.unit_basis, layout_mode:draft.layout_mode,
+      stretch_position: draft.stretch_position
     };
   }
 
   async function saveProfile() {
+    if (saving) return;
     var name = util.byId('cal-name').value.trim();
     if (!name) { SS.toast('Give the profile a name.', 'error'); return; }
     draft.name = name;
     var body = currentBody();
+    saving = true;
     try {
       var saved;
       if (draft.id) saved = await API.updateProfile(draft.id, body);
@@ -594,21 +672,29 @@
       draft = normalizeProfile(saved);
       draft._isDefault = false;
       dirty = false;
-      await refreshProfiles();
+      state.calibrationDraftDirty = false;
       state.active.profileId = saved.id;
+      await refreshProfiles();
       renderFromDraft();
       bus.emit('profileId:changed');
       SS.toast('Profile saved.');
     } catch (e) {
       SS.toast(e.message || String(e), 'error');
-    }
+    } finally { saving = false; }
   }
 
   function newProfile() {
+    if (saving || (dirty && !confirmDiscard())) return false;
+    ++loadRevision;
     draft = defaultDraft();
+    draft.name = '';
     dirty = true;
+    state.calibrationDraftDirty = true;
+    state.active.profileId = null;
     renderFromDraft();
+    bus.emit('calibration:draft-changed');
     util.byId('cal-name').focus();
+    return true;
   }
 
   async function duplicateProfile() {
@@ -623,6 +709,7 @@
       draft = normalizeProfile(saved);
       draft._isDefault = false;
       dirty = false;
+      state.calibrationDraftDirty = false;
       renderFromDraft();
       bus.emit('profileId:changed');
       SS.toast('Profile duplicated.');
@@ -634,10 +721,15 @@
     if (!window.confirm('Delete profile “' + draft.name + '”? This cannot be undone.')) return;
     try {
       await API.deleteProfile(draft.id);
-      await refreshProfiles();
+      ++loadRevision;
       draft = defaultDraft();
+      draft.name = '';
       dirty = true;
+      state.calibrationDraftDirty = true;
+      state.active.profileId = null;
+      await refreshProfiles();
       renderFromDraft();
+      bus.emit('calibration:draft-changed');
       SS.toast('Profile deleted.');
     } catch (e) { SS.toast(e.message || String(e), 'error'); }
   }
@@ -663,6 +755,7 @@
       draft = normalizeProfile(saved);
       draft._isDefault = false;
       dirty = false;
+      state.calibrationDraftDirty = false;
       renderFromDraft();
       bus.emit('profileId:changed');
       SS.toast('Profile imported.');
@@ -681,5 +774,112 @@
     } catch (e) { /* ignore */ }
   }
 
-  SS.calibration = { init: init };
+  function newPolicy() {
+    return defaultPolicy();
+  }
+  function buildPolicyControls() {
+    var box = util.el('section', {class:'stretch-policy-controls', 'aria-label':'Whole-book stretch rules'});
+    box.appendChild(util.el('h3',{text:'Units and whole-book stretch rules'}));
+    var requested=util.el('button',{type:'button',class:'btn btn-primary btn-sm',text:'Use requested stretch rules'});
+    requested.addEventListener('click',function(){
+      draft.stretch_policy=newPolicy();
+      draft.non_stretchable=SS.LETTERS.filter(function(letter){return !draft.stretch_policy.caps_percent[letter];});
+      draft.stretch_position='anywhere';markDirty();renderFromDraft();
+      SS.toast('Requested rules loaded into this profile draft. Save, then compute a new layout. Existing layouts are unchanged.');
+    });
+    box.appendChild(requested);
+    box.appendChild(util.el('p',{class:'profile-help',text:'Requested preset: ד ה ר ת unlimited; other letters and word spaces +50% maximum. Gaps have preference 1, אדהטלמםקרת preference 2, and the rest preference 3. Equal added millimetres within each preference, stopping at each cap.'}));
+    function field(label, element) { box.appendChild(util.el('label',{class:'field'},[util.el('span',{text:label}),element])); return element; }
+    var layoutMode=field('Line breaks and amudim',util.el('select',{id:'cal-layout-mode'},[
+      util.el('option',{value:'reflow',text:'Reflow words to units per line — recalculate amudim'}),
+      util.el('option',{value:'reference',text:'Exact reference columns — keep original word positions'})]));
+    layoutMode.addEventListener('change',function(){draft.layout_mode=layoutMode.value;markDirty();});
+    var unitsMode = field('Unit size calculation',util.el('select',{id:'cal-unit-mode'},[
+      util.el('option',{value:'line',text:'Row units — use the letter widths in the table'}),
+      util.el('option',{value:'column',text:'Reference-height skeleton units (legacy)'}),util.el('option',{value:'manual',text:'Manual millimetres per unit (legacy)'})]));
+    var units = field('Units per row',util.el('input',{id:'cal-units-per-row',type:'number',min:'0.001',step:'1','aria-label':'Units per row'}));
+    var hyphenUnits = field('Width per STAM hyphen (line units)',util.el('input',{id:'cal-hyphen-units',type:'number',min:'0',step:'0.25','aria-label':'Width assigned to each STAM hyphen marker'}));
+    box.appendChild(util.el('p',{id:'cal-unit-formula',class:'profile-help',role:'status'}));
+    var mode = field('Stretch caps',util.el('select',{id:'cal-policy-mode'},[
+      util.el('option',{value:'percent',text:'Percentage / unlimited per letter'}),util.el('option',{value:'legacy',text:'Saved millimetre caps (legacy)'})]));
+    var distribution = field('Share remaining stretch equally',util.el('select',{id:'cal-stretch-distribution'},[
+      util.el('option',{value:'equal_percent',text:'Same percentage increase'}),util.el('option',{value:'equal_mm',text:'Same added millimetres'})]));
+    var spaces = field('Word-space maximum increase (%) — up to 50%',util.el('input',{id:'cal-space-percent',type:'number',min:'0',max:'50',step:'1'}));
+    var setumaMode = field('Setumah-gap limit',util.el('select',{id:'cal-setuma-mode'},[
+      util.el('option',{value:'percent',text:'Percentage increase'}),util.el('option',{value:'unlimited',text:'Unlimited within the column'})]));
+    var setumaPercent = field('Setumah-gap maximum increase (%)',util.el('input',{id:'cal-setuma-percent',type:'number',min:'0',step:'1'}));
+    box.appendChild(util.el('p',{class:'profile-help',text:'Paragraph lines: gap only. Internal setumah gaps expand before anything else, with no letter or word-space stretching on that line. A petuchah keeps all remaining width as its end-of-line paragraph space. Fixed passages and invalid edge gaps stay unchanged.'}));
+    box.appendChild(util.el('p',{class:'profile-help',text:'Save measurements before computing a new layout. Existing saved and written layouts keep their original measurements and stretch decisions.'}));
+    root.appendChild(box);
+    unitsMode.addEventListener('change',function(){draft.unit_basis=unitsMode.value==='line'?'line_units':'skeleton';draft.units_per_row=unitsMode.value==='manual'?null:(draft.units_per_row||62);markDirty();renderPolicy();renderRows();});
+    units.addEventListener('input',function(){draft.units_per_row=Number(units.value);markDirty();refreshColumnUnit();});
+    hyphenUnits.addEventListener('input',function(){if(draft.stretch_policy){draft.stretch_policy.stam_hyphen_units=Math.max(0,Number(hyphenUnits.value));markDirty();refreshColumnUnit();}});
+    mode.addEventListener('change',function(){
+      if(mode.value==='percent') {
+        draft.stretch_policy=newPolicy();
+        SS.LETTERS.forEach(function(letter){var width=computeTotal(letter);draft.stretch_policy.caps_percent[letter]=width>0?Math.floor((Number(draft.max_stretch[letter])||0)/width*100000)/1000:0;});
+      } else {
+        if(draft.stretch_policy && Object.values(draft.stretch_policy.caps_percent).includes('unlimited')) {SS.toast('Choose finite percentage caps before switching back to legacy millimetres.','error');mode.value='percent';return;}
+        if(draft.stretch_policy) SS.LETTERS.forEach(function(letter){draft.max_stretch[letter]=computeTotal(letter)*Number(draft.stretch_policy.caps_percent[letter]||0)/100;});
+        draft.stretch_policy=null;
+      }
+      markDirty();renderPolicy();renderRows();
+    });
+    distribution.addEventListener('change',function(){if(draft.stretch_policy){draft.stretch_policy.distribution=distribution.value;markDirty();}});
+    spaces.addEventListener('input',function(){if(draft.stretch_policy){draft.stretch_policy.word_space_percent=Number(spaces.value);markDirty();}});
+    setumaMode.addEventListener('change',function(){if(draft.stretch_policy){draft.stretch_policy.setuma_percent=setumaMode.value==='unlimited'?'unlimited':50;markDirty();renderPolicy();}});
+    setumaPercent.addEventListener('input',function(){if(draft.stretch_policy){draft.stretch_policy.setuma_percent=Number(setumaPercent.value);markDirty();}});
+  }
+  function columnWidth() {
+    var current = SS.geometry && SS.geometry.getDraft && SS.geometry.getDraft();
+    if (!current) current = (state.geometries||[]).find(function(g){return g.id===state.active.geometryId;});
+    return Number(current && current.line_width_mm) || 180;
+  }
+  function refreshColumnUnit() {
+    if (!draft || !root) return;
+    if (draft.units_per_row != null && Number(draft.units_per_row)>0) {
+      draft.unit_mm=columnWidth()/Number(draft.units_per_row);
+      if(draft.unit_basis==='line_units'){
+        draft.unit_mm/=draft.letter_height_mm/draft.reference_height_mm;
+      }
+      setFieldValue('unit_mm',draft.unit_mm);renderRows();
+    }
+    var formula=util.byId('cal-unit-formula');
+    if(formula){
+      if(draft.units_per_row!=null){
+        var physicalUnit=columnWidth()/draft.units_per_row;
+        var hyphenUnits=draft.stretch_policy && draft.stretch_policy.stam_hyphen_units!=null?Number(draft.stretch_policy.stam_hyphen_units):1;
+        formula.textContent=columnWidth()+' mm column ÷ '+draft.units_per_row+' units per row = '+util.fmt(physicalUnit,6)+' mm per '+(draft.unit_basis==='line_units'?'row unit. A 2-unit letter uses 2 row units and a 3-unit letter uses 3. At 62 units, at most 31 two-unit letters fit; stroke and spaces use additional width.':'reference-height skeleton unit (legacy).')+' Each STAM hyphen = '+util.fmt(hyphenUnits,3)+' line units = '+util.fmt(hyphenUnits*physicalUnit,6)+' mm. Spaces also count towards the line. Save and compute a new draft to reflow whole words, change line breaks and recalculate the number of amudim.';
+      } else {
+        formula.textContent='Legacy manual unit size. Choose row units to calculate from the letter widths in the table and a fixed row budget.';
+      }
+    }
+  }
+  function renderPolicy() {
+    var policy=draft.stretch_policy;
+    var preferences = hasPreferences();
+    var legacySpace = util.byId('cal-legacy-word-gap');
+    if (legacySpace) legacySpace.hidden = preferences;
+    var songButton = util.byId('cal-song-widths');
+    if (songButton) songButton.disabled = !preferences;
+    util.byId('cal-layout-mode').value=draft.layout_mode;
+    util.byId('cal-unit-mode').value=draft.units_per_row==null?'manual':draft.unit_basis==='line_units'?'line':'column';
+    util.byId('cal-units-per-row').disabled=draft.units_per_row==null;
+    util.byId('cal-units-per-row').value=draft.units_per_row==null?'':draft.units_per_row;
+    var unit=util.qs('[data-field="unit_mm"]',root);unit.readOnly=draft.units_per_row!=null;unit.disabled=draft.units_per_row!=null;
+    util.byId('cal-policy-mode').value=policy?'percent':'legacy';
+    ['cal-stretch-distribution','cal-space-percent','cal-setuma-mode','cal-setuma-percent','cal-hyphen-units'].forEach(function(id){util.byId(id).disabled=!policy;});
+    ['cal-space-percent','cal-setuma-mode','cal-setuma-percent','cal-hyphen-units'].forEach(function(id){util.byId(id).parentNode.hidden=preferences;});
+    util.byId('cal-cap-heading').textContent=policy?'Maximum increase':'Cap mm';
+    if(policy){
+      util.byId('cal-stretch-distribution').value=policy.distribution;
+      util.byId('cal-space-percent').value=policy.word_space_percent;
+      util.byId('cal-setuma-mode').value=policy.setuma_percent==='unlimited'?'unlimited':'percent';
+      util.byId('cal-setuma-percent').disabled=policy.setuma_percent==='unlimited';
+      util.byId('cal-setuma-percent').value=policy.setuma_percent==='unlimited'?'':policy.setuma_percent;
+      util.byId('cal-hyphen-units').value=policy.stam_hyphen_units == null ? 1 : policy.stam_hyphen_units;
+    }
+    refreshColumnUnit();
+  }
+  SS.calibration = { init: init, startNew: newProfile, requestedRules:newPolicy, getDraft:function(){return draft;}, isDirty: function () { return dirty; }, selectSaved: function () { dirty=false; ++loadRevision; } };
 })();

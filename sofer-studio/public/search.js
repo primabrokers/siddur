@@ -36,9 +36,57 @@
     buildStatic();
     bindAppBarSearch();
     renderBuiltinSources();
+    initReferenceStarter();
     bus.on('selection:changed', renderSources);
     bus.on('app:ready', renderSources);
     renderSources();
+  }
+
+  function initReferenceStarter() {
+    var bench=util.byId('bench') || util.qs('main');
+    if(!bench)return;
+    var select=util.el('select',{'aria-label':'Layout 1 book'});
+    [['Genesis','Bereishis · בראשית'],['Exodus','Shemos · שמות'],['Leviticus','Vayikra · ויקרא'],['Numbers','Bamidbar · במדבר'],['Deuteronomy','Devarim · דברים'],['all','Full Torah · כל התורה']].forEach(function(b){select.appendChild(util.el('option',{value:b[0],text:b[1]}));});
+    var load=util.el('button',{class:'btn btn-primary',text:'Load Layout 1'});
+    var panel=util.el('section',{class:'reference-start','aria-label':'Tikkun reference'},[
+      util.el('strong',{text:'Start from the classic Tikkun'}),select,load,
+      util.el('p',{text:'The Tikkun supplies the verified Torah text, פ/ס markers and special passages; it does not force its page breaks. Your saved Classic profile is the default measurement baseline. Loading it creates an editable reflow copy, so the saved Classic profile is not changed. The selected units per row — 62 initially — reflow complete words and determine the new number of amudim. Exact reference columns remain optional in Measurements. Review with your sofer before writing.'})
+    ]);
+    bench.parentNode.insertBefore(panel,bench);
+    load.addEventListener('click',async function(){
+      if(SS.calibration && SS.calibration.isDirty && SS.calibration.isDirty()){SS.toast('Save or discard your edited profile first.','error');return;}
+      load.disabled=true;load.textContent='Loading reference…';
+      try {
+        var rules=SS.calibration&&SS.calibration.requestedRules&&SS.calibration.requestedRules();
+        if(!state.active.profileId){
+          var p=await API.createProfile({name:'Classic Sefer Torah — starter measurements',letter_height_mm:4.5,unit_mm:.5,stroke_mm:.3,
+            ...(rules?{units_per_row:62,unit_basis:'line_units',layout_mode:'reflow',stretch_policy:rules,non_stretchable:SS.LETTERS.filter(function(ch){return !rules.caps_percent[ch];})}:{})});
+          state.profiles=await API.listProfiles();state.active.profileId=p.id;
+          if(SS.calibration.selectSaved)SS.calibration.selectSaved();bus.emit('profiles:list');bus.emit('profileId:changed');
+        } else {
+          // The saved Classic reference is the measurement source, not a
+          // page-break lock.  Preserve it by cloning before switching modes.
+          var active=await API.getProfile(state.active.profileId);
+          if(active && (active.layout_mode!=='reflow' || active.unit_basis!=='line_units')){
+            var copied=await API.duplicateProfile(active.id,{name:active.name+' — editable reflow draft'});
+            var updated=await API.updateProfile(copied.id,Object.assign({},copied,{
+              units_per_row:Number(active.units_per_row)||62,
+              unit_basis:'line_units',
+              layout_mode:'reflow',
+              stretch_policy:rules||active.stretch_policy,
+              non_stretchable:rules?SS.LETTERS.filter(function(ch){return !rules.caps_percent[ch];}):active.non_stretchable
+            }));
+            state.profiles=await API.listProfiles();state.active.profileId=updated.id;
+            if(SS.calibration.selectSaved)SS.calibration.selectSaved();bus.emit('profiles:list');bus.emit('profileId:changed');
+          }
+        }
+        var g=await API.createGeometry({name:'Layout 1 · editable 42-line measurements',line_width_mm:180,lines_per_amud:42,baseline_pitch_mm:8,max_letters_per_line:0});
+        state.geometries=await API.listGeometries();state.active.geometryId=g.id;bus.emit('geometryId:changed');
+        await loadBuiltin('tikkun:'+select.value);
+        await SS.app.compute();
+      }catch(e){SS.toast(e.message||String(e),'error');}
+      finally{load.disabled=false;load.textContent='Load Layout 1';}
+    });
   }
 
   function buildStatic() {
@@ -148,7 +196,7 @@
       if (b.sha256) meta.push('sha256 ' + String(b.sha256).slice(0, 8));
       var metaEl = util.el('span', { class: 'mono t--2 faint', text: meta.join(' · ') });
       var load = util.el('button', { type: 'button', class: 'btn btn-ghost btn-sm', text: 'Load' });
-      load.addEventListener('click', function () { loadBuiltin(b.book); });
+      load.addEventListener('click', function () { loadBuiltin(b.book).catch(function(){}); });
       if (b.partial_corpus) metaEl.title = b.note || 'concatenated study text';
       row.appendChild(label); row.appendChild(metaEl); row.appendChild(load);
       list.appendChild(row);
@@ -160,10 +208,12 @@
       var res = await API.importSource({ builtin: book });
       state.sources = await API.listSources();
       renderSources();
-      if (state.sources.length) state.active.sourceId = state.sources[state.sources.length - 1].id;
+        state.active.sourceId = res.id;
+        bus.emit('sourceId:changed');
+      bus.emit('sources:updated');
       bus.emit('selection:changed');
       SS.toast('Loaded ' + book + ': ' + (res.letter_count != null ? res.letter_count.toLocaleString() + ' letters' : ''));
-    } catch (e) { SS.toast(e.message || String(e), 'error'); }
+      } catch (e) { SS.toast(e.message || String(e), 'error'); throw e; }
   }
 
   async function importPasted() {
@@ -195,7 +245,8 @@
       var warnings = res.warnings || [];
       state.sources = await API.listSources();
       renderSources();
-      if (state.sources.length) state.active.sourceId = state.sources[state.sources.length - 1].id;
+      state.active.sourceId = res.id;
+      bus.emit('sources:updated');
       bus.emit('selection:changed');
       var sections = res.section_breaks || {};
       SS.toast('Source imported: ' + res.letter_count + ' letters; ' + Number(sections.petucha || 0) + ' pesucha, ' + Number(sections.setuma || 0) + ' setuma' + (warnings.length ? ' (' + warnings.length + ' warnings)' : ''));

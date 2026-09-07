@@ -4,7 +4,7 @@
 // Chunked computation with a progress callback for large corpora.
 
 import { createHash } from 'node:crypto';
-import { totalWidth, interLetterGap, interWordGap, wordWidth, minColumnWidth } from './width.js';
+import { totalWidth, interLetterGap, interWordGap, wordWidth, minColumnWidth, measurementUnitMm } from './width.js';
 import { lettersOf, letterKeyOf } from './profile.js';
 import { stripNekud } from './text.js';
 import { letterCap, measuredLetterWidth, baseBudget, spaceCandidatesOf, balancedSuggestions, effectiveProfile } from './stretch-policy.js';
@@ -98,11 +98,13 @@ export function computeYerios(totalAmudim, geometry, profile) {
 // ---- Setuma gap ----------------------------------------------------------
 
 export function setumaGapMm(profile, geometry) {
+  const minimum = profile.stretch_policy?.version === 2
+    ? Number(profile.special_widths_units?.setuma || 20) * measurementUnitMm(profile) : 0;
   if (geometry && geometry.setuma_gap_mm != null && Number.isFinite(Number(geometry.setuma_gap_mm))) {
-    return Math.max(Number(geometry.setuma_gap_mm), Number(profile.special_widths_units?.setuma || 20) * Number(profile.unit_mm || 0));
+    return Math.max(Number(geometry.setuma_gap_mm), minimum);
   }
   const ref = (geometry && geometry.setuma_reference_letter) || 'א';
-  return Math.max(9 * totalWidth(ref, profile) + 8 * interLetterGap(profile), Number(profile.special_widths_units?.setuma || 20) * Number(profile.unit_mm || 0));
+  return Math.max(9 * totalWidth(ref, profile) + 8 * interLetterGap(profile), minimum);
 }
 
 // ---- Token stream --------------------------------------------------------
@@ -824,9 +826,10 @@ function computeReferenceLayout(source, profile, geometry, derived, opts) {
     // only their explicit blank gaps; never classify song spacing as setumah.
     const gaps=items.filter(it=>it.type==='segment_gap');
     if(gaps.length){
-      for(const [gapIndex,item] of gaps.entries()){
+      const fallbackGap = Math.max(0,effectiveLineW-width)/gaps.length;
+      for(const item of gaps){
         const chosen=item.break_kind==='middle'||gaps.length===1?Number(songWidths.middle):Number(songWidths.side);
-        item.width_mm=chosen>0?chosen:Math.max(0,effectiveLineW-width)/gaps.length;
+        item.width_mm=chosen>0?chosen:fallbackGap;
         width+=item.width_mm;
       }
     }
@@ -864,7 +867,7 @@ function reflowMeasuredReference(referenceLines,lineW,profile) {
   // disappear when pagination is recalculated. Only protect meaningful fixed
   // rows (songs / inverted-nun passages) and their textual boundary rows.
   referenceLines.forEach((line,index)=>{
-    if(songPages.has(line.reference_page)) protectedIndexes.add(index);
+    if(profile.stretch_policy?.version === 2 && songPages.has(line.reference_page)) protectedIndexes.add(index);
     if(line.fixed_pattern&&line.items.length){
       protectedIndexes.add(index);
       if(index&&referenceLines[index-1].items.length)protectedIndexes.add(index-1);
@@ -906,7 +909,12 @@ function reflowMeasuredReference(referenceLines,lineW,profile) {
       continue;
     }
     buffer.push(...line.items);
-    if(line.petucha_end||line.sefer_end)flush(line.sefer_end?'sefer':'petucha');
+    if(line.petucha_end||line.sefer_end){
+      flush(line.petucha_end?'petucha':'sefer');
+      // A book boundary can also be a petuchah. Retain both facts rather than
+      // dropping the paragraph marker when protecting the end-of-book space.
+      if(line.sefer_end && output.length) output.at(-1).sefer_end=true;
+    }
   }
   flush();
   const before=referenceLines.flatMap(l=>l.words.flatMap(w=>w.letters.map(x=>x.id)));

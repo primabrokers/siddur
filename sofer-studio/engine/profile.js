@@ -116,7 +116,7 @@ export function normalizeProfile(p) {
       },
     } : null,
     units_per_row: src.units_per_row == null ? null : Number(src.units_per_row),
-    unit_basis: src.unit_basis === 'average_letter' ? 'average_letter' : 'skeleton',
+    unit_basis: ['line_units', 'average_letter'].includes(src.unit_basis) ? src.unit_basis : 'skeleton',
     layout_mode: src.layout_mode === 'reflow' ? 'reflow' : 'reference',
     ...(src.average_unit_mm != null ? {average_unit_mm:Number(src.average_unit_mm)} : {}),
     ...(src.unit_column_width_mm != null ? { unit_column_width_mm: Number(src.unit_column_width_mm) } : {}),
@@ -129,7 +129,7 @@ export function defaultProfile(name) {
   return normalizeProfile({
     name: name || 'Classic Sefer Torah',
     units_per_row: 62,
-    unit_basis: 'average_letter',
+    unit_basis: 'line_units',
     layout_mode: 'reflow',
     non_stretchable: [],
     stretch_policy: DEFAULT_STRETCH_POLICY,

@@ -1,13 +1,16 @@
 // Versioned, JSON-safe stretch policy. Existing snapshots without a policy keep
 // their original millimetre caps. No persisted Infinity or inferred permissions.
-import { totalWidth, interWordGap } from './width.js';
+import { totalWidth, interWordGap, measurementUnitMm } from './width.js';
 
 export const UNLIMITED = 'unlimited';
 const floorMm = n => Math.floor((Math.max(0, n) + 1e-10) * 1000) / 1000;
 
 export function measuredLetterWidth(word, letter, profile) {
   const override = (word.override || []).find(o => o.id === letter.id);
-  return override ? Number(override.mm) : totalWidth(letter.base, profile);
+  if (override) return Number(override.mm);
+  const base = totalWidth(letter.base, profile);
+  return letter.stam_letter_mark?.type === 'large' ? base * 1.5 :
+    letter.stam_letter_mark?.type === 'small' ? base * 0.5 : base;
 }
 
 export function percentageCap(base, percent, budget) {
@@ -37,23 +40,22 @@ export function effectiveProfile(profile, geometry) {
       throw new Error('Column-derived units require a positive column width and units per row');
     }
     result.unit_mm = width / units;
-    if (result.unit_basis === 'average_letter') {
-      // One average unit is the arithmetic mean of the profile's 27 measured
-      // letters, including one stroke contribution. Keep relative skeleton
-      // widths and physical stroke; solve the old skeleton scale explicitly.
-      const letters=Object.keys(result.letter_widths);
-      const meanSkeleton=letters.reduce((n,ch)=>n+Number(result.letter_widths[ch]),0)/letters.length;
-      const meanStroke=letters.reduce((n,ch)=>n+result.stroke_mm*Number(result.stroke_factors?.[ch]??1),0)/letters.length;
-      const scale=result.letter_height_mm/result.reference_height_mm;
-      result.average_unit_mm=width/units;
-      result.unit_mm=(result.average_unit_mm-meanStroke)/(meanSkeleton*scale);
-      if (!(result.unit_mm>0) || !Number.isFinite(result.unit_mm)) throw new Error('Units per line leave no room for the measured stroke; reduce units or widen the column');
+    if (result.unit_basis === 'line_units' || result.unit_basis === 'average_letter') {
+      // Correct the old average-letter interpretation only for new calculations.
+      // Persisted profiles and saved layout snapshots are never rewritten here.
+      // Two table units consume two row units, independent of other letters or
+      // vertical height. The frozen width model still adds physical stroke once.
+      const scale = result.letter_height_mm / result.reference_height_mm;
+      if (!(scale > 0) || !Number.isFinite(scale)) throw new Error('Line units require a positive letter and reference height');
+      result.unit_basis = 'line_units';
+      result.unit_mm = width / units / scale;
+      delete result.average_unit_mm;
     }
     result.unit_column_width_mm = width;
   }
   if (result.stretch_policy) {
     if (result.stretch_policy.version === 2) {
-      result.gaps.inter_word = Number(result.special_widths_units?.word_space || 0) * Number(result.unit_mm || 0);
+      result.gaps.inter_word = Number(result.special_widths_units?.word_space || 0) * measurementUnitMm(result);
       result.stretch_policy.stam_hyphen_units = Number(result.special_widths_units?.hyphen || 0);
     }
     // This policy explicitly approves an increase of up to 50% for ordinary
@@ -73,7 +75,7 @@ export function spaceCandidatesOf(line, profile) {
   const budget = baseBudget(line), items = line.items || [], words = line.words || [];
   const candidates = [];
   if (policy.version === 2 && line.petucha_end && budget > 0) {
-    const base = Math.max(0.001, Number(profile.special_widths_units?.petucha || 20) * Number(profile.unit_mm || 0));
+    const base = Math.max(0.001, Number(profile.special_widths_units?.petucha || 20) * measurementUnitMm(profile));
     candidates.push({
       letter_occurrence_id: 'petucha-gap-end', kind: 'petucha_gap', word_index: null,
       letter: 'פ gap', word: 'Petuchah', base_width_mm: base,
@@ -88,7 +90,7 @@ export function spaceCandidatesOf(line, profile) {
     if (item.type === 'word') {
       if (index > 0 && items[index - 1].type === 'word') {
         const width = policy.version === 2
-          ? Number(profile.special_widths_units?.word_space || 0) * Number(profile.unit_mm || 0)
+          ? Number(profile.special_widths_units?.word_space || 0) * measurementUnitMm(profile)
           : interWordGap(profile);
         const limit = profile.word_space_limit_mm == null ? width * 1.5 : Number(profile.word_space_limit_mm);
         const cap = floorMm(Math.min(percentageCap(width, Math.min(50, Number(policy.word_space_percent) || 0), budget), Math.max(0, limit - width)));
@@ -120,7 +122,7 @@ export function spaceCandidatesOf(line, profile) {
 export function balancedSuggestions(candidates, budget, distribution = 'equal_percent') {
   let remaining = floorMm(budget);
   const allocations = candidates.map(() => 0);
-  for (const priority of [...new Set(candidates.map(c => c.priority ?? 1))].sort()) {
+  for (const priority of [...new Set(candidates.map(c => c.priority ?? 1))].sort((a, b) => a - b)) {
     let active = candidates.map((c, i) => ({ c, i })).filter(({ c }) => (c.priority ?? 1) === priority && c.cap_mm > 0);
     while (active.length && remaining > 1e-9) {
       const weight = c => distribution === 'equal_mm' ? 1 : Math.max(0.001, c.base_width_mm);

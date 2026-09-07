@@ -64,14 +64,24 @@ export function lineWidth(tokens, profile) {
   return w;
 }
 
+// Measurement-table units become physical row units in the corrected mode.
+// Legacy saved layouts retain their original reference-height unit conversion.
+export function measurementUnitMm(profile) {
+  if (profile.unit_basis === 'line_units' && profile.units_per_row > 0 && profile.unit_column_width_mm > 0) {
+    return profile.unit_column_width_mm / profile.units_per_row;
+  }
+  return Number(profile.unit_mm) || 0;
+}
+
 // Unit <-> mm conversion.
 export function unitsToMm(units, profile) {
-  return units * profile.unit_mm;
+  return units * measurementUnitMm(profile);
 }
 
 export function mmToUnits(mm, profile) {
-  if (!(profile.unit_mm > 0)) return 0;
-  return mm / profile.unit_mm;
+  const unit = measurementUnitMm(profile);
+  if (!(unit > 0)) return 0;
+  return mm / unit;
 }
 
 // Minimum column width: 3 repetitions of the threshold word + 2 inter-word gaps.

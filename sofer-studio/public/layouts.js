@@ -106,7 +106,8 @@
       state.layout = lay;
       state.active.layoutId = lay.id;
       bus.emit('layout:loaded', lay);
-      SS.activateDrawer('progress');
+      if (SS.workspace) SS.workspace.open('layout');
+      else SS.activateDrawer('progress');
       var bench = util.byId('lower-bench');
       if (bench) bench.classList.remove('is-collapsed');
       SS.toast('Opened layout ' + lay.id + '.');

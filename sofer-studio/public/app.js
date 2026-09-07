@@ -78,7 +78,14 @@
     var sel = util.byId(selId);
     if (!sel) return;
     util.clear(sel);
+    if (activeKey === 'profileId' && state.calibrationDraftDirty && !state.active.profileId) {
+      sel.appendChild(util.el('option', { value: '', text: 'New profile — save first' }));
+      (items || []).forEach(function (it) { sel.appendChild(util.el('option', { value: it.id, text: it[labelField] || it.id })); });
+      sel.value = '';
+      return;
+    }
     if (!items || items.length === 0) {
+      state.active[activeKey] = null;
       var o0 = util.el('option', { value: '', text: '— none —' });
       sel.appendChild(o0);
       return;
@@ -91,8 +98,22 @@
     if (cur && items.some(function (it) { return it.id === cur; })) {
       sel.value = cur;
     } else {
-      state.active[activeKey] = items[0].id;
-      sel.value = items[0].id;
+      // A deliberately saved Classic/Tikkun profile is the measured baseline
+      // for a new reference layout.  Prefer it only when the user has not
+      // already selected a profile; an explicit selection always wins.
+      var fallback = items[0];
+      if (activeKey === 'profileId') {
+        var classic = items.find(function (it) {
+          var name = String(it && it[labelField] || '').trim().toLowerCase();
+          return /^(classic|classic sefer torah|classic tikkun|tikkun classic)$/.test(name);
+        }) || items.find(function (it) {
+          var name = String(it && it[labelField] || '').toLowerCase();
+          return name.indexOf('classic') !== -1 && name.indexOf('editable copy') === -1;
+        });
+        if (classic) fallback = classic;
+      }
+      state.active[activeKey] = fallback.id;
+      sel.value = fallback.id;
     }
   }
 
@@ -110,6 +131,42 @@
     fillSelect('source-select', state.sources, 'name', 'sourceId');
     fillSelect('profile-select', state.profiles, 'name', 'profileId');
     fillSelect('geometry-select', state.geometries, 'name', 'geometryId');
+  }
+
+  function showCalibration() {
+    if (window.matchMedia && window.matchMedia('(max-width: 1023px)').matches) activatePhonePanel('measure');
+    jumpToPanel('calibration');
+    var input = util.byId('cal-name');
+    if (input) input.focus();
+  }
+
+  function initProfileStart() {
+    var bench = util.byId('workbench');
+    if (!bench || util.byId('profile-start')) return;
+    var start = util.el('button', { id: 'btn-new-profile', type: 'button', class: 'btn btn-primary', text: 'Create a new profile' });
+    start.addEventListener('click', function () {
+      if (SS.calibration && SS.calibration.startNew()) showCalibration();
+    });
+    var starter = util.el('button', {id:'btn-starter-layout',type:'button',class:'btn btn-ghost',text:'New 42-line measurement draft'});
+    starter.addEventListener('click', async function () {
+      if (state.calibrationDraftDirty && !window.confirm('Leave your unsaved profile draft and select a new editable starter?')) return;
+      starter.disabled = true;
+      try {
+        // Create new entities; never overwrite an existing measured profile/layout.
+        var profile = await API.createProfile({name:'STaM Ashkenaz — starter measurements (draft)',letter_height_mm:4.5,stroke_mm:.2,unit_mm:.5});
+        var geometry = await API.createGeometry(SS.geometry.starter());
+        state.profiles = await API.listProfiles(); state.geometries = await API.listGeometries();
+        state.calibrationDraftDirty = false;
+        state.active.profileId = profile.id; state.active.geometryId = geometry.id;
+        if (SS.calibration.selectSaved) SS.calibration.selectSaved();
+        refreshSelects(); bus.emit('profileId:changed'); bus.emit('geometryId:changed');
+        SS.toast('Measurement draft selected — not the Simanim reference. Review measurements before computing a custom layout.');
+      } catch(e) { SS.toast(e.message || String(e),'error'); }
+      finally { starter.disabled = false; }
+    });
+    var guide = util.el('div', { id: 'profile-start', class: 'profile-start' }, [start,starter,
+      util.el('span', { text: '1. Create and save your measured profile  →  2. Load a book  →  3. Choose column geometry and compute  →  4. Review, then Print / Save PDF' })]);
+    bench.parentNode.insertBefore(guide, bench);
   }
 
   /* ------------------------------------------------------------------ *
@@ -133,6 +190,7 @@
       else if (head) head.setAttribute('aria-expanded', 'true');
       if (!head) return;
       head.addEventListener('click', function () {
+        if (SS.workspace) return;
         var collapsed = p.classList.toggle('is-collapsed');
         head.setAttribute('aria-expanded', String(!collapsed));
         map[id] = collapsed;
@@ -165,12 +223,18 @@
   }
 
   function toggleDrawer() {
+    if (SS.workspace) { SS.workspace.open('review', 'progress'); return; }
     var bench = util.byId('lower-bench');
     if (!bench) return;
     bench.classList.toggle('is-collapsed');
   }
 
   function activateDrawer(name) {
+    if (SS.workspace) {
+      SS.workspace.open(name === 'layouts' ? 'setup' : 'review', name);
+      bus.emit('drawer:activated', name);
+      return;
+    }
     util.qsa('.dt[data-drawer]').forEach(function (b) {
       b.setAttribute('aria-selected', String(b.getAttribute('data-drawer') === name));
     });
@@ -346,6 +410,7 @@
   }
 
   function jumpToPanel(name) {
+    if (SS.workspace) { SS.workspace.panel(name); return; }
     if (name === 'layouts' || name === 'progress' || name === 'diff' || name === 'compare') {
       var bench = util.byId('lower-bench');
       if (bench) bench.classList.remove('is-collapsed');
@@ -356,12 +421,13 @@
       panel.classList.remove('is-collapsed');
       panel.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
       var head = util.qs('.panel-head', panel);
-      if (head) head.focus();
+      if (head) { head.setAttribute('aria-expanded', 'true'); head.focus(); }
     }
     if (name === 'search') focusSearch();
   }
 
   function focusSearch() {
+    if (SS.workspace) SS.workspace.open('setup', 'book');
     var el = util.byId('search-input');
     if (el) el.focus();
   }
@@ -412,11 +478,16 @@
   }
 
   async function computeLayout() {
+    if (SS.calibration && SS.calibration.isDirty && SS.calibration.isDirty()) {
+      SS.toast('Save your new or edited calibration profile before computing.', 'error');
+      showCalibration();
+      return;
+    }
     var src = activeSource();
     var prof = activeProfile();
     var geom = activeGeometry();
+    if (!prof) { SS.toast('Create and save a calibration profile first.', 'error'); showCalibration(); return; }
     if (!src) { SS.toast('Import a Torah source first.', 'error'); return; }
-    if (!prof) { SS.toast('Select or create a calibration profile.', 'error'); return; }
     if (!geom) { SS.toast('Select or create a column geometry.', 'error'); return; }
 
     var btn = util.byId('btn-compute');
@@ -456,7 +527,8 @@
       updateLockChip();
       bus.emit('layout:loaded', state.layout);
       bus.emit('selection:changed');
-      activateDrawer('progress');
+      if (SS.workspace) SS.workspace.open('layout');
+      else activateDrawer('progress');
       var ben = util.byId('lower-bench');
       if (ben) ben.classList.remove('is-collapsed');
       var amudim = (result.summary && result.summary.total_amudim != null) ? result.summary.total_amudim : null;
@@ -491,7 +563,7 @@
     util.clear(el);
     var lay = state.layout;
     if (lay && lay.status === 'locked') {
-      el.appendChild(util.el('span', { class: 'chip locked', text: '\u1f512 locked' }));
+      el.appendChild(util.el('span', { class: 'chip locked', text: 'Locked' }));
     } else if (state.active.layoutId) {
       el.appendChild(util.el('span', { class: 'chip draft', text: 'draft' }));
     } else {
@@ -527,6 +599,11 @@
 
     // Keep the header lock chip in sync whenever a layout is loaded/opened/adopted.
     bus.on('layout:loaded', function () { updateLockChip(); });
+    bus.on('sources:updated', refreshSelects);
+    bus.on('profiles:list', refreshSelects);
+    bus.on('profileId:changed', refreshSelects);
+    bus.on('geometryId:changed', refreshSelects);
+    bus.on('calibration:draft-changed', refreshSelects);
 
     try {
       await Promise.all([
@@ -559,6 +636,8 @@
         } catch (e) { console.error('[init][' + name + ']', e); }
       });
 
+    initProfileStart();
+    initWorkspace();
     try { await API.session(); } catch (e) { /* no server yet */ }
 
     bus.emit('app:ready');
@@ -571,7 +650,164 @@
     catch (e) { state[key] = []; }
   }
 
-  SS.app = { boot: boot, compute: computeLayout };
+  // Reuse the existing modules and their DOM nodes: switching workspace never
+  // reconstructs a form, discards an edit, or changes the persisted layout.
+  // Kept in app.js so existing, session-serving HTML can adopt the new UI without
+  // restarting a demo process or replacing any user's in-memory database.
+  function initWorkspace() {
+    var app = util.byId('app');
+    if (!app || SS.workspace) return;
+    document.body.classList.add('sofer-workspace');
+    var current = 'setup', views = {}, tabs = {}, sections = {}, sectionTabs = {};
+    var selected = { setup: 'book', review: 'stretch' };
+    var nav = util.el('nav', { id: 'workspace-tabs', role: 'tablist', 'aria-label': 'Sofer workspace' });
+    var main = util.el('main', { id: 'workspace-main' });
+    var labels = { setup: 'Setup', layout: 'Layout', review: 'Review', download: 'Download' };
+    Object.keys(labels).forEach(function (name, index) {
+      var tab = util.el('button', { id: 'tab-' + name, type: 'button', role: 'tab', 'aria-controls': 'view-' + name }, [
+        util.el('span', { class: 'step-number', text: String(index + 1) }), util.el('span', { text: labels[name] })]);
+      tab.addEventListener('click', function () { open(name); });
+      nav.appendChild(tab); tabs[name] = tab;
+      views[name] = util.el('section', { id: 'view-' + name, class: 'workspace-view', role: 'tabpanel', 'aria-labelledby': tab.id, tabindex: '0' });
+      main.appendChild(views[name]);
+    });
+    util.byId('appbar').after(nav);
+    app.appendChild(main);
+
+    function move(node, to) { if (typeof node === 'string') node = util.byId(node); if (node) to.appendChild(node); }
+    function heading(view, title, detail) {
+      var head = util.el('div', { class: 'workspace-heading' }, [util.el('div', {}, [
+        util.el('h1', { text: title }), util.el('p', { text: detail })])]);
+      view.appendChild(head); return head;
+    }
+    function group(viewName, entries) {
+      var bar = util.el('nav', { class: 'workspace-subnav', role: 'tablist', 'aria-label': labels[viewName] + ' tools' });
+      sections[viewName] = {}; sectionTabs[viewName] = {};
+      views[viewName].appendChild(bar);
+      entries.forEach(function (entry) {
+        var key = entry[0], id = viewName + '-' + key;
+        var button = util.el('button', { id: 'tool-' + id, type: 'button', role: 'tab', 'aria-controls': 'section-' + id, text: entry[1] });
+        button.addEventListener('click', function () { open(viewName, key); });
+        var section = util.el('section', { id: 'section-' + id, class: 'workspace-section', role: 'tabpanel', 'aria-labelledby': button.id });
+        bar.appendChild(button); views[viewName].appendChild(section);
+        sections[viewName][key] = section; sectionTabs[viewName][key] = button;
+      });
+      keyboardTabs(bar);
+    }
+    function keyboardTabs(bar) {
+      bar.addEventListener('keydown', function (ev) {
+        var items = Array.from(bar.querySelectorAll('[role="tab"]'));
+        var index = items.indexOf(ev.target), next = index;
+        if (index < 0) return;
+        if (ev.key === 'ArrowRight') next = (index + 1) % items.length;
+        else if (ev.key === 'ArrowLeft') next = (index + items.length - 1) % items.length;
+        else if (ev.key === 'Home') next = 0;
+        else if (ev.key === 'End') next = items.length - 1;
+        else return;
+        ev.preventDefault(); ev.stopPropagation(); items[next].click(); items[next].focus();
+      });
+    }
+    heading(views.setup, 'Start with your book', 'Load the classic Tikkun, or use your own measurements. Your saved work stays separate.');
+    var selectors = util.el('div', { class: 'workspace-selectors' });
+    ['source-select', 'profile-select', 'geometry-select'].forEach(function (id) {
+      var select = util.byId(id); if (select) move(select.closest('label'), selectors);
+    });
+    move('btn-compute', selectors); views.setup.appendChild(selectors);
+    group('setup', [['book', 'Book & source'], ['calibration', 'Measurements'], ['geometry', 'Column settings'], ['layouts', 'Saved layouts']]);
+    move(util.qs('.reference-start'), sections.setup.book);
+    var searchField = util.byId('search-input');
+    if (searchField) move(searchField.closest('.app-field'), sections.setup.book);
+    move('panel-search', sections.setup.book);
+    move('profile-start', sections.setup.calibration);
+    move('panel-calibration', sections.setup.calibration);
+    move('panel-geometry', sections.setup.geometry);
+    move('layouts-body', sections.setup.layouts);
+
+    // The document and a single optional inspector are the only Layout content.
+    var layoutBar = util.el('div', { class: 'workspace-document-label' }, [
+      util.el('strong', { text: 'Your Tikkun' }), util.el('span', { id: 'workspace-layout-summary', text: 'Load a book in Setup to begin.' }),
+      util.el('span', { class: 'workspace-line-hint', text: 'Click a line to edit its stretching' })]);
+    views.layout.appendChild(layoutBar);
+    var documentGrid = util.el('div', { id: 'document-workspace' }); views.layout.appendChild(documentGrid);
+    move('tikkun-region', documentGrid);
+    var inspector = util.el('aside', { id: 'line-editor', 'aria-label': 'Line editor', hidden: true });
+    var close = util.el('button', { type: 'button', class: 'btn btn-ghost btn-sm', text: 'Close', 'aria-label': 'Close line editor' });
+    inspector.appendChild(util.el('div', { class: 'line-editor-head' }, [util.el('strong', { text: 'Line editor' }), close]));
+    move('stretch-inspector', inspector); documentGrid.appendChild(inspector);
+    close.addEventListener('click', function () { if (SS.stretch && SS.stretch.close) SS.stretch.close(); inspector.hidden = true; focusTikkun(); });
+    bus.on('line:selected', function (payload) { if (payload && payload.raw) { open('layout'); inspector.hidden = false; } });
+    bus.on('layout:loaded', function () { inspector.hidden = true; updateSummary(); });
+    bus.on('layout:locked', updateSummary);
+    ['jump:line', 'jump:amud', 'flash:shem'].forEach(function (event) { bus.on(event, function () { open('layout'); }); });
+
+    var reviewHead = heading(views.review, 'Review before writing', 'Check the whole book, then individual lines. Suggestions still need your sofer’s approval.');
+    move('btn-lock', reviewHead);
+    group('review', [['stretch', 'Whole-book stretching'], ['validation', 'Checks'], ['shemos', 'Protected names'], ['passages', 'Special passages'], ['progress', 'Progress'], ['compare', 'Compare'], ['diff', 'Changes']]);
+    move(util.qs('.stretch-book'), sections.review.stretch);
+    var stretchDetails = util.qs('.stretch-book'); if (stretchDetails) stretchDetails.open = true;
+    ['validation', 'shemos', 'passages'].forEach(function (name) { move('panel-' + name, sections.review[name]); });
+    ['progress', 'compare', 'diff'].forEach(function (name) { move(name + '-body', sections.review[name]); });
+    move('panel-compare-mini', sections.review.compare);
+
+    heading(views.download, 'Take your Tikkun with you', 'Print or save all pages as a PDF. Screen zoom never changes the measurements in your export.');
+    var downloadCard = util.el('div', { class: 'workspace-download-card' });
+    downloadCard.appendChild(util.el('h2', { text: 'Full document PDF' }));
+    downloadCard.appendChild(util.el('p', { id: 'download-summary', role: 'status', text: 'Open or compute a layout first.' }));
+    move('export-controls', downloadCard); views.download.appendChild(downloadCard);
+    views.download.appendChild(util.el('p', { class: 'workspace-note', text: 'Review protected names, special passages and letter shapes before writing. Layout planning does not replace hagahah.' }));
+    var reportLink = util.el('button', { class: 'btn btn-ghost', text: 'View / download stretch report' });
+    reportLink.addEventListener('click', function () { open('review', 'stretch'); }); views.download.appendChild(reportLink);
+
+    // Old panels are retained, but no longer expandable competing columns.
+    util.qsa('.panel', main).forEach(function (panel) {
+      panel.classList.remove('is-collapsed');
+      var head = util.qs('.panel-head', panel);
+      if (head) { head.removeAttribute('tabindex'); head.removeAttribute('role'); head.removeAttribute('aria-expanded'); }
+    });
+    ['workbench', 'lower-bench', 'phone-tabs', 'sargel'].forEach(function (id) { var el = util.byId(id); if (el) el.hidden = true; });
+    keyboardTabs(nav);
+    function updateSummary() {
+      var lay = state.layout, lines = lay && lay.lines || [];
+      var count = lay && lay.summary && lay.summary.total_amudim;
+      if (!count && lines.length) count = new Set(lines.map(function (line) { return line.amud || line.amud_index || 1; })).size;
+      var text = lay ? (count || 0) + ' columns · ' + lines.length + ' lines · ' + (lay.status === 'locked' ? 'Locked' : 'Draft') : 'Load a book in Setup to begin.';
+      util.byId('workspace-layout-summary').textContent = text;
+      util.byId('download-summary').textContent = lay ? text + (lay.summary && lay.summary.study_preview ? ' · Export blocked: unverified study preview.' : ' · PDF includes every column.') : 'Open or compute a layout first.';
+    }
+    function open(name, section) {
+      if (!views[name]) return;
+      if (name !== 'layout' && SS.tikkun && SS.tikkun.setExpanded) SS.tikkun.setExpanded(false);
+      current = name;
+      Object.keys(views).forEach(function (key) {
+        views[key].hidden = key !== name; tabs[key].setAttribute('aria-selected', String(key === name)); tabs[key].tabIndex = key === name ? 0 : -1;
+      });
+      if (section && sections[name] && sections[name][section]) selected[name] = section;
+      Object.keys(sections).forEach(function (view) {
+        Object.keys(sections[view]).forEach(function (key) {
+          var active = key === selected[view]; sections[view][key].hidden = !active;
+          sectionTabs[view][key].setAttribute('aria-selected', String(active)); sectionTabs[view][key].tabIndex = active ? 0 : -1;
+        });
+      });
+      // The existing preview observes its box; notify also covers older browsers.
+      window.dispatchEvent(new Event('resize'));
+    }
+    SS.workspace = {
+      open: open, current: function () { return current; },
+      panel: function (name) {
+        if (name === 'tikkun') open('layout');
+        else if (name === 'search') { open('setup', 'book'); focusSearch(); }
+        else if (sections.setup[name]) open('setup', name);
+        else open('review', name === 'compare-mini' ? 'compare' : name);
+      }
+    };
+    updateSummary(); open('setup');
+  }
+
+  SS.app = { boot: boot, compute: computeLayout, reloadLayout: async function(id) {
+    var layout = await fetchLayoutPaginated(id,500);
+    if(state.active.layoutId !== id) return;
+    state.layout=layout; bus.emit('layout:loaded',layout); updateLockChip();
+  } };
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', boot);

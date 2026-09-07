@@ -19,6 +19,10 @@
   var renderToken = 0;    // cancels stale renders
   var tagginOn = false;
   var selectedKey = null; // "amud:line"
+  var pageIndex = 0, pageEls = [], fitMode = 'width', frame = null, currentSheet = null;
+  var toolbar, pageSelect, fitSelect, scaleLabel, prevButton, nextButton, expandButton;
+  var fitPending = false, renderedLayout = null, renderedCount = 0;
+  var buildPage = null, pageGroups = [], printReady = false;
 
   // The seven letters that traditionally receive taggin (visual only).
   var TAGGIN = { '\u05e9': 1, '\u05e2': 1, '\u05d8': 1, '\u05e0': 1, '\u05d6': 1, '\u05d2': 1, '\u05e5': 1 };
@@ -26,6 +30,15 @@
   function init(ctx) {
     container = util.byId('tikkun-scroll');
     refEl = util.byId('tikkun-ref');
+    buildPreviewControls();
+    if (window.ResizeObserver) new ResizeObserver(scheduleFit).observe(container);
+    window.addEventListener('resize', scheduleFit);
+    if (document.fonts) document.fonts.load('24px "Stam Ashkenaz CLM"', 'אבגד').then(scheduleFit).catch(function () {
+      SS.toast && SS.toast('STaM font could not load. Do not use the fallback preview for writing.', 'error');
+    });
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape') setExpanded(false);
+    });
 
     bus.on('layout:loaded', function (layout) { render(layout); });
     bus.on('taggin:toggle', function (on) { tagginOn = !!on; rerender(); });
@@ -35,6 +48,152 @@
     bus.on('line:status', function () { rerender(); });
 
     renderEmpty();
+  }
+
+  function buildPreviewControls() {
+    toolbar = util.el('div', { class: 'preview-toolbar', 'aria-label': 'Preview controls' });
+    prevButton = util.el('button', { class: 'btn btn-ghost btn-sm', text: 'Previous', 'aria-label': 'Previous page' });
+    nextButton = util.el('button', { class: 'btn btn-ghost btn-sm', text: 'Next', 'aria-label': 'Next page' });
+    pageSelect = util.el('select', { 'aria-label': 'Preview page' });
+    fitSelect = util.el('select', { 'aria-label': 'Preview zoom' }, [
+      util.el('option', { value: 'page', text: 'Fit whole page' }),
+      util.el('option', { value: 'width', text: 'Fit width' }),
+      util.el('option', { value: 'actual', text: '100% view' })
+    ]);
+    fitSelect.value = fitMode;
+    scaleLabel = util.el('span', { class: 'mono t--2', 'aria-live': 'polite' });
+    expandButton = util.el('button', { class: 'btn btn-ghost btn-sm', text: 'Focus mode', 'aria-pressed': 'false' });
+    var printButton = util.el('button', { class: 'btn btn-primary btn-sm', text: 'Download', id: 'preview-print' });
+    var sectionToggle = util.el('input', { type: 'checkbox', checked: true, id: 'section-guides-toggle' });
+    var sectionLabel = util.el('label', { class: 'toggle' }, [sectionToggle,
+      util.el('span', { text: 'פ/ס guides' })]);
+    sectionLabel.title = 'Section markers are screen-only guides and are not printed.';
+    var help = util.el('details', { class: 'preview-help' }, [util.el('summary', { text: 'Reading the preview' }), util.el('p', { text: 'Vertical guides mark the measured text margins. Green = aligned; amber = still short. Section and book-end spaces stay open. Downloads include all pages.' })]);
+    [prevButton, pageSelect, nextButton, fitSelect, scaleLabel, expandButton, printButton].forEach(function (e) { toolbar.appendChild(e); });
+    toolbar.appendChild(sectionLabel);
+    sectionToggle.addEventListener('change', function () {
+      container.classList.toggle('hide-section-guides', !sectionToggle.checked);
+    });
+    toolbar.appendChild(help);
+    container.parentNode.insertBefore(toolbar, container);
+    prevButton.addEventListener('click', function () { selectPage(pageIndex - 1); });
+    nextButton.addEventListener('click', function () { selectPage(pageIndex + 1); });
+    pageSelect.addEventListener('change', function () { selectPage(Number(pageSelect.value)); });
+    fitSelect.addEventListener('change', function () { fitMode = fitSelect.value; scheduleFit(); });
+    expandButton.addEventListener('click', function () { setExpanded(!util.byId('tikkun-region').classList.contains('preview-expanded')); });
+    printButton.addEventListener('click', function () { if (SS.workspace) SS.workspace.open('download'); else if (SS.export) SS.export.printLayout(); });
+  }
+
+  function setExpanded(on) {
+    var region = util.byId('tikkun-region');
+    if (!region || !expandButton) return;
+    region.classList.toggle('preview-expanded', !!on);
+    document.body.classList.toggle('document-focus', !!on);
+    expandButton.textContent = on ? 'Exit focus' : 'Focus mode';
+    expandButton.setAttribute('aria-pressed', String(!!on));
+    scheduleFit();
+  }
+
+  function selectPage(index) {
+    if (!pageEls.length) return;
+    pageIndex = Math.max(0, Math.min(pageEls.length - 1, index));
+    printReady = false;
+    container.classList.remove('print-ready');
+    pageEls.forEach(function (el, i) {
+      if (i === pageIndex && !el.dataset.rendered) {
+        var built = buildPage(i); el.replaceWith(built); pageEls[i] = el = built;
+      } else if (i !== pageIndex && el.dataset.rendered) {
+        // Keep only the visible page's glyph/word DOM, not an entire book.
+        var placeholder = el.cloneNode(false); delete placeholder.dataset.rendered;
+        el.replaceWith(placeholder); pageEls[i] = el = placeholder;
+      }
+      el.classList.toggle('screen-page-hidden', i !== pageIndex);
+    });
+    pageSelect.value = String(pageIndex);
+    prevButton.disabled = pageIndex === 0; nextButton.disabled = pageIndex === pageEls.length - 1;
+    container.scrollTop = 0; container.scrollLeft = 0;
+    scheduleFit();
+  }
+
+  async function preparePrint() {
+    if (document.fonts) await document.fonts.load('24px "Stam Ashkenaz CLM"', 'אבגד');
+    if (!pageEls.length || !buildPage) return false;
+    var token = renderToken;
+    for (var i = 0; i < pageEls.length; i++) {
+      if (token !== renderToken) return false;
+      if (!pageEls[i].dataset.rendered) {
+        var built = buildPage(i); built.classList.toggle('screen-page-hidden', i !== pageIndex);
+        pageEls[i].replaceWith(built); pageEls[i] = built;
+      }
+      if (i % 2 === 1) await new Promise(function (resolve) { setTimeout(resolve, 0); });
+    }
+    if (token !== renderToken) return false;
+    // Hidden screen pages need layout boxes while their ink is measured for print.
+    container.classList.add('print-measuring');
+    try { fitGlyphs(); } finally { container.classList.remove('print-measuring'); }
+    printReady = true; container.classList.add('print-ready');
+    return true;
+  }
+
+  function finishPrint() { if (pageEls.length) selectPage(pageIndex); }
+
+  // Fit the entire rendered page, not just its font. Width and height both
+  // constrain the scale. No minimum zoom is imposed that could cause clipping.
+  function fitScale(mode, width, height, availableWidth, availableHeight) {
+    if (![width, height, availableWidth, availableHeight].every(function (n) { return Number.isFinite(n) && n > 0; })) return 1;
+    if (mode === 'actual') return 1;
+    return Math.min(1, availableWidth / width, mode === 'width' ? 1 : availableHeight / height);
+  }
+
+  function scheduleFit() {
+    if (fitPending) return;
+    fitPending = true;
+    requestAnimationFrame(function () { fitPending = false; fitPage(); });
+  }
+
+  function fitPage() {
+    if (!currentSheet || !frame || !pageEls.length || !container.clientWidth || !container.clientHeight) return;
+    currentSheet.style.transform = 'none';
+    fitGlyphs();
+    var width = Math.max(currentSheet.offsetWidth, currentSheet.scrollWidth);
+    var height = Math.max(currentSheet.offsetHeight, currentSheet.scrollHeight);
+    var scale = fitScale(fitMode, width, height, Math.max(1, container.clientWidth - 56), Math.max(1, container.clientHeight - 56));
+    currentSheet.style.transform = 'scale(' + scale + ')';
+    frame.style.width = Math.ceil(width * scale) + 'px';
+    frame.style.height = Math.ceil(height * scale) + 'px';
+    scaleLabel.textContent = Math.round(scale * 100) + '%';
+  }
+
+  function fitGlyphs() {
+    if (!container) return;
+    var ctx = null, metrics = new Map();
+    if (typeof window.CanvasRenderingContext2D === 'function') ctx = document.createElement('canvas').getContext('2d');
+    util.qsa('.lk[data-width-mm] > .ink-glyph', container).forEach(function (ink) {
+      // Fractional layout widths exclude both the page zoom and the previous
+      // glyph transform. Measuring transformed rectangles during a transition
+      // feeds the old scale back into the next pass and leaves only boxes wide.
+      var natural = parseFloat(window.getComputedStyle(ink).width);
+      var target = parseFloat(window.getComputedStyle(ink.parentNode).width);
+      if (!(natural > 0 && target > 0)) return;
+      var fit = glyphFit(natural, target);
+      // At ordinary line edges align visible ink, not a font's invisible side
+      // bearing or lamed overhang. Interior font spacing stays unchanged.
+      if (ctx && ink.dataset.marginEdge && ink.textContent !== '\u05dc') {
+        var style = window.getComputedStyle(ink), font = style.fontStyle+' '+style.fontWeight+' '+style.fontSize+' '+style.fontFamily;
+        var key = font+'|'+ink.textContent, m = metrics.get(key);
+        if (!m) { ctx.font=font;ctx.textAlign='left';ctx.direction='ltr';m=ctx.measureText(ink.textContent);metrics.set(key,m); }
+        fit = glyphFit(natural,target,m.actualBoundingBoxLeft,m.actualBoundingBoxRight);
+      }
+      ink.style.transform = 'translateX('+fit.translate+'px) scaleX('+fit.scale+')';
+    });
+  }
+
+  function glyphFit(natural,target,left,right) {
+    if(Number.isFinite(left)&&Number.isFinite(right)&&left+right>0){
+      var scale=target/(left+right);
+      return {scale:scale,translate:(natural-right)*scale};
+    }
+    return {scale:target/natural,translate:0};
   }
 
   /* ---------- pick first defined field ---------- */
@@ -68,6 +227,8 @@
   function renderEmpty() {
     if (!container) return;
     util.clear(container);
+    currentSheet = null; frame = null; pageEls = []; pageGroups = []; buildPage = null; printReady = false;
+    if (pageSelect) { util.clear(pageSelect); pageSelect.disabled = true; prevButton.disabled = true; nextButton.disabled = true; scaleLabel.textContent = ''; }
     var msg = util.el('div', { class: 'empty' },
       [util.el('span', { class: 'emark', text: '\u05e1\u05e4\u05e8' }),
        util.el('p', { text: 'No layout computed yet.' }),
@@ -78,12 +239,16 @@
 
   function render(layout) {
     var token = ++renderToken;
+    renderedCount = 0;
     if (!container) return;
     if (!layout || !Array.isArray(layout.lines) || layout.lines.length === 0) {
       renderEmpty();
       return;
     }
     util.clear(container);
+    var sameLayout = renderedLayout && renderedLayout.id === layout.id;
+    renderedLayout = layout;
+    if (!sameLayout) pageIndex = 0;
 
     // Group lines into amudim (columns), preserving order.
     var amudim = [];   // [{ index, lines: [] }]
@@ -106,7 +271,8 @@
     var sheet = util.el('div', { class: 'sheet' });
     sheet.setAttribute('lang', 'he');
     sheet.setAttribute('dir', 'rtl');
-    applyFitScale(sheet, layout);
+    sheet.style.setProperty('--tf-scale', '1');
+    currentSheet = sheet;
 
     // Watermark excerpts, partial corpora, and study-preview layouts (known
     // special passages rendered without a verified pattern) — none is writing-ready.
@@ -122,14 +288,28 @@
     var row = util.el('div', { class: 'amudim-row' });
     sheet.appendChild(row);
 
-    // Build amud DOM elements (deferred append for chunking).
-    var amudEls = [];
-    amudim.forEach(function (g, gi) {
+    // Lazy page DOM. A full book contains hundreds of thousands of glyph spans;
+    // constructing all of them up front freezes the browser unnecessarily.
+    pageGroups = amudim;
+    buildPage = function (gi) {
+      var g = amudim[gi];
       var lastYeria = layout.summary && layout.summary.amudim_per_yeria &&
         (g.num % layout.summary.amudim_per_yeria === 0);
       var el = buildAmud(g, gi, layout, lastYeria);
-      amudEls.push(el);
-    });
+      el.appendChild(util.el('div', { class: 'print-study-label', text: 'Sofer Studio · ' + (layout.summary && layout.summary.layout_mode==='reflow' ? 'Reflowed from Tikkun · '+layout.summary.units_per_row+' units per line — new pagination; sofer review required' : layout.summary && layout.summary.reference ? 'Tikkun reference column '+g.lines[0].reference_page+' — sofer review required' : isStudyPreview ? 'STUDY PREVIEW — NOT WRITING-READY' : isExcerpt ? 'SAMPLE TEXT — NOT A FULL TORAH LAYOUT' : 'Study layout — verify source, calibration and special passages before writing.') }));
+      // Reserve the complete column height even for a short sample. This is a
+      // viewport treatment only; no lines, words or measured boxes are changed.
+      var geometry = layoutGeometry(layout) || {};
+      var fullHeight = Number(geometry.lines_per_amud || g.lines.length) * Number(geometry.baseline_pitch_mm || 8);
+      if (Number.isFinite(fullHeight) && fullHeight > 0) el.style.minHeight = fullHeight + 'mm';
+      el.dataset.rendered = 'true';
+      return el;
+    };
+    var amudEls = amudim.map(function (g) { var el = util.el('div', { class: 'amud screen-page-hidden' }); el.dataset.amud = String(g.num); return el; });
+    pageEls = amudEls;
+    util.clear(pageSelect);
+    amudim.forEach(function (g, i) { pageSelect.appendChild(util.el('option', { value: String(i), text: 'Page ' + (i + 1) + ' of ' + amudim.length + ' · Amud ' + g.num })); });
+    pageSelect.disabled = false;
 
     // Chunked append: wire horizontal seams per yeria handled in buildAmud.
     var chunk = 4;
@@ -137,12 +317,15 @@
       if (token !== renderToken) return;
       var end = Math.min(start + chunk, amudEls.length);
       for (var i = start; i < end; i++) row.appendChild(amudEls[i]);
+      renderedCount = end;
       if (end < amudEls.length) {
         setTimeout(function () { appendNext(end); }, 0);
-      }
+      } else { bus.emit('preview:ready'); scheduleFit(); }
     })(0);
 
-    container.appendChild(sheet);
+    frame = util.el('div', { class: 'preview-page-frame' });
+    frame.appendChild(sheet); container.appendChild(frame);
+    selectPage(pageIndex);
     fillPrintNote(layout);
   }
 
@@ -163,13 +346,17 @@
 
     var geom = layoutGeometry(layout);
     var pitch = (geom && geom.baseline_pitch_mm) || 10;
+    var profile = layout.snapshot && layout.snapshot.profile;
+    if (profile && profile.letter_height_mm) linesWrap.style.fontSize = (Number(profile.letter_height_mm) * 1.3) + 'mm';
+    if (geom && geom.line_width_mm) linesWrap.style.setProperty('--line-width', geom.line_width_mm + 'mm');
+    linesWrap.style.minHeight = ((geom && geom.lines_per_amud) || g.lines.length) * pitch + 'mm';
 
     g.lines.forEach(function (line, li) {
       var lineEl = renderLine(line, g.num, li, g.lines.length, pitch);
       linesWrap.appendChild(lineEl);
 
       var lr = util.el('span', { class: 'lr' });
-      lr.style.top = (li * lineEl.estimatedHeight) + 'px';
+      lr.style.top = (li * pitch) + 'mm';
       grid.appendChild(lr);
     });
 
@@ -186,23 +373,37 @@
       dataset: { amud: String(amudNum), line: String(num) }
     });
     el.setAttribute('role', 'listitem');
+    el.style.height = pitch + 'mm';
+    el.style.minHeight = '0'; el.style.padding = '0';
 
-    var gim = util.el('span', { class: 'lnum', text: util.gimatria(num) });
+    var gim = util.el('span', { class: 'lnum', text: util.gimatria(li + 1) });
     gim.setAttribute('lang', 'he');
     el.appendChild(gim);
 
     var txt = util.el('span', { class: 'ltext' });
     txt.setAttribute('lang', 'he');
     txt.setAttribute('dir', 'rtl');
+    var gap=Number(line.leftover_mm),intentional=!!(line.fixed_pattern||line.petucha_end||line.sefer_end||line.setuma_at_edge||(line.has_setuma&&!line.setuma_stretch_enabled));
+    var alignment=intentional?'intentional':!Number.isFinite(gap)?'unknown':gap<-.001?'overfull':gap>=.001?'short':'aligned';
+    el.classList.add('alignment-'+alignment);el.dataset.alignment=alignment;
+    txt.setAttribute('aria-label','Measured text column — '+alignment);
 
     appendLineContent(txt, line, text);
+    if (line.petucha_end) {
+      // Zero-width annotation AFTER the preceding word, not part of its ink.
+      // The actual end-of-line whitespace remains owned by the measured layout.
+      var anchor = util.el('span', { class: 'parasha-anchor', 'aria-label': 'Petuchah after this word; line-end space' });
+      anchor.appendChild(sectionGuide('petucha', 'פ', 'Petuchah — פתוחה: line-end space'));
+      txt.appendChild(anchor);
+    }
 
     el.appendChild(txt);
 
     // side note: leftover / width
     var leftover = pick(line, ['leftover_mm', 'leftover'], null);
-    var width = pick(line, ['width_mm', 'width'], null);
+    var width = pick(line, ['stretched_width_mm', 'width_mm', 'width'], null);
     var side = [];
+    side.push(alignment==='intentional'?'Section / fixed space':alignment==='aligned'?'Aligned':alignment==='short'?'Still short':alignment==='overfull'?'Overfull':'Unmeasured');
     if (leftover !== null && leftover !== undefined && util.isFiniteNum(leftover) && Number(leftover) !== 0) {
       side.push((Number(leftover) > 0 ? '+' : '') + util.fmt(leftover) + '\u00a0mm');
     }
@@ -241,19 +442,22 @@
     var items = Array.isArray(line.items) ? line.items : [];
     var stretch = mapStretch(line);
     var wi = 0;
+    var wordGap = Number(line.inter_word_gap_mm);
+    var letterGap = Number(line.inter_letter_gap_mm);
 
     function wordBox(word, wordIndex) {
+      if (wordIndex == null) wordIndex = wi;
       var box = util.el('span', { class: 'word-box' });
       box.setAttribute('dir', 'rtl');
       box.setAttribute('lang', 'he');
       if (util.isFiniteNum(word.width_mm)) {
-        box.style.setProperty('--word-width-mm', String(word.width_mm));
-        var wordStretchMm = (word.letters || []).reduce(function (sum, letter) { return sum + Number(stretch[letter.id] && stretch[letter.id].stretch_mm || 0); }, 0);
-        box.style.inlineSize = String(Number(word.width_mm) + wordStretchMm) + 'mm';
-        box.style.columnGap = String(Number(line.inter_letter_gap_mm || 0)) + 'mm';
-        box.dataset.widthMm = String(word.width_mm);
-        box.title = 'word width ' + util.mm(Number(word.width_mm));
+        var added = (word.letters || []).reduce(function (sum, l) { return sum + Number(stretch[l.id] && stretch[l.id].stretch_mm || 0); }, 0);
+        var measuredWidth = Number(word.width_mm) + added;
+        box.style.width = measuredWidth + 'mm';
+        box.dataset.widthMm = String(measuredWidth);
+        box.title = 'word width ' + util.mm(measuredWidth);
       }
+      if (Number.isFinite(letterGap)) box.style.gap = letterGap + 'mm';
       var isShem = !!word.isShem;
       var uncertain = !!(word.uncertain || (word.shem && word.shem.uncertain));
       if (isShem) {
@@ -268,18 +472,21 @@
         var lt = letters[li];
         var lid = lt ? lt.id : null;
         var s = util.el('span', { class: 'lk' });
-        s.textContent = g;
-        if (lt && util.isFiniteNum(lt.width_mm)) {
-          s.style.inlineSize = String(Number(lt.width_mm) + Number(lid && stretch[lid] && stretch[lid].stretch_mm || 0)) + 'mm';
+        var ink = util.el('span', {class:'ink-glyph', text:g});
+        s.appendChild(ink);
+        if (lt && Number.isFinite(Number(lt.width_mm))) {
+          var targetWidth = Number(lt.width_mm) + Number(stretch[lid] && stretch[lid].stretch_mm || 0);
+          s.style.width = targetWidth + 'mm'; s.dataset.widthMm = String(targetWidth);
         }
         if (lt && lt.holy) {
           s.classList.add('holy-letter');
+          ink.classList.add('holy-letter');
           s.title = 'Holy letter — human decision';
         }
         if (lt && lt.stam_letter_mark) {
           var markerType = lt.stam_letter_mark.type;
           s.classList.add('marker-' + markerType);
-          if (markerType === 'backward_nun') s.textContent = '\u05e0';
+          if (markerType === 'backward_nun') ink.textContent = '\u05e0';
         }
         if (g === '\u05dc' && wordIndex === 0 && li === 0) s.classList.add('lamed-line-start');
         if (g === '\u05dc' && wordIndex === words.length - 1 && li === graphemes.length - 1) s.classList.add('lamed-line-end');
@@ -299,49 +506,72 @@
           s.classList.add('ov-' + (o.type || 'large'));
           s.dataset.occurrence = o.occurrence_id || lid;
           s.dataset.overrideType = o.type || '';
-          s.title = (o.type || 'unusual') + ' override ' + util.mm(Number(o.mm || 0));
+          if (Number(o.stam_hyphens) > 0) {
+            s.classList.add('stam-width-mark');
+            s.dataset.stamMarker = Array(Math.min(8, Number(o.stam_hyphens)) + 1).join('-');
+            s.dataset.stamHyphenUnits = String(o.stam_hyphen_units == null ? '' : o.stam_hyphen_units);
+          }
+          s.title = (o.type || 'unusual') + ' override ' + util.mm(Number(o.mm || 0)) + (Number(o.stam_hyphens) > 0 ? ' · STAM ' + o.stam_hyphens + ' hyphen mark(s), ' + o.stam_hyphen_units + ' unit(s) each' : '');
         }
         box.appendChild(s);
       });
       return box;
     }
 
-    function gapEl(it) {
+    function gapEl(it, index) {
+      if (it.type === 'setuma_gap' && stretch['setuma-gap-' + index]) {
+        it = Object.assign({}, it, {width_mm: Number(it.width_mm) + Number(stretch['setuma-gap-' + index].stretch_mm || 0)});
+      }
       var cls = it.type === 'setuma_gap' ? 'setuma-gap' : 'segment-gap';
       var g = util.el('span', { class: cls });
       g.textContent = '\u00a0';
       if (util.isFiniteNum(it.width_mm)) {
         g.dataset.widthMm = String(it.width_mm);
         g.style.setProperty('--gap-width-mm', String(it.width_mm));
+        g.style.width = Number(it.width_mm) + 'mm'; g.style.minWidth = '0';
         g.title = cls + ' ' + util.mm(Number(it.width_mm));
+      }
+      if (it.type === 'setuma_gap') {
+        g.setAttribute('aria-label', 'Setumah after preceding word; measured space ' + it.width_mm + ' mm');
+        g.appendChild(sectionGuide('setuma', 'ס', 'Setumah — סתומה: measured internal space'));
       }
       return g;
     }
 
     if (items.length) {
       // Authoritative: render one element per items[] entry, consuming words in order.
-      items.forEach(function (it, itemIndex) {
+      items.forEach(function (it, index) {
         if (it.type === 'word') {
-          if (itemIndex > 0 && items[itemIndex - 1].type === 'word') {
-            var wordGap = util.el('span', { class: 'word-gap', text: '\u00a0' });
-            wordGap.style.inlineSize = String(Number(line.inter_word_gap_mm || 0)) + 'mm';
-            parent.appendChild(wordGap);
-          }
-          parent.appendChild(wordBox(words[wi] || { text: it.text || it.consonant || '', width_mm: it.width_mm, letters: [], override: [] }, wi));
+          if (index && items[index-1].type === 'word') appendWordGap();
+          parent.appendChild(wordBox(words[wi] || { text: it.text || it.consonant || '', width_mm: it.width_mm, letters: [], override: [] }));
           wi++;
         } else if (it.type === 'setuma_gap' || it.type === 'segment_gap') {
-          parent.appendChild(gapEl(it));
+          parent.appendChild(gapEl(it, index));
+        } else if(it.type === 'nun_hafucha') {
+          var nun=util.el('span',{class:'nun-hafucha',text:'׆',title:'Inverted nun from reference'});
+          nun.style.width=it.width_mm+'mm';parent.appendChild(nun);
         }
       });
     } else if (words.length) {
       words.forEach(function (w, i) {
-        if (i > 0) parent.appendChild(document.createTextNode(' '));
-        parent.appendChild(wordBox(w, i));
+        wi = i;
+        if (i > 0) appendWordGap();
+        parent.appendChild(wordBox(w));
       });
     } else {
       // Legacy fallback with NO backend metadata: raw text + honest label (F-12).
       parent.appendChild(document.createTextNode(text));
       parent.appendChild(util.el('span', { class: 't--2 faint legacy-note', text: ' (no backend metadata)' }));
+    }
+    if(!line.fixed_pattern&&!line.petucha_end&&!line.setuma_at_edge&&(!line.has_setuma||line.setuma_stretch_enabled)&&!line.sefer_end){
+      var edgeGlyphs=parent.querySelectorAll('.lk > .ink-glyph');
+      if(edgeGlyphs.length){edgeGlyphs[0].dataset.marginEdge='start';edgeGlyphs[edgeGlyphs.length-1].dataset.marginEdge='end';}
+    }
+    function appendWordGap() {
+      if (!Number.isFinite(wordGap)) { parent.appendChild(document.createTextNode(' ')); return; }
+      var gap = util.el('span', {class:'word-gap', 'aria-hidden':'true', text:' '});
+      var extra = Number(stretch['word-space-before-' + wi] && stretch['word-space-before-' + wi].stretch_mm || 0);
+      gap.style.width = (wordGap + extra) + 'mm'; gap.dataset.widthMm = String(wordGap + extra); parent.appendChild(gap);
     }
   }
 
@@ -354,6 +584,11 @@
       if (id !== null && id !== undefined) map[id] = d;
     });
     return map;
+  }
+
+  function sectionGuide(kind, letter, title) {
+    return util.el('span', { class: 'parasha-mark', 'data-section-kind': kind,
+      lang: 'he', title: title + ' (guide only; not printed)', text: letter, 'aria-hidden': 'true' });
   }
 
   /* ---------- selection & jumps ---------- */
@@ -381,6 +616,7 @@
     if (!payload) return;
     var amud = payload.amud != null ? payload.amud : payload.amud_index;
     var num = payload.line != null ? payload.line : payload.line_index;
+    showAmud(amud);
     var el = findLine(amud, num);
     if (!el) { SS.toast && SS.toast('Line not found in current layout.', 'error'); return; }
     el.scrollIntoView({ block: 'center', behavior: 'smooth' });
@@ -389,9 +625,15 @@
 
   function jumpToAmud(amud) {
     if (!container) return;
+    showAmud(amud);
     var el = util.qs('.amud[data-amud="' + amud + '"]', container);
     if (!el) return;
     el.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  }
+
+  function showAmud(amud) {
+    var index = pageEls.findIndex(function (el) { return String(el.dataset.amud) === String(amud); });
+    if (index >= 0) selectPage(index);
   }
 
   function pulse(el) {
@@ -404,8 +646,11 @@
 
   function flashToken(token) {
     if (!container || !token) return;
+    var groupIndex = pageGroups.findIndex(function (g) { return g.lines.some(function (l) { return lineText(l).indexOf(token) >= 0; }); });
+    if (groupIndex >= 0) selectPage(groupIndex);
     util.qsa('.shem-tok', container).forEach(function (s) {
       if (s.dataset.shem && (s.textContent.indexOf(token) >= 0 || token.indexOf(s.textContent) >= 0)) {
+        var amud = s.closest('.amud'); if (amud) showAmud(amud.dataset.amud);
         s.scrollIntoView({ block: 'center', behavior: 'smooth' });
         pulse(s);
       }
@@ -414,23 +659,6 @@
 
   function rerender() {
     if (state.layout) render(state.layout);
-  }
-
-  // Explicit fitting: scale the parchment so the measured column width maps to the
-  // available viewport, but never clip — anything still wider scrolls horizontally.
-  function applyFitScale(sheet, layout) {
-    try {
-      var g = layoutGeometry(layout);
-      var lineWidthMm = g && g.line_width_mm;
-      if (!lineWidthMm || !container) return;
-      var pxPerMm = 96 / 25.4;
-      var fullPx = lineWidthMm * pxPerMm;
-      var avail = container.clientWidth - 120;
-      if (!avail || avail < 40) avail = 640;
-      var scale = Math.min(1, avail / fullPx);
-      if (scale < 0.35) scale = 0.35;
-      sheet.style.setProperty('--tf-scale', String(scale));
-    } catch (e) { /* non-fatal */ }
   }
 
   function fillPrintNote(layout) {
@@ -450,6 +678,15 @@
     render: render,
     jumpToLine: jumpToLine,
     jumpToAmud: jumpToAmud,
-    flashToken: flashToken
+    flashToken: flashToken,
+    fitScale: fitScale,
+    setExpanded: setExpanded,
+    glyphFit: glyphFit,
+    layoutGeometry: layoutGeometry,
+    isReady: function () { return pageEls.length > 0 && renderedCount === pageEls.length; },
+    preparePrint: preparePrint,
+    finishPrint: finishPrint,
+    isPrintReady: function () { return printReady; },
+    refreshPrintNote: function () { if (renderedLayout) fillPrintNote(renderedLayout); }
   };
 })();

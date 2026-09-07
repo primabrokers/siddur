@@ -17,6 +17,8 @@
 
   var root = null;
   var tagginState = false;
+  var sourceSummary = null, sourceReference = null, sourceRead = 0, sourceLoadedId = null;
+  var sectionPage = 0;
 
   // The three product-defined special passages (named in the requirements —
   // these are fixed passages, not sample data).
@@ -35,6 +37,7 @@
     bus.on('app:ready', renderPassages);
     bus.on('layout:loaded', loadOccurrences);
     bus.on('sourceId:changed', loadOccurrences);
+    bus.on('layout:loaded', renderSectionBreaks);
     renderPassages();
     loadOccurrences();
   }
@@ -43,6 +46,27 @@
    * Passage cards
    * ------------------------------------------------------------------ */
   function buildStatic() {
+    root.appendChild(util.el('div', { class: 'eyebrow', text: 'Petuchah / Setumah · פתוחה / סתומה' }));
+    root.appendChild(util.el('p', { class: 't--1', text: 'Markers belong after the preceding word. The פ/ס screen guides are not Torah letters and do not print. Auto-stretch preserves the section spaces.' }));
+    root.appendChild(util.el('div', { id: 'section-break-summary', 'aria-live': 'polite' }));
+    var sections = util.el('details', { id: 'section-break-details' });
+    sections.appendChild(util.el('summary', { text: 'Find section breaks in this layout' }));
+    var controls = util.el('div', { class: 'section-break-controls' });
+    var filter = util.el('select', { id: 'section-break-filter', 'aria-label': 'Section break type' }, [
+      util.el('option', { value: '', text: 'All section breaks' }),
+      util.el('option', { value: 'petucha', text: 'Petuchah · פ' }),
+      util.el('option', { value: 'setuma', text: 'Setumah · ס' })
+    ]);
+    var prev = util.el('button', { class: 'btn btn-ghost btn-sm', id: 'section-break-prev', text: 'Previous' });
+    var next = util.el('button', { class: 'btn btn-ghost btn-sm', id: 'section-break-next', text: 'Next' });
+    [filter, prev, util.el('span', { id: 'section-break-page' }), next].forEach(function (el) { controls.appendChild(el); });
+    sections.appendChild(controls);
+    sections.appendChild(util.el('div', { id: 'section-break-list', class: 'section-break-list' }));
+    root.appendChild(sections);
+    root.appendChild(util.el('div', { class: 'sirtut' }));
+    filter.addEventListener('change', function () { sectionPage = 0; renderSectionBreaks(); });
+    prev.addEventListener('click', function () { sectionPage--; renderSectionBreaks(); });
+    next.addEventListener('click', function () { sectionPage++; renderSectionBreaks(); });
     root.appendChild(util.el('div', { class: 'passages-list', id: 'passages-list' }));
     root.appendChild(util.el('div', { class: 'sirtut' }));
 
@@ -71,6 +95,11 @@
     var list = util.byId('passages-list');
     if (!list) return;
     util.clear(list);
+
+    if (sourceReference) {
+      list.appendChild(util.el('p', { class: 't--1', text: 'Layout 1 uses the pinned reference’s fixed song lines, blank lines and inverted nuns. Separate reflow patterns are not applied. These reference shapes still need sofer review; they are not certified.' }));
+      return;
+    }
 
     state.active.enabledPatterns = state.active.enabledPatterns || {};
 
@@ -190,11 +219,71 @@
 
   function loadOccurrences() {
     var srcId = state.active.sourceId;
-    if (!srcId) { renderOccurrences([]); return; }
+    var read = ++sourceRead;
+    if (sourceLoadedId !== srcId) { overrides = {}; sectionPage = 0; }
+    sourceLoadedId = srcId;
+    sourceSummary = null;
+    sourceReference = null;
+    renderPassages();
+    renderSectionBreaks();
+    if (!srcId || !API.getSource) { renderOccurrences([]); return; }
     API.getSource(srcId).then(function (src) {
+      if (read !== sourceRead || srcId !== state.active.sourceId) return;
       occurrences = (src && src.unusual_letters) || [];
+      sourceSummary = src && src.section_breaks;
+      sourceReference = src && src.reference;
+      renderPassages();
       renderOccurrences(occurrences);
-    }).catch(function () { renderOccurrences([]); });
+      renderSectionBreaks();
+    }).catch(function () {
+      if (read !== sourceRead || srcId !== state.active.sourceId) return;
+      renderOccurrences([]); renderSectionBreaks();
+    });
+  }
+
+  function renderSectionBreaks() {
+    var summary = util.byId('section-break-summary'), list = util.byId('section-break-list');
+    if (!summary || !list) return;
+    var s = sourceSummary;
+    summary.textContent = !state.active.sourceId ? 'Choose a source to inspect its section markers.' : !s
+      ? 'Section metadata is unavailable. Do not assume this source contains all section breaks.'
+      : !s.present
+        ? 'This source has no petuchah/setumah markers. Import a marked Tikkun source; section positions will not be guessed.'
+        : 'Source markers: ' + s.petucha + ' petuchah · ' + s.setuma + ' setumah. Positions still require comparison with the chosen Tikkun and sofer review.';
+    summary.className = 't--1' + (s && s.present ? '' : ' blocker');
+    var layout = state.layout, entries = [];
+    if (layout && (!layout.source_id || layout.source_id === state.active.sourceId)) {
+      (layout.lines || []).forEach(function (line) {
+        var wordIndex = 0, previous = '';
+        (line.items || []).forEach(function (it) {
+          if (it.type === 'word') {
+            var word = (line.words || [])[wordIndex++];
+            previous = word && (word.consonant || word.text) || it.text || '';
+          } else if (it.type === 'setuma_gap') {
+            entries.push({ kind: 'setuma', line: line, word: previous, gap: it.width_mm });
+          }
+        });
+        if (line.petucha_end) entries.push({ kind: 'petucha', line: line, word: line.last_word || previous });
+      });
+    }
+    var filter = util.byId('section-break-filter').value;
+    entries = entries.filter(function (entry) { return !filter || entry.kind === filter; });
+    var size = 50, pages = Math.ceil(entries.length / size);
+    sectionPage = Math.max(0, Math.min(sectionPage, pages - 1));
+    util.byId('section-break-prev').disabled = sectionPage === 0;
+    util.byId('section-break-next').disabled = sectionPage + 1 >= pages;
+    util.byId('section-break-page').textContent = entries.length ? (sectionPage + 1) + ' / ' + pages : '0';
+    util.clear(list);
+    if (!entries.length) list.appendChild(util.el('div', { class: 'empty', text: 'No matching section breaks in the loaded layout.' }));
+    entries.slice(sectionPage * size, (sectionPage + 1) * size).forEach(function (entry) {
+      var line = entry.line, localLine = line.line_in_amud || line.line_index;
+      var caption = (entry.kind === 'petucha' ? 'פ Petuchah' : 'ס Setumah') + ' · Amud ' + line.amud + ', line ' + localLine
+        + (entry.word ? ' · after ' + entry.word : ' · review position')
+        + (entry.gap != null ? ' · gap ' + util.mm(entry.gap) : ' · line-end space');
+      var button = util.el('button', { class: 'btn btn-ghost btn-sm', text: caption });
+      button.addEventListener('click', function () { bus.emit('jump:line', { amud: line.amud, line: line.line_index }); });
+      list.appendChild(button);
+    });
   }
 
   function renderOccurrences(list) {
