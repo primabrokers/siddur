@@ -181,7 +181,6 @@
     root.appendChild(util.el('div', { class: 'field-label', text: 'Setuma + spacing limits' }));
     var spGrid = util.el('div', { class: 'geom-grid' });
     // Pesucha/setuma widths now live with the 27 letters in Measurements.
-    spGrid.appendChild(mmField('Min inter-letter gap', 'min_inter_letter_gap_mm', 0.1));
     spGrid.appendChild(mmField('Min inter-word gap', 'min_inter_word_gap_mm', 0.1));
     spGrid.appendChild(mmField('Max inter-word gap (blank = auto)', 'max_inter_word_gap_mm', 0.1));
     // N-04: the max inter-word gap factor scales the calibrated small-letter width

@@ -49,11 +49,11 @@ test('unused letters never rescale the letters being fitted, and column width ne
 test('word spaces, stroke and inter-letter gaps consume additional width', () => {
   const requested = defaultProfile();
   const p = profile({ stretch_policy: requested.stretch_policy });
-  assert.deepEqual(flow(Array(33).fill('א').join(' '), p).lines.map(count), [16, 16, 1]); // 16*2 + 15*2 = 62.
+  assert.deepEqual(flow(Array(33).fill('א').join(' '), p).lines.map(count), [21, 12]); // 21*2 + 20*1 = 62.
   assert.equal(count(flow(Array(64).fill('א').join(' '), profile({ stroke_mm: .2 })).lines[0]), 30);
   assert.equal(count(flow(Array(50).fill('אא').join(' '), profile({ gaps: { inter_letter: 1, inter_word: 0 } })).lines[0]), 28);
   const resolved = effectiveProfile(p, geometry);
-  assert.equal(resolved.gaps.inter_word, 6);
+  assert.equal(resolved.gaps.inter_word, 3);
   assert.equal(setumaGapMm(resolved, { setuma_gap_mm: 0 }), 60);
 });
 

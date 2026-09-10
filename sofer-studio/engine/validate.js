@@ -4,7 +4,7 @@
 
 import { countHebrewLetters } from './text.js';
 import { totalWidth, interWordGap, interLetterGap } from './width.js';
-import { applyStretch } from './layout.js';
+import { applyStretch, petuchaGapMm } from './layout.js';
 
 const TOL = 1e-6;
 
@@ -65,6 +65,11 @@ export function validateLine(line, profile, geometry) {
   const effWidth = line.stretched_width_mm != null ? Number(line.stretched_width_mm) : line.width_mm;
   if (effWidth - lineW > TOL) {
     errors.push(`overfull: width ${round(effWidth)}mm exceeds line width ${round(lineW)}mm by ${round(effWidth - lineW)}mm`);
+  }
+
+  if (profile.stretch_policy?.version === 2 && line.petucha_end && !line.fixed_pattern) {
+    const required = petuchaGapMm(profile), available = lineW - Number(line.width_mm);
+    if (available + 0.001 < required) errors.push(`paragraph gap needs at least ${round(required)}mm; only ${round(available)}mm remains after the preceding word`);
   }
 
   // Applying some stretching does not imply a full line. Keep the unresolved

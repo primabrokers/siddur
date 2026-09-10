@@ -107,6 +107,23 @@ export function setumaGapMm(profile, geometry) {
   return Math.max(9 * totalWidth(ref, profile) + 8 * interLetterGap(profile), minimum);
 }
 
+export function petuchaGapMm(profile) {
+  return profile.stretch_policy?.version === 2
+    ? Math.max(20, Number(profile.special_widths_units?.petucha) || 20) * measurementUnitMm(profile) : 0;
+}
+
+function paragraphReserve(units, index, profile, geometry, overrides) {
+  if (profile.stretch_policy?.version !== 2) return 0;
+  let reserve = 0, i = index;
+  while (units[i + 1]?.type === 'setuma') {
+    reserve += setumaGapMm(profile, geometry);
+    if (units[i + 2]?.type !== 'word') return reserve;
+    reserve += measureWord(units[i + 2], profile, overrides);
+    i += 2;
+  }
+  return reserve + (units[i + 1]?.type === 'petucha' ? petuchaGapMm(profile) : 0);
+}
+
 // ---- Token stream --------------------------------------------------------
 
 export function buildWordUnits(source) {
@@ -313,12 +330,14 @@ export function fitLines(source, profile, geometry, opts = {}) {
 
     if (u.type === 'word') {
       const w = measureWord(u, profile, overrideMap);
+      const reserve = current.some(item => item.type === 'segment_gap') ? 0 : paragraphReserve(units, i, profile, geometry, overrideMap);
+      const joinsSetuma = profile.stretch_policy?.version === 2 && current.at(-1)?.type === 'setuma_gap';
       const addGap = prevWasWord ? gap_word : 0;
       const addW = addGap + w;
       if (current.length === 0) {
         current.push({ ...u, width_mm: w, override: wordOverrides(u, overrideMap, profile) });
         currentWidth = w;
-      } else if (currentWidth + addW <= lineW + 1e-9) {
+      } else if (joinsSetuma || currentWidth + addW + reserve <= lineW + 1e-9) {
         current.push({ ...u, width_mm: w, override: wordOverrides(u, overrideMap, profile) });
         currentWidth += addW;
       } else {
@@ -332,7 +351,7 @@ export function fitLines(source, profile, geometry, opts = {}) {
       if (current.length === 0) {
         current.push({ type: 'setuma_gap', width_mm: sgap, verse: u.verse });
         currentWidth = sgap;
-      } else if (currentWidth + sgap <= lineW + 1e-9) {
+      } else if (profile.stretch_policy?.version === 2 || currentWidth + sgap <= lineW + 1e-9) {
         current.push({ type: 'setuma_gap', width_mm: sgap, verse: u.verse });
         currentWidth += sgap;
       } else {
@@ -900,9 +919,10 @@ function reflowMeasuredReference(referenceLines,lineW,profile) {
     }
     if(packs.at(-1)?.at(-1).type==='setuma_gap')throw new Error('Reflow blocked: setumah lacks a following word');
     let current=[];
-    for(const pack of packs){
+    for(const [index, pack] of packs.entries()){
       const together=current.concat(pack);
-      if(current.length&&widthOf(together)>lineW+1e-9){output.push(makeLine(current,widthOf(current),lineW,profile));current=[];}
+      const reserve = index === packs.length - 1 && endedBy === 'petucha' ? petuchaGapMm(profile) : 0;
+      if(current.length&&widthOf(together)+reserve>lineW+1e-9){output.push(makeLine(current,widthOf(current),lineW,profile));current=[];}
       current.push(...pack);
     }
     if(current.length){const line=makeLine(current,widthOf(current),lineW,profile,{endedBy});line.sefer_end=endedBy==='sefer';output.push(line);}
@@ -915,6 +935,13 @@ function reflowMeasuredReference(referenceLines,lineW,profile) {
     if(line.fixed_pattern&&!line.items.length)continue;
     if(protectedIndexes.has(index)){
       flush();
+      // A prose paragraph ending beside a fixed song can wrap independently:
+      // its final word and ending gap must fit, while the song itself stays intact.
+      if(profile.stretch_policy?.version === 2 && line.petucha_end && !line.fixed_pattern && line.width_mm + petuchaGapMm(profile) > lineW + 1e-9){
+        buffer.push(...line.items);flush('petucha');
+        if(line.sefer_end)output.at(-1).sefer_end=true;
+        continue;
+      }
       // Fixed song/inverted-nun blocks and their immediate boundary rows keep
       // exact reference membership. This prevents a setumah adjacent to a
       // fixed passage being detached from either neighbouring word.
@@ -1040,11 +1067,13 @@ export async function computeLayoutAsync(source, profile, geometry, opts = {}) {
     }
     if (u.type === 'word') {
       const w = measureWord(u, profile, overrideMap);
+      const reserve = current.some(item => item.type === 'segment_gap') ? 0 : paragraphReserve(units, i, profile, geometry, overrideMap);
+      const joinsSetuma = profile.stretch_policy?.version === 2 && current.at(-1)?.type === 'setuma_gap';
       const addGap = prevWasWord ? gap_word : 0;
       if (current.length === 0) {
         current.push({ ...u, width_mm: w, override: wordOverrides(u, overrideMap, profile) });
         currentWidth = w;
-      } else if (currentWidth + (addGap + w) <= lineW + 1e-9) {
+      } else if (joinsSetuma || currentWidth + addGap + w + reserve <= lineW + 1e-9) {
         current.push({ ...u, width_mm: w, override: wordOverrides(u, overrideMap, profile) });
         currentWidth += addGap + w;
       } else {
@@ -1057,7 +1086,7 @@ export async function computeLayoutAsync(source, profile, geometry, opts = {}) {
       if (current.length === 0) {
         current.push({ type: 'setuma_gap', width_mm: sgap, verse: u.verse });
         currentWidth = sgap;
-      } else if (currentWidth + sgap <= lineW + 1e-9) {
+      } else if (profile.stretch_policy?.version === 2 || currentWidth + sgap <= lineW + 1e-9) {
         current.push({ type: 'setuma_gap', width_mm: sgap, verse: u.verse });
         currentWidth += sgap;
       } else {

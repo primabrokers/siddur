@@ -1,13 +1,7 @@
 /*
- * Sofer Studio — calibration.js
- * Calibration profile editor: master scale, stroke, min letter-height warning,
- * full 27-letter table (incl. five sofiyot), per-letter stretch caps, profile
- * CRUD / duplicate / import / export.
- *
- * The letter-height warning is keyed to a configurable minimum practical
- * LETTER HEIGHT (letter_height_mm < min_letter_height_mm), per the revised
- * requirement — NOT against the nib/stroke measurement. A separate, clearly
- * labelled minimum STROKE width warning is also offered.
+ * Calibration profile editor: letter height in units, the 27-letter width table,
+ * special spaces and stretch caps. Historical physical calibration values are
+ * retained when saved profiles are loaded and saved.
  */
 (function () {
   'use strict';
@@ -39,7 +33,7 @@
     '\u05e3': 2, '\u05e6': 2, '\u05e5': 2, '\u05e7': 2, '\u05e8': 2,
     '\u05e9': 3, '\u05ea': 2
   };
-  var SPECIAL_DEFAULTS = { word_space: 2, hyphen: 1, petucha: 20, setuma: 20 };
+  var SPECIAL_DEFAULTS = { word_space: 1, hyphen: 1, petucha: 20, setuma: 20 };
   var SPECIAL_LABELS = { word_space: 'Word space', hyphen: 'Hyphen', petucha: 'Pesucha gap', setuma: 'Setuma gap' };
   function defaultPriorities() {
     var out = { word_space: 3, hyphen: 3, petucha: 1, setuma: 1 };
@@ -141,14 +135,11 @@
     var master = util.el('div', { class: 'master-grid' });
     master.appendChild(mmField('Skeleton unit size', 'unit_mm', 0.01, 'Calculated from the column in automatic modes; editable in manual mode.'));
     master.appendChild(mmField('Letter height', 'letter_height_units', 0.1, 'Height in the same units as the measurement table.', 'units'));
-    master.appendChild(mmField('Stroke (kav)', 'stroke_mm', 0.01, 'Thickness of the ink stroke in mm, measured from the sofer’s writing — not letter height. The width calculation adds this once per letter.'));
-    master.appendChild(mmField('Min stroke width', 'min_nib_mm', 0.01, 'Warn when stroke falls below this (separate from letter height)'));
     root.appendChild(master);
     buildPolicyControls();
 
     // spacing + stretch position
     var gaps = util.el('div', { class: 'master-grid' });
-    gaps.appendChild(mmField('Inter-letter gap', 'gaps.inter_letter', 0.1, 'Gap between adjacent letters within a word'));
     var legacySpace = mmField('Inter-word gap', 'gaps.inter_word', 0.1, 'Saved spacing for earlier profiles');
     legacySpace.id = 'cal-legacy-word-gap';
     gaps.appendChild(legacySpace);
@@ -180,7 +171,7 @@
     root.appendChild(util.el('div', { class: 'panel-foot' },
       util.el('span', { text: 'Skeleton widths ', class: '' })));
     var foot = util.qs('.panel-foot', root);
-    foot.innerHTML = '<strong>Widths exclude stroke;</strong> lower stretch-preference numbers are used first. ' +
+    foot.innerHTML = '<strong>New profiles use no added stroke allowance or inter-letter gap;</strong> lower stretch-preference numbers are used first. ' +
       'Holy-letter protection comes only from human input and can never be inferred or bypassed.';
   }
 
@@ -247,10 +238,10 @@
       name: 'Classic Sefer Torah',
       letter_height_mm: 4.5,
       letter_height_units: 2,
-      stroke_mm: 0.2,
+      stroke_mm: 0,
       unit_mm: 0.5,
       min_letter_height_mm: 3.0,
-      min_nib_mm: 1.0,
+      min_nib_mm: 0,
       reference_height_mm: REF_HEIGHT_DEFAULT,
       letter_widths: Object.assign({}, DEFAULT_WIDTHS),
       stroke_factors: {},

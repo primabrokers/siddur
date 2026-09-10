@@ -49,7 +49,13 @@ test('only Letter height is editable, in units defaulting to 2, and changes pres
   try {
     const field=f.d.querySelector('[data-field="letter_height_units"]');
     assert.equal(field.value,'2'); assert.equal(field.closest('label').querySelector('.unit').textContent,'units');
-    for(const name of ['letter_height_mm','reference_height_mm','min_letter_height_mm']) assert.equal(f.d.querySelector('[data-field="'+name+'"]'),null);
+    for(const name of ['letter_height_mm','reference_height_mm','min_letter_height_mm','stroke_mm','min_nib_mm','gaps.inter_letter']) assert.equal(f.d.querySelector('[data-field="'+name+'"]'),null);
+    assert.equal(f.SS.calibration.getDraft().stroke_mm,0);
+    assert.equal(f.SS.calibration.getDraft().min_nib_mm,0);
+    assert.equal(f.SS.calibration.getDraft().gaps.inter_letter,0);
+    assert.equal(f.SS.calibration.getDraft().stretch_policy.special_widths_units.word_space,1);
+    assert.equal(defaultProfile().special_widths_units.word_space,1);
+    assert.equal(defaultProfile().stroke_mm,0);
     f.input('#geometry-body [data-field="line_width_mm"]',124); // one row unit = 2mm.
     const p=f.SS.calibration.getDraft(); assert.equal(p.letter_height_mm,4);
     const before=totalWidth('א',effectiveProfile(normalizeProfile(p),{line_width_mm:124}));
@@ -65,11 +71,13 @@ test('legacy millimetre heights display as units without changing stored measure
     f.d.querySelector('#calibration-body .grid-crud .btn-primary').click();await tick();
     assert.equal(f.body.letter_height_units,null);assert.equal(f.body.letter_height_mm,4.25);
     assert.equal(f.body.reference_height_mm,saved.reference_height_mm);assert.equal(f.body.min_letter_height_mm,saved.min_letter_height_mm);
+    assert.equal(f.body.stroke_mm,saved.stroke_mm);assert.equal(f.body.min_nib_mm,saved.min_nib_mm);
+    assert.deepEqual(f.body.gaps,saved.gaps);
   } finally { f.dom.window.close(); }
 });
 const p = overrides => normalizeProfile({...defaultProfile(),units_per_row:null,letter_height_units:null,
   letter_height_mm:3,reference_height_mm:3,unit_mm:.5,stroke_mm:0,
-  stretch_policy:{...defaultProfile().stretch_policy,caps_percent:{},word_space_percent:0,hyphen_percent:0,...overrides}});
+  stretch_policy:{...defaultProfile().stretch_policy,caps_percent:{},word_space_percent:0,hyphen_percent:0,special_widths_units:{...defaultProfile().special_widths_units,word_space:2},...overrides}});
 const g=normalizeGeometry({line_width_mm:20,max_letters_per_line:0});
 const line=(text,profile)=>computeLayout(processSource({text,format:'stam'}),profile,g).lines[0];
 test('v2 word spaces support percentages above 50 and Unlimited but retain explicit physical caps',()=>{

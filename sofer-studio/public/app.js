@@ -153,7 +153,7 @@
       starter.disabled = true;
       try {
         // Create new entities; never overwrite an existing measured profile/layout.
-        var profile = await API.createProfile({name:'STaM Ashkenaz — starter measurements (draft)',letter_height_units:2,letter_height_mm:4.5,stroke_mm:.2,unit_mm:.5,units_per_row:62,unit_basis:'line_units',layout_mode:'reflow'});
+        var profile = await API.createProfile({name:'STaM Ashkenaz — starter measurements (draft)',letter_height_units:2,letter_height_mm:4.5,stroke_mm:0,min_nib_mm:0,unit_mm:.5,units_per_row:62,unit_basis:'line_units',layout_mode:'reflow'});
         var geometry = await API.createGeometry(SS.geometry.starter());
         state.profiles = await API.listProfiles(); state.geometries = await API.listGeometries();
         state.calibrationDraftDirty = false;

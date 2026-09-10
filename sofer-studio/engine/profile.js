@@ -22,7 +22,7 @@ export const DEFAULT_LETTER_WIDTHS_UNITS = {
 };
 
 export const SPECIAL_MEASUREMENT_KEYS = ['word_space', 'hyphen', 'petucha', 'setuma'];
-export const DEFAULT_SPECIAL_WIDTHS_UNITS = Object.freeze({ word_space: 2, hyphen: 1, petucha: 20, setuma: 20 });
+export const DEFAULT_SPECIAL_WIDTHS_UNITS = Object.freeze({ word_space: 1, hyphen: 1, petucha: 20, setuma: 20 });
 export const DEFAULT_STRETCH_PRIORITIES = Object.freeze({
   ...Object.fromEntries(HEBREW_LETTERS.map((ch) => [ch, 'אדהטלמםקרת'.includes(ch) ? 2 : 3])),
   word_space: 3, hyphen: 3, petucha: 1, setuma: 1,
@@ -133,6 +133,8 @@ export function defaultProfile(name) {
     name: name || 'Classic Sefer Torah',
     units_per_row: 62,
     letter_height_units: 2,
+    stroke_mm: 0,
+    min_nib_mm: 0,
     unit_basis: 'line_units',
     layout_mode: 'reflow',
     non_stretchable: [],

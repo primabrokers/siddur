@@ -82,7 +82,8 @@ test('empty workspace can create its first profile without a source or geometry'
     assert.equal(f.calls[0].kind,'create');assert.equal(f.SS.state.active.profileId,'created-profile');
     assert.equal(f.SS.state.sources.length,0);assert.equal(f.SS.state.geometries.length,0);
     assert.match(f.w.document.getElementById('calibration-body').textContent,/initial numbers are examples/);
-    assert.match(f.w.document.querySelector('[data-field="stroke_mm"]').closest('label').textContent,/Thickness of the ink stroke in mm/);
+    assert.equal(f.w.document.querySelector('[data-field="stroke_mm"]'),null);
+    assert.equal(f.SS.calibration.getDraft().stroke_mm,0);
   }finally{f.dom.window.close();}
 });
 test('late profile fetch does not overwrite a new unsaved profile',async()=>{
