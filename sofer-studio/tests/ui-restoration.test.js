@@ -56,7 +56,7 @@ test('measurement table follows column width and row units and matches the engin
 
 for (const policyKind of ['manual', 'percentage']) {
   test('opening and saving a ' + policyKind + ' profile preserves its saved rules and measurements', async () => {
-    const original = normalizeProfile({ ...defaultProfile(), id: 'saved', name: 'Saved calibration', units_per_row: null,
+    const original = normalizeProfile({ ...defaultProfile(), id: 'saved', name: 'Saved calibration', units_per_row: null, letter_height_units: null,
       unit_basis: 'skeleton', layout_mode: 'reference', unit_mm: .37, stroke_factors: { 'א': 1.75 },
       non_stretchable: ['א', 'ב'], gaps: { inter_word: 2.75, inter_letter: .13 },
       stretch_policy: policyKind === 'manual' ? null : { version: 1, caps_percent: { 'א': 0, 'ב': 17, 'ר': 'unlimited' },

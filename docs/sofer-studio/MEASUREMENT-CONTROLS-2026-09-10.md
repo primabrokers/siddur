@@ -1,0 +1,15 @@
+# Measurement controls — 10 September 2026
+
+Word space, hyphen, pesucha and setuma now use the same numeric percentage and **Unlimited** dropdown as letter rows. Switching modes preserves the percentage entered during that edit. Hyphen caps are editable and applied to marked hyphen widths with their own stretch preference; repeated hyphens count individually. Word-space caps can exceed 50% or be unlimited when explicitly chosen. The existing default is still 50%, and an explicit physical spacing maximum continues to apply.
+
+The height controls are reduced to **Letter height**, shown in **units**, default **2** for new profiles. The minimum letter height and reference height inputs are removed. A row unit is column width divided by units per row; height in millimetres is height units multiplied by that row-unit size. Changing height does not rescale the horizontal row budget. Manual profiles use their manually calibrated unit size.
+
+Older profiles retain their physical height unless edited. Their height is displayed in equivalent units without automatically changing the stored measurement. Internal reference/minimum fields remain for compatibility. Database migration 8 adds only a nullable `letter_height_units` column; it does not rewrite existing profile values or layout snapshots. New layouts resolve the chosen units to physical dimensions for preview and printing.
+
+Validation: all **29 test files / 236 checks passed**, including the prior 62-unit regression, migration preservation, HTTP save/reload/duplicate, layout snapshot isolation, finite and unlimited caps, physical maximums, hyphen priority and holy-letter protection. Real Chromium checks confirmed the new controls, default height, persistence across reload, and actual visible stretching of a hyphen-marked occurrence.
+
+Release: `measurements-v13`, with separate saved and temporary services. A verified online backup precedes the additive migration. Routing is restricted to the Sofer site block; old temporary sessions and previous production services remain available. Use `https://sofer.primainsurance.tech/?upgrade=measurements-v13` to select the updated temporary app. Export unsaved temporary work before switching versions. Saved layouts retain their original measurements; compute a new draft to apply edited settings.
+
+Live verification passed: both services are healthy on image `sha256:b3baf7bdfb934b13f73d2f29e6bb0e76789b3f897cb1c852c6e5c0cf903264e0`, and all 51 engine/server/public/database-code files match the tested source. Public Chromium checks confirmed the default of 2, all four dropdowns after a reload, 3 height units resolving to 6 mm in a 124 mm / 62-unit column, and visible hyphen stretching within that column. No browser JavaScript errors occurred.
+
+The backup passed SQLite integrity checks. Comparing the original fields across all eight saved tables confirmed that all existing values, including 21 layouts and 171,874 layout lines, were preserved. The only database additions are the nullable height-unit column and migration-8 record. Non-Sofer routing bytes were unchanged.

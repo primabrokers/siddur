@@ -48,7 +48,7 @@
   }
   function defaultPolicy() {
     var caps = {}; SS.LETTERS.forEach(function (ch) { caps[ch] = '\u05d3\u05d4\u05e8\u05ea'.indexOf(ch) >= 0 ? 'unlimited' : 50; });
-    return { version: 2, caps_percent: caps, distribution: 'equal_mm', word_space_percent: 50,
+    return { version: 2, caps_percent: caps, distribution: 'equal_mm', word_space_percent: 50, hyphen_percent: 0,
       petucha_percent: 'unlimited', setuma_percent: 'unlimited', stam_hyphen_units: 1,
       special_widths_units: Object.assign({}, SPECIAL_DEFAULTS), priorities: defaultPriorities(),
       song_widths_mm: { page: 0, middle: 0, side: 0 } };
@@ -140,11 +140,9 @@
     root.appendChild(util.el('div', { class: 'sirtut' }));
     var master = util.el('div', { class: 'master-grid' });
     master.appendChild(mmField('Skeleton unit size', 'unit_mm', 0.01, 'Calculated from the column in automatic modes; editable in manual mode.'));
-    master.appendChild(mmField('Letter height', 'letter_height_mm', 0.1, 'Master ktav height — scales all widths proportionally'));
+    master.appendChild(mmField('Letter height', 'letter_height_units', 0.1, 'Height in the same units as the measurement table.', 'units'));
     master.appendChild(mmField('Stroke (kav)', 'stroke_mm', 0.01, 'Thickness of the ink stroke in mm, measured from the sofer’s writing — not letter height. The width calculation adds this once per letter.'));
-    master.appendChild(mmField('Min letter height', 'min_letter_height_mm', 0.1, 'Warn when letter height falls below this'));
     master.appendChild(mmField('Min stroke width', 'min_nib_mm', 0.01, 'Warn when stroke falls below this (separate from letter height)'));
-    master.appendChild(mmField('Reference height', 'reference_height_mm', 0.5, 'Height the skeleton widths are stored at'));
     root.appendChild(master);
     buildPolicyControls();
 
@@ -209,9 +207,11 @@
   /* ------------------------------------------------------------------ *
    * mm field builder (with steppers + sargel wake)
    * ------------------------------------------------------------------ */
-  function mmField(label, path, step, hint) {
-    var input = util.el('input', { type: 'number', step: String(step), 'data-mm': path, 'data-field': path });
-    var unitSpan = util.el('span', { class: 'unit', text: 'mm' });
+  function mmField(label, path, step, hint, unit) {
+    var input = util.el('input', { type: 'number', step: String(step), 'data-field': path });
+    if (!unit) input.setAttribute('data-mm', path);
+    else input.min = '0.001';
+    var unitSpan = util.el('span', { class: 'unit', text: unit || 'mm' });
     var down = util.el('button', { type: 'button', 'aria-label': 'decrease', text: '\u2212' });
     var up = util.el('button', { type: 'button', 'aria-label': 'increase', text: '+' });
 
@@ -246,6 +246,7 @@
       id: null,
       name: 'Classic Sefer Torah',
       letter_height_mm: 4.5,
+      letter_height_units: 2,
       stroke_mm: 0.2,
       unit_mm: 0.5,
       min_letter_height_mm: 3.0,
@@ -289,6 +290,7 @@
       id: p.id,
       name: p.name || 'Profile',
       letter_height_mm: toNum(p.letter_height_mm, 4.5),
+      letter_height_units: p.letter_height_units == null ? null : Number(p.letter_height_units),
       stroke_mm: toNum(p.stroke_mm, 0.2),
       unit_mm: toNum(p.unit_mm, 0.5),
       min_letter_height_mm: toNum(p.min_letter_height_mm, 3.0),
@@ -379,8 +381,7 @@
   function renderScaleNote() {
     var el = util.byId('cal-scale-note');
     if (!el) return;
-    el.textContent = 'All widths scale proportionally from ' + util.mm(draft.reference_height_mm) +
-      ' reference \u2192 current ' + util.mm(draft.letter_height_mm) + ' (\u00d7' + util.fmt(scale(), 3) + ').';
+    el.textContent = 'Letter height: ' + util.fmt(draft.letter_height_units == null ? draft.letter_height_mm / heightUnitMm() : draft.letter_height_units, 3) + ' units. Row units and the table determine horizontal widths.';
   }
 
   function computeTotal(letter) {
@@ -437,29 +438,10 @@
       var totalCell = util.el('td', { class: 'num', text: util.fmt(total) });
       tr.appendChild(totalCell);
 
-      // Cap (editable, hard capped)
-      var capInput = util.el('input', { class: 'cell', type: 'number', min: '0', step: draft.stretch_policy ? '1' : '0.05', value: cap === 'unlimited' ? '' : cap, 'aria-label': 'stretch cap for ' + letter });
-      capInput.disabled = cap === 'unlimited';
-      capInput.addEventListener('input', function () {
-        var v = util.parseNum(capInput.value);
-        // These are absolute millimetres chosen by the sofer. Do not silently
-        // clamp an approved fitting profile to the old arbitrary 2 mm UI limit.
-        if (draft.stretch_policy) draft.stretch_policy.caps_percent[letter] = v;
-        else draft.max_stretch[letter] = v;
-        markDirty();
-      });
-      var tdCap = util.el('td', { class: 'num cap' }, capInput);
-      if (draft.stretch_policy) {
-        var capMode = util.el('select', {'aria-label': 'stretch limit type for ' + letter}, [
-          util.el('option', {value:'percent',text:'% increase'}), util.el('option', {value:'unlimited',text:'Unlimited'})]);
-        capMode.value = cap === 'unlimited' ? 'unlimited' : 'percent';
-        capMode.addEventListener('change', function () {
-          draft.stretch_policy.caps_percent[letter] = capMode.value === 'unlimited' ? 'unlimited' : 50;
-          markDirty(); renderRows();
-        });
-        tdCap.appendChild(capMode);
-      }
-      tr.appendChild(tdCap);
+      tr.appendChild(capCell(letter, cap, !!draft.stretch_policy, function(value) {
+        if (draft.stretch_policy) draft.stretch_policy.caps_percent[letter] = value;
+        else draft.max_stretch[letter] = value;
+      }));
 
       // Numeric preference: lower numbers are used first.
       var btn = util.el('input', { class: 'cell stretch-priority', type: 'number', min: '1', step: '1',
@@ -496,23 +478,36 @@
       tr.appendChild(util.el('td', { class: 'num', text: '—' }));
       tr.appendChild(util.el('td', { class: 'num', text: util.fmt(specialWidthMm(key)) }));
       tr.appendChild(util.el('td', { class: 'num', text: util.fmt(specialWidthMm(key)) }));
-      var specialCap = key === 'word_space' ? draft.stretch_policy.word_space_percent :
-        key === 'petucha' ? draft.stretch_policy.petucha_percent : key === 'setuma' ? draft.stretch_policy.setuma_percent : 0;
-      var capInput = util.el('input', { class: 'cell', type: 'text', value: String(specialCap), 'aria-label': 'stretch cap for ' + key });
-      capInput.disabled = key === 'hyphen';
-      capInput.addEventListener('change', function () {
-        var raw = capInput.value.trim().toLowerCase();
-        var value = raw === 'unlimited' && key !== 'word_space' ? 'unlimited' : Math.max(0, Number(raw) || 0);
-        if (key === 'word_space') value = Math.min(50, value);
-        draft.stretch_policy[key === 'word_space' ? 'word_space_percent' : key + '_percent'] = value;
-        markDirty(); renderRows();
-      });
-      tr.appendChild(util.el('td', { class: 'num' }, capInput));
+      var capKey = key === 'word_space' ? 'word_space_percent' : key + '_percent';
+      tr.appendChild(capCell(key, draft.stretch_policy[capKey] == null ? 0 : draft.stretch_policy[capKey], true, function(value) {
+        draft.stretch_policy[capKey] = value;
+      }));
       var priority = util.el('input', { class: 'cell stretch-priority', type: 'number', min: '1', step: '1', value: draft.stretch_policy.priorities[key] });
       priority.addEventListener('input', function () { draft.stretch_policy.priorities[key] = Math.max(1, Math.round(util.parseNum(priority.value) || 1)); markDirty(); });
       tr.appendChild(util.el('td', { class: 'cap' }, priority));
       tbody.appendChild(tr);
     });
+  }
+
+  function capCell(key, cap, percentage, save) {
+    var lastPercent = cap === 'unlimited' ? 50 : cap;
+    var input = util.el('input', { class:'cell', type:'number', min:'0', step:percentage?'1':'0.05',
+      value:cap==='unlimited'?'':cap, 'aria-label':'stretch cap for '+key });
+    input.disabled = cap === 'unlimited';
+    input.addEventListener('input', function() { lastPercent = util.parseNum(input.value); save(lastPercent); markDirty(); });
+    var cell = util.el('td', {class:'num cap'}, input);
+    if (percentage) {
+      var mode = util.el('select', {'aria-label':'stretch limit type for '+key}, [
+        util.el('option', {value:'percent',text:'% increase'}), util.el('option', {value:'unlimited',text:'Unlimited'})]);
+      mode.value = cap === 'unlimited' ? 'unlimited' : 'percent';
+      mode.addEventListener('change', function() {
+        var unlimited = mode.value === 'unlimited';
+        input.disabled = unlimited; input.value = unlimited ? '' : lastPercent;
+        save(unlimited ? 'unlimited' : lastPercent); markDirty();
+      });
+      cell.appendChild(mode);
+    }
+    return cell;
   }
 
   function specialWidthMm(key) {
@@ -630,9 +625,10 @@
     if(path==='unit_mm' && draft.units_per_row!=null){refreshColumnUnit();return;}
     var v = ev.target.tagName === 'SELECT' ? ev.target.value : util.parseNum(ev.target.value);
     nestedSet(path, v);
+    if (path === 'letter_height_units') { refreshColumnUnit(); markDirty(); return; }
     markDirty();
     if (path === 'unit_mm' || path === 'letter_height_mm' || path === 'reference_height_mm' || path === 'stroke_mm') {
-      if(draft.units_per_row!=null)refreshColumnUnit();else renderRows();
+      refreshColumnUnit();
     }
   }
 
@@ -641,6 +637,7 @@
     return {
       name: draft.name || 'Profile',
       letter_height_mm: draft.letter_height_mm,
+      letter_height_units: draft.letter_height_units,
       stroke_mm: draft.stroke_mm,
       unit_mm: draft.unit_mm,
       min_letter_height_mm: draft.min_letter_height_mm,
@@ -835,15 +832,22 @@
     if (!current) current = (state.geometries||[]).find(function(g){return g.id===state.active.geometryId;});
     return Number(current && current.line_width_mm) || 180;
   }
+  function heightUnitMm() {
+    return draft.units_per_row > 0 ? columnWidth() / draft.units_per_row : Number(draft.unit_mm);
+  }
   function refreshColumnUnit() {
     if (!draft || !root) return;
+    if (draft.letter_height_units != null) draft.letter_height_mm = Number(draft.letter_height_units) * heightUnitMm();
+    setFieldValue('letter_height_units', draft.letter_height_units == null ? Number((draft.letter_height_mm / heightUnitMm()).toFixed(6)) : draft.letter_height_units);
     if (draft.units_per_row != null && Number(draft.units_per_row)>0) {
       draft.unit_mm=columnWidth()/Number(draft.units_per_row);
       if(draft.unit_basis==='line_units'){
         draft.unit_mm/=draft.letter_height_mm/draft.reference_height_mm;
       }
-      setFieldValue('unit_mm',draft.unit_mm);renderRows();
+      setFieldValue('unit_mm',draft.unit_mm);
     }
+    renderRows();
+    renderScaleNote();
     var formula=util.byId('cal-unit-formula');
     if(formula){
       if(draft.units_per_row!=null){

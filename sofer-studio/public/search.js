@@ -59,7 +59,7 @@
       try {
         var rules=SS.calibration&&SS.calibration.requestedRules&&SS.calibration.requestedRules();
         if(!state.active.profileId){
-          var p=await API.createProfile({name:'Classic Sefer Torah — starter measurements',letter_height_mm:4.5,unit_mm:.5,stroke_mm:.3,
+          var p=await API.createProfile({name:'Classic Sefer Torah — starter measurements',letter_height_units:2,letter_height_mm:4.5,unit_mm:.5,stroke_mm:.3,
             ...(rules?{units_per_row:62,unit_basis:'line_units',layout_mode:'reflow',stretch_policy:rules,non_stretchable:SS.LETTERS.filter(function(ch){return !rules.caps_percent[ch];})}:{})});
           state.profiles=await API.listProfiles();state.active.profileId=p.id;
           if(SS.calibration.selectSaved)SS.calibration.selectSaved();bus.emit('profiles:list');bus.emit('profileId:changed');

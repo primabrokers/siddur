@@ -451,7 +451,7 @@
       box.setAttribute('dir', 'rtl');
       box.setAttribute('lang', 'he');
       if (util.isFiniteNum(word.width_mm)) {
-        var added = (word.letters || []).reduce(function (sum, l) { return sum + Number(stretch[l.id] && stretch[l.id].stretch_mm || 0); }, 0);
+        var added = (word.letters || []).reduce(function (sum, l) { return sum + (Number(stretch[l.id] && stretch[l.id].stretch_mm || 0) + Number(stretch['hyphen-'+l.id] && stretch['hyphen-'+l.id].stretch_mm || 0)); }, 0);
         var measuredWidth = Number(word.width_mm) + added;
         box.style.width = measuredWidth + 'mm';
         box.dataset.widthMm = String(measuredWidth);
@@ -471,11 +471,12 @@
       graphemes.forEach(function (g, li) {
         var lt = letters[li];
         var lid = lt ? lt.id : null;
+        var addedWidth = Number(stretch[lid] && stretch[lid].stretch_mm || 0) + Number(stretch['hyphen-'+lid] && stretch['hyphen-'+lid].stretch_mm || 0);
         var s = util.el('span', { class: 'lk' });
         var ink = util.el('span', {class:'ink-glyph', text:g});
         s.appendChild(ink);
         if (lt && Number.isFinite(Number(lt.width_mm))) {
-          var targetWidth = Number(lt.width_mm) + Number(stretch[lid] && stretch[lid].stretch_mm || 0);
+          var targetWidth = Number(lt.width_mm) + addedWidth;
           s.style.width = targetWidth + 'mm'; s.dataset.widthMm = String(targetWidth);
         }
         if (lt && lt.holy) {
@@ -491,9 +492,9 @@
         if (g === '\u05dc' && wordIndex === 0 && li === 0) s.classList.add('lamed-line-start');
         if (g === '\u05dc' && wordIndex === words.length - 1 && li === graphemes.length - 1) s.classList.add('lamed-line-end');
         if (tagginOn && TAGGIN[g]) s.classList.add('taggin');
-        if (lid && stretch[lid]) {
+        if (lid && (stretch[lid] || stretch['hyphen-'+lid])) {
           s.classList.add('stretched');
-          var dmm = Number(stretch[lid].stretch_mm || 0);
+          var dmm = addedWidth;
           s.title = 'stretched +' + util.mm(dmm);
           s.dataset.stretchMm = String(dmm);
         }

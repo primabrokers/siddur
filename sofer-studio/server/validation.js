@@ -17,6 +17,7 @@ function checkNonNegative(errs, body, key, label, opts = {}) {
 
 export function validateProfileInput(body) {
   const errs = [];
+  checkNonNegative(errs, body, 'letter_height_units', 'Letter height in units', { allowZero: false });
   checkNonNegative(errs, body, 'letter_height_mm', 'letter_height_mm', { allowZero: false });
   checkNonNegative(errs, body, 'stroke_mm', 'stroke_mm');
   checkNonNegative(errs, body, 'unit_mm', 'unit_mm', { allowZero: false });
@@ -37,7 +38,10 @@ export function validateProfileInput(body) {
         if (!validPercent(value)) errs.push('caps_percent[' + letter + '] must be a non-negative percentage or unlimited');
       }
       if (!['equal_percent', 'equal_mm'].includes(policy.distribution)) errs.push('Choose equal_percent or equal_mm distribution');
-      if (typeof policy.word_space_percent !== 'number' || !Number.isFinite(policy.word_space_percent) || policy.word_space_percent < 0 || policy.word_space_percent > 50) errs.push('Ordinary word-space stretching must be between 0 and 50 percent');
+      if (policy.version === 2) {
+        if (!validPercent(policy.word_space_percent)) errs.push('Word-space cap must be a non-negative percentage or unlimited');
+        if (policy.hyphen_percent != null && !validPercent(policy.hyphen_percent)) errs.push('Hyphen cap must be a non-negative percentage or unlimited');
+      } else if (typeof policy.word_space_percent !== 'number' || !Number.isFinite(policy.word_space_percent) || policy.word_space_percent < 0 || policy.word_space_percent > 50) errs.push('Ordinary word-space stretching must be between 0 and 50 percent');
       if (policy.version === 2 && !validPercent(policy.petucha_percent)) errs.push('Petuchah gap cap must be a non-negative percentage or unlimited');
       if (!validPercent(policy.setuma_percent)) errs.push('Setumah gap cap must be a non-negative percentage or unlimited');
       if (policy.version === 1 && typeof policy.setuma_first !== 'boolean') errs.push('setuma_first must be a boolean');

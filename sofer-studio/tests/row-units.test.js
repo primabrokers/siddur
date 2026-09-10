@@ -9,7 +9,7 @@ import { validateProfileInput } from '../server/validation.js';
 import { validateLine } from '../engine/validate.js';
 
 const geometry = normalizeGeometry({ line_width_mm: 186, max_letters_per_line: 0 });
-const profile = (patch = {}) => normalizeProfile({ ...defaultProfile(), stroke_mm: 0,
+const profile = (patch = {}) => normalizeProfile({ ...defaultProfile(), letter_height_units: null, stroke_mm: 0,
   stretch_policy: null, gaps: { inter_letter: 0, inter_word: 0 }, ...patch });
 const flow = (text, p = profile(), g = geometry) => computeLayout(processSource({ text }), p, g);
 const count = line => line.words.reduce((n, w) => n + w.letters.length, 0);

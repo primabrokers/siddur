@@ -7,7 +7,7 @@ import { createHash } from 'node:crypto';
 import { totalWidth, interLetterGap, interWordGap, wordWidth, minColumnWidth, measurementUnitMm } from './width.js';
 import { lettersOf, letterKeyOf } from './profile.js';
 import { stripNekud } from './text.js';
-import { letterCap, measuredLetterWidth, baseBudget, spaceCandidatesOf, balancedSuggestions, effectiveProfile } from './stretch-policy.js';
+import { letterCap, measuredLetterWidth, baseBudget, spaceCandidatesOf, balancedSuggestions, effectiveProfile, percentageCap } from './stretch-policy.js';
 
 const TOL = 1e-6; // additive comparison tolerance for width/leftover checks (F-01)
 
@@ -129,7 +129,12 @@ export function buildWordUnits(source) {
         continue;
       }
       const graphemes = lettersOf(t.text);
-      const marks = new Map((t.stam_width_marks || []).map((mark) => [Number(mark.letter_index), mark]));
+      const marks = new Map();
+      for (const mark of t.stam_width_marks || []) {
+        const index = Number(mark.letter_index), previous = marks.get(index);
+        marks.set(index, previous?.type === 'hyphen' && mark.type === 'hyphen' && previous.mode === 'add' && mark.mode === 'add'
+          ? { ...mark, count: Number(previous.count) + Number(mark.count) } : { ...mark });
+      }
       const holy = new Set((t.holy_letter_indexes || []).map(Number));
       const letterMarks = new Map((t.stam_letter_marks || []).map((mark) => [Number(mark.letter_index), mark]));
       const letters = graphemes.map((g, letterInWord) => {
@@ -442,11 +447,19 @@ export function stretchCandidatesOf(line, profile, lettersById) {
       if (l.holy || (profile.stretch_policy?.version !== 2 && w.isShem)) return;
       if (profile.non_stretchable.includes(l.base)) return;
       const cap = letterCap(w, l, profile, baseBudget(line));
-      if (!(cap > 0)) return;
       let posOk = true;
       if (filter === 'word_final') posOk = li === n - 1;
       else if (filter === 'line_end') posOk = (wi === wordCount - 1) && (li === n - 1);
-      if (posOk) {
+      if (!posOk) return;
+      const mark = (w.override || []).find(o => o.id === l.id && o.stam_hyphens > 0);
+      if (profile.stretch_policy?.version === 2 && mark) {
+        const base = Number(mark.stam_hyphens) * Number(mark.stam_hyphen_units) * stamMarkerUnitMm(profile);
+        const hyphenCap = percentageCap(base, profile.stretch_policy.hyphen_percent ?? 0, baseBudget(line));
+        if (hyphenCap > 0) cands.push({letter_occurrence_id:'hyphen-'+l.id, kind:'hyphen', letter:'-', word:w.text,
+          base_width_mm:base, cap_mm:hyphenCap, cap_percent:profile.stretch_policy.hyphen_percent,
+          priority:profile.stretch_priorities?.hyphen ?? 3});
+      }
+      if (cap > 0) {
         cands.push({
           letter_occurrence_id: l.id,
           letter: l.base,

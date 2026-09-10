@@ -56,18 +56,18 @@ export function insertProfile(db, p) {
   const id = getId();
   db.prepare(`INSERT INTO profiles (
     id, name, reference_height_mm, letter_height_mm, stroke_mm, unit_mm, min_nib_mm, min_letter_height_mm,
-    letter_widths, stroke_factors, gaps, non_stretchable, max_stretch, stretch_position, created_at, stretch_policy, units_per_row, unit_basis, layout_mode
-  ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+    letter_widths, stroke_factors, gaps, non_stretchable, max_stretch, stretch_position, created_at, stretch_policy, units_per_row, unit_basis, layout_mode, letter_height_units
+  ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
     id, n.name, n.reference_height_mm, n.letter_height_mm, n.stroke_mm, n.unit_mm, n.min_nib_mm, n.min_letter_height_mm,
     json(n.letter_widths), json(n.stroke_factors), json(n.gaps), json(Array.from(n.non_stretchable)),
-    json(n.max_stretch), n.stretch_position, nowIso(), json(n.stretch_policy), n.units_per_row, n.unit_basis, n.layout_mode
+    json(n.max_stretch), n.stretch_position, nowIso(), json(n.stretch_policy), n.units_per_row, n.unit_basis, n.layout_mode, n.letter_height_units
   );
   return { ...fullProfileFrom(n, id), id };
 }
 
 function fullProfileFrom(n, id) {
   return {
-    id, name: n.name, reference_height_mm: n.reference_height_mm, letter_height_mm: n.letter_height_mm,
+    id, name: n.name, reference_height_mm: n.reference_height_mm, letter_height_mm: n.letter_height_mm, letter_height_units: n.letter_height_units,
     stroke_mm: n.stroke_mm, unit_mm: n.unit_mm, min_nib_mm: n.min_nib_mm, min_letter_height_mm: n.min_letter_height_mm,
     letter_widths: n.letter_widths, stroke_factors: n.stroke_factors, gaps: n.gaps,
     non_stretchable: Array.from(n.non_stretchable), max_stretch: n.max_stretch,
@@ -77,7 +77,7 @@ function fullProfileFrom(n, id) {
 }
 
 export function listProfiles(db) {
-  const rows = db.prepare('SELECT id, name, letter_height_mm, stroke_mm, unit_mm, created_at FROM profiles ORDER BY created_at DESC').all();
+  const rows = db.prepare('SELECT id, name, letter_height_mm, letter_height_units, stroke_mm, unit_mm, created_at FROM profiles ORDER BY created_at DESC').all();
   return rows;
 }
 
@@ -86,7 +86,7 @@ export function getProfile(db, id) {
   if (!row) return null;
   return normalizeProfile({
     id: row.id, name: row.name, reference_height_mm: row.reference_height_mm,
-    letter_height_mm: row.letter_height_mm, stroke_mm: row.stroke_mm, unit_mm: row.unit_mm,
+    letter_height_mm: row.letter_height_mm, letter_height_units: row.letter_height_units, stroke_mm: row.stroke_mm, unit_mm: row.unit_mm,
     min_nib_mm: row.min_nib_mm, min_letter_height_mm: row.min_letter_height_mm, letter_widths: parse(row.letter_widths),
     stroke_factors: parse(row.stroke_factors), gaps: parse(row.gaps),
     non_stretchable: parse(row.non_stretchable), max_stretch: parse(row.max_stretch),
@@ -99,10 +99,10 @@ export function updateProfile(db, id, p) {
   const n = normalizeProfile({ ...p });
   const r = db.prepare(`UPDATE profiles SET name=?, reference_height_mm=?, letter_height_mm=?, stroke_mm=?,
     unit_mm=?, min_nib_mm=?, min_letter_height_mm=?, letter_widths=?, stroke_factors=?, gaps=?, non_stretchable=?,
-    max_stretch=?, stretch_position=?, stretch_policy=?, units_per_row=?, unit_basis=?, layout_mode=? WHERE id=?`).run(
+    max_stretch=?, stretch_position=?, stretch_policy=?, units_per_row=?, unit_basis=?, layout_mode=?, letter_height_units=? WHERE id=?`).run(
     n.name, n.reference_height_mm, n.letter_height_mm, n.stroke_mm, n.unit_mm, n.min_nib_mm, n.min_letter_height_mm,
     json(n.letter_widths), json(n.stroke_factors), json(n.gaps), json(Array.from(n.non_stretchable)),
-    json(n.max_stretch), n.stretch_position, json(n.stretch_policy), n.units_per_row, n.unit_basis, n.layout_mode, id
+    json(n.max_stretch), n.stretch_position, json(n.stretch_policy), n.units_per_row, n.unit_basis, n.layout_mode, n.letter_height_units, id
   );
   if (r.changes === 0) return null;
   return getProfile(db, id);

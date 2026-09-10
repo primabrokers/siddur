@@ -6,7 +6,7 @@ function reportLine(line, decisions, geometry) {
   for(const [wordIndex,word] of (line.words||[]).entries()) for(const letter of word.letters||[]) occurrences.set(letter.id,{word:word.text,word_index:wordIndex+1,letter:letter.base});
   return decisions.filter(d=>d.stretch_mm>0).map(d=>({
     page:line.amud,line:((line.line_index-1)%geometry.lines_per_amud)+1,line_index:line.line_index,line_id:line.line_id,
-    ...(occurrences.get(d.letter_occurrence_id) || {
+    ...(occurrences.get(d.kind === 'hyphen' ? d.letter_occurrence_id.slice(7) : d.letter_occurrence_id) || {
       word: d.kind === 'setuma_gap' ? 'Setumah gap' : d.kind === 'petucha_gap' ? 'Petuchah gap' : 'Word space',
       letter: '', word_index: null,
     }),
@@ -44,6 +44,7 @@ export function planBookStretch(row,lines,profile) {
     words_stretched:new Set(entries.filter(e=>e.kind==='letter').map(e=>e.line_id+':'+e.word_index)).size,
     letters_stretched:entries.filter(e=>e.kind==='letter').length,
     spaces_stretched:entries.filter(e=>e.kind==='word_space').length,
+    hyphens_stretched:entries.filter(e=>e.kind==='hyphen').length,
     petucha_gaps_stretched:entries.filter(e=>e.kind==='petucha_gap').length,
     setuma_gaps_stretched:entries.filter(e=>e.kind==='setuma_gap').length,
     remaining_gap_lines:proposed.filter(l=>l.remaining_mm>=.001).length+skipped.filter(l=>l.remaining_mm>=.001).length,

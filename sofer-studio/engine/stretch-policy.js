@@ -34,6 +34,11 @@ export function letterCap(word, letter, profile, budget) {
 
 export function effectiveProfile(profile, geometry) {
   const result = structuredClone(profile);
+  if (result.letter_height_units != null) {
+    const unit = result.units_per_row != null ? Number(geometry.line_width_mm) / Number(result.units_per_row) : Number(result.unit_mm);
+    result.letter_height_mm = Number(result.letter_height_units) * unit;
+    if (!(result.letter_height_mm > 0) || !Number.isFinite(result.letter_height_mm)) throw new Error('Letter height and unit size must be positive');
+  }
   if (result.units_per_row != null) {
     const units = Number(result.units_per_row), width = Number(geometry.line_width_mm);
     if (!(units > 0) || !Number.isFinite(units) || !(width > 0) || !Number.isFinite(width)) {
@@ -92,12 +97,13 @@ export function spaceCandidatesOf(line, profile) {
         const width = policy.version === 2
           ? Number(profile.special_widths_units?.word_space || 0) * measurementUnitMm(profile)
           : interWordGap(profile);
-        const limit = profile.word_space_limit_mm == null ? width * 1.5 : Number(profile.word_space_limit_mm);
-        const cap = floorMm(Math.min(percentageCap(width, Math.min(50, Number(policy.word_space_percent) || 0), budget), Math.max(0, limit - width)));
+        const percent = policy.version === 2 ? policy.word_space_percent : Math.min(50, Number(policy.word_space_percent) || 0);
+        const limit = profile.word_space_limit_mm == null ? (policy.version === 2 ? Infinity : width * 1.5) : Number(profile.word_space_limit_mm);
+        const cap = floorMm(Math.min(percentageCap(width, percent, budget), Math.max(0, limit - width)));
         if (cap > 0) candidates.push({
           letter_occurrence_id: 'word-space-before-' + wi, kind: 'word_space', word_index: wi,
           letter: 'space', word: (words[wi - 1]?.text || '') + ' | ' + (words[wi]?.text || ''),
-          base_width_mm: width, cap_mm: cap, cap_percent: Math.min(50, Number(policy.word_space_percent) || 0),
+          base_width_mm: width, cap_mm: cap, cap_percent: percent,
           priority: policy.version === 2 ? (profile.stretch_priorities?.word_space ?? 3) : 1,
         });
       }

@@ -175,6 +175,7 @@ ALTER TABLE profiles ADD COLUMN units_per_row REAL;
 ALTER TABLE profiles ADD COLUMN unit_basis TEXT;
 ALTER TABLE profiles ADD COLUMN layout_mode TEXT;`,
   },
+  { version: 8, sql: `ALTER TABLE profiles ADD COLUMN letter_height_units REAL;` },
 ];
 
 export function applyMigrations(db) {
