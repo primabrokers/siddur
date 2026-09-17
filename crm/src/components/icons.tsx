@@ -33,6 +33,14 @@ export const IconToday = (props: IconProps) => (
   </Icon>
 )
 
+/** Inbox — envelope. */
+export const IconInbox = (props: IconProps) => (
+  <Icon {...props}>
+    <rect x="2" y="3.5" width="12" height="9" rx="1.5" />
+    <path d="M2.5 4.5 8 9l5.5-4.5" />
+  </Icon>
+)
+
 /** Contacts — person. */
 export const IconContacts = (props: IconProps) => (
   <Icon {...props}>

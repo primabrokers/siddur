@@ -141,6 +141,13 @@ export const COMMANDS: Command[] = [
     run: (ctx) => ctx.navigate('/import'),
   },
   {
+    id: 'go.comms',
+    label: 'Go to Inbox',
+    group: 'navigate',
+    keywords: ['email', 'mail', 'whatsapp', 'messages', 'comms'],
+    run: (ctx) => ctx.navigate('/comms'),
+  },
+  {
     id: 'go.settings',
     label: 'Go to Settings',
     group: 'navigate',

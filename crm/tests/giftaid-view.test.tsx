@@ -200,6 +200,8 @@ const state = {
   board: board as unknown,
   failures: failures as unknown[],
   validationLoading: false,
+  /** 09 §4 drafting — the Settings switch behind the "✦ Draft with AI" verb. */
+  drafting: true,
 }
 
 const createDeclaration = {
@@ -236,7 +238,11 @@ vi.mock('../src/lib/queries/giftaid', () => ({
 }))
 
 vi.mock('../src/lib/queries/settings', () => ({
-  useAutomationRules: () => query([{ rule_key: 'org_details', is_enabled: true, params: { name: 'Yeshivas Ohr', hmrc_reference: 'XR12345' } }]),
+  useAutomationRules: () =>
+    query([
+      { rule_key: 'org_details', is_enabled: true, params: { name: 'Yeshivas Ohr', hmrc_reference: 'XR12345' } },
+      { rule_key: 'ai_features', is_enabled: true, params: { drafting: state.drafting } },
+    ]),
   readOrgDetails: (rules: Array<{ rule_key: string; params: Record<string, string> }> | undefined) => {
     const params = rules?.find((rule) => rule.rule_key === 'org_details')?.params ?? {}
     return {
@@ -246,7 +252,14 @@ vi.mock('../src/lib/queries/settings', () => ({
       contact_email: params.contact_email ?? '',
     }
   },
+  readAiFeatures: (rules: Array<{ rule_key: string; params: Record<string, unknown> }> | undefined) => {
+    const params = rules?.find((rule) => rule.rule_key === 'ai_features')?.params ?? {}
+    const out: Record<string, boolean> = {}
+    for (const [key, value] of Object.entries(params)) out[key] = value === true
+    return out
+  },
   ORG_DETAILS_KEY: 'org_details',
+  AI_FEATURES_KEY: 'ai_features',
 }))
 
 vi.mock('../src/features/auth/useTeamMember', () => ({
@@ -286,6 +299,7 @@ beforeEach(() => {
   state.board = board
   state.failures = failures
   state.validationLoading = false
+  state.drafting = true
   // jsdom has no matchMedia; the workspace treats a missing one as desktop.
   // @ts-expect-error — narrow test double, only `matches` is read.
   window.matchMedia = (q: string) => ({ matches: true, media: q, addEventListener() {}, removeEventListener() {} })
@@ -345,6 +359,24 @@ describe('the missing-declaration queue (05 §5 panel 2)', () => {
     )
     expect(within(dialog).getByRole('button', { name: 'Copy for WhatsApp' })).toBeInTheDocument()
     expect((within(dialog).getByLabelText('Draft') as HTMLTextAreaElement).value).toContain('Aron Berger')
+  })
+
+  it('offers the AI first draft alongside the manual one while drafting is on (09 §4)', async () => {
+    await renderWorkspace()
+    const panel = screen.getByRole('region', { name: 'Missing declarations' })
+    // Both verbs on the same row: the AI draft is an extra, never a replacement.
+    expect(within(panel).getAllByRole('button', { name: /Draft request/ }).length).toBeGreaterThan(0)
+    expect(within(panel).getAllByRole('button', { name: /Draft with AI/ }).length).toBeGreaterThan(0)
+  })
+
+  it('hides the AI draft when drafting is switched off, leaving the manual path whole', async () => {
+    state.drafting = false
+    await renderWorkspace()
+    const panel = screen.getByRole('region', { name: 'Missing declarations' })
+    expect(within(panel).queryByRole('button', { name: /Draft with AI/ })).not.toBeInTheDocument()
+    // The manual mailto/WhatsApp draft still works with AI unavailable (09 §1).
+    expect(within(panel).getAllByRole('button', { name: 'Draft request' }).length).toBeGreaterThan(0)
+    expect(within(panel).getAllByRole('button', { name: 'Took it orally' }).length).toBeGreaterThan(0)
   })
 
   it('"Took it orally" records an oral declaration and queues the confirmation', async () => {

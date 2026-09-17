@@ -20,6 +20,8 @@ import {
   useUncancelDeclaration,
   useUnmarkClaimPaid,
 } from '../../lib/queries/giftaid'
+import { useAiFeature } from '../../lib/queries/ai'
+import { DraftSheet } from '../ai'
 import { useTeamMember } from '../auth/useTeamMember'
 import { displayName } from '../contacts/normalise'
 import { downloadCsv } from '../giving/download'
@@ -79,6 +81,8 @@ export function GiftAidView() {
   const [reviewOpen, setReviewOpen] = useState(false)
   const [declarationFor, setDeclarationFor] = useState<{ id?: string; name?: string } | null>(null)
   const [requestFor, setRequestFor] = useState<MissingQueueRow | null>(null)
+  /** The AI first draft (09 §4) — a separate row choice from the manual one. */
+  const [aiDraftFor, setAiDraftFor] = useState<MissingQueueRow | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [desktop, setDesktop] = useState(true)
 
@@ -97,6 +101,8 @@ export function GiftAidView() {
   const isAdmin = role === 'admin'
   const canChase = role === 'admin' || role === 'fundraiser'
   const org = readOrgDetails(rules.data)
+  /** 09 §4 drafting, switchable in Settings; off leaves the queue unchanged. */
+  const draftingOn = useAiFeature('drafting')
 
   const claimId = data.rolling?.claim_id ?? null
   const validation = useClaimValidation(claimId)
@@ -275,6 +281,9 @@ export function GiftAidView() {
             summary={queue}
             canChase={canChase}
             onDraftRequest={setRequestFor}
+            // 09 §4: the AI draft is an *extra* first draft — the manual
+            // mailto/WhatsApp path above it is unchanged with drafting off.
+            {...(draftingOn ? { onDraftWithAi: setAiDraftFor } : {})}
             onTookOrally={tookOrally}
             amountsHidden={data.amountsHidden}
             loading={board.isLoading && !board.data}
@@ -338,6 +347,19 @@ export function GiftAidView() {
         charityName={org.name}
         amountsHidden={data.amountsHidden}
       />
+
+      {/* Mounted only while a donor is chosen, so each draft starts from that
+          record and nothing survives between two donors (09 §4). */}
+      {aiDraftFor ? (
+        <DraftSheet
+          open
+          onClose={() => setAiDraftFor(null)}
+          contactId={aiDraftFor.contact_id}
+          contactName={displayName(aiDraftFor.contact) || 'this donor'}
+          purpose="ga_declaration_request"
+          contactEmail={aiDraftFor.contact?.email ?? null}
+        />
+      ) : null}
     </>
   )
 }

@@ -2,6 +2,7 @@ import type { ComponentType } from 'react'
 import type { IconProps } from '../../components/icons'
 import {
   IconContacts,
+  IconInbox,
   IconGiving,
   IconPipeline,
   IconReports,
@@ -25,6 +26,7 @@ export const PRIMARY_NAV: NavItem[] = [
   { to: '/contacts', label: 'Contacts', Icon: IconContacts },
   { to: '/pipeline', label: 'Pipeline', Icon: IconPipeline, phase2: true },
   { to: '/giving', label: 'Giving', Icon: IconGiving },
+  { to: '/comms', label: 'Inbox', Icon: IconInbox },
   { to: '/reports', label: 'Reports', Icon: IconReports, phase2: true },
 ]
 

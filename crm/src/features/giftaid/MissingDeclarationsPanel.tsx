@@ -9,6 +9,12 @@ export interface MissingDeclarationsPanelProps {
   /** Chasing declarations is fundraiser-and-up (05 §5 permissions). */
   canChase: boolean
   onDraftRequest: (row: MissingQueueRow) => void
+  /**
+   * The AI first draft (09 §4), offered only while the `drafting` feature is on.
+   * Omitted, the row keeps its manual verbs and nothing else changes — the
+   * manual path must work when AI is unavailable (09 §1, CLAUDE.md rule 6).
+   */
+  onDraftWithAi?: (row: MissingQueueRow) => void
   onTookOrally: (row: MissingQueueRow) => void
   amountsHidden: boolean
   loading?: boolean
@@ -29,6 +35,7 @@ export function MissingDeclarationsPanel({
   summary,
   canChase,
   onDraftRequest,
+  onDraftWithAi,
   onTookOrally,
   amountsHidden,
   loading,
@@ -94,6 +101,16 @@ export function MissingDeclarationsPanel({
                     <Button variant="accentOutline" size="sm" onClick={() => onDraftRequest(row)}>
                       Draft request
                     </Button>
+                    {onDraftWithAi ? (
+                      <Button
+                        variant="accentOutline"
+                        size="sm"
+                        onClick={() => onDraftWithAi(row)}
+                        title="A first draft you read, edit and send yourself"
+                      >
+                        <span aria-hidden="true">✦</span> Draft with AI
+                      </Button>
+                    ) : null}
                     <Button variant="outline" size="sm" onClick={() => onTookOrally(row)}>
                       Took it orally
                     </Button>
