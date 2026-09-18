@@ -1,0 +1,118 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700&display=swap">
+  <style>
+    body { margin: 0; font-family: 'Albert Sans', system-ui, sans-serif; color: #1F2933; }
+    a { color: #0E6E6B; } a:hover { color: #0A5451; }
+  </style>
+</helmet>
+<div style="display: flex; flex-direction: column; width: 1440px; height: 700px; background: #F6F7F9; overflow: hidden; box-sizing: border-box">
+
+  <!-- Header -->
+  <div style="display: flex; align-items: center; gap: 16px; background: #fff; border-bottom: 1px solid #E3E6EA; padding: 14px 24px">
+    <span style="font-size: 17px; font-weight: 700">Pipeline — active asks</span>
+    <div style="display: flex; gap: 4px; font-size: 12.5px">
+      <span style="background: #E3F0EE; color: #0A5451; border-radius: 999px; padding: 4px 12px; font-weight: 600">Mine</span>
+      <span style="border: 1px solid #E3E6EA; border-radius: 999px; padding: 4px 12px; color: #6B7686">Everyone</span>
+    </div>
+    <div style="margin-left: auto; display: flex; gap: 22px; font-size: 13px; color: #4B5563; font-variant-numeric: tabular-nums">
+      <span>Total asked <b style="color: #A97F24">£212,000</b></span>
+      <span>Weighted <b style="color: #A97F24">£124,400</b></span>
+      <span style="color: #6B7686">6 open · 2 need a next move</span>
+    </div>
+  </div>
+
+  <!-- Board -->
+  <div style="display: flex; gap: 12px; padding: 16px 24px; flex-grow: 1; min-height: 0; box-sizing: border-box">
+
+    <!-- Column: Qualified -->
+    <div style="display: flex; flex-direction: column; gap: 10px; width: 252px; flex-shrink: 0">
+      <div style="display: flex; flex-direction: column; gap: 2px; padding: 0 2px">
+        <div style="display: flex; align-items: baseline; justify-content: space-between"><span style="font-size: 13px; font-weight: 700">Qualified</span><span style="font-size: 12px; color: #6B7686; font-variant-numeric: tabular-nums">£52k</span></div>
+        <div style="font-size: 11px; color: #9AA3AD">exit: capacity + interest confirmed · rot 30d</div>
+      </div>
+      <div style="background: #fff; border: 1px solid #E3E6EA; border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 6px">
+        <div style="display: flex; align-items: center; gap: 8px"><span style="width: 8px; height: 8px; border-radius: 50%; background: #E8871E"></span><span style="font-weight: 600; font-size: 13.5px">Naftoli Katz</span><span style="margin-left: auto; font-size: 13px; color: #A97F24; font-weight: 700; font-variant-numeric: tabular-nums">£40k</span></div>
+        <div style="font-size: 12px; color: #6B7686">Kollel wing naming · 40% · decide Nov</div>
+        <div style="font-size: 12px; color: #4B5563">Next: lunch after yomim noraim — today</div>
+      </div>
+      <div style="background: #FDF0F0; border: 1px solid #ECC7C7; border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 6px">
+        <div style="display: flex; align-items: center; gap: 8px"><span style="width: 8px; height: 8px; border-radius: 50%; background: #D9A800"></span><span style="font-weight: 600; font-size: 13.5px">Feld Brothers Ltd</span><span style="margin-left: auto; font-size: 13px; color: #A97F24; font-weight: 700; font-variant-numeric: tabular-nums">£12k</span></div>
+        <div style="font-size: 12px; color: #B03030">Rotting — idle 38 days in stage</div>
+        <div style="font-size: 12px; color: #B08A00">No next move — decide one</div>
+      </div>
+    </div>
+
+    <!-- Column: Cultivating -->
+    <div style="display: flex; flex-direction: column; gap: 10px; width: 252px; flex-shrink: 0">
+      <div style="display: flex; flex-direction: column; gap: 2px; padding: 0 2px">
+        <div style="display: flex; align-items: baseline; justify-content: space-between"><span style="font-size: 13px; font-weight: 700">Cultivating</span><span style="font-size: 12px; color: #6B7686; font-variant-numeric: tabular-nums">£100k</span></div>
+        <div style="font-size: 11px; color: #9AA3AD">exit: ready to be asked · rot 45d</div>
+      </div>
+      <div style="background: #fff; border: 1px solid #E3E6EA; border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 6px">
+        <div style="display: flex; align-items: center; gap: 8px"><span style="width: 8px; height: 8px; border-radius: 50%; background: #D64545"></span><span style="font-weight: 600; font-size: 13.5px">Dovid Cohen</span><span style="margin-left: auto; font-size: 13px; color: #A97F24; font-weight: 700; font-variant-numeric: tabular-nums">£20k</span></div>
+        <div style="font-size: 12px; color: #6B7686">Building campaign · 70% · decide Oct</div>
+        <div style="font-size: 12px; color: #B03030">Next: call re proposal — overdue</div>
+      </div>
+      <div style="background: #fff; border: 1px solid #E3E6EA; border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 6px">
+        <div style="display: flex; align-items: center; gap: 8px"><span style="width: 8px; height: 8px; border-radius: 50%; background: #9AA3AD"></span><span style="font-weight: 600; font-size: 13.5px">Mrs. B. Halberstam</span><span style="margin-left: auto; font-size: 13px; color: #A97F24; font-weight: 700; font-variant-numeric: tabular-nums">£80k</span></div>
+        <div style="font-size: 12px; color: #6B7686">Legacy discussion · 30% · no date</div>
+        <div style="font-size: 12px; color: #4B5563">Next: home visit — 3 Sep</div>
+      </div>
+    </div>
+
+    <!-- Column: Solicited -->
+    <div style="display: flex; flex-direction: column; gap: 10px; width: 252px; flex-shrink: 0">
+      <div style="display: flex; flex-direction: column; gap: 2px; padding: 0 2px">
+        <div style="display: flex; align-items: baseline; justify-content: space-between"><span style="font-size: 13px; font-weight: 700">Solicited</span><span style="font-size: 12px; color: #6B7686; font-variant-numeric: tabular-nums">£35k</span></div>
+        <div style="font-size: 11px; color: #9AA3AD">exit: answer received · rot 14d</div>
+      </div>
+      <div style="background: #fff; border: 1px solid #E3E6EA; border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 6px">
+        <div style="display: flex; align-items: center; gap: 8px"><span style="width: 8px; height: 8px; border-radius: 50%; background: #3E7CB1"></span><span style="font-weight: 600; font-size: 13.5px">Reuven Adler</span><span style="margin-left: auto; font-size: 13px; color: #A97F24; font-weight: 700; font-variant-numeric: tabular-nums">£35k</span></div>
+        <div style="font-size: 12px; color: #6B7686">Proposal sent 18 Aug · 60%</div>
+        <div style="font-size: 12px; color: #3E7CB1">Waiting — auto follow-up in 2 days</div>
+      </div>
+    </div>
+
+    <!-- Column: Pledged -->
+    <div style="display: flex; flex-direction: column; gap: 10px; width: 252px; flex-shrink: 0">
+      <div style="display: flex; flex-direction: column; gap: 2px; padding: 0 2px">
+        <div style="display: flex; align-items: baseline; justify-content: space-between"><span style="font-size: 13px; font-weight: 700">Pledged</span><span style="font-size: 12px; color: #6B7686; font-variant-numeric: tabular-nums">£25k</span></div>
+        <div style="font-size: 11px; color: #9AA3AD">exit: paid in full</div>
+      </div>
+      <div style="background: #fff; border: 1px solid #E3E6EA; border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 6px">
+        <div style="display: flex; align-items: center; gap: 8px"><span style="width: 8px; height: 8px; border-radius: 50%; background: #9AA3AD"></span><span style="font-weight: 600; font-size: 13.5px">Weinberger Trust</span><span style="margin-left: auto; font-size: 13px; color: #A97F24; font-weight: 700; font-variant-numeric: tabular-nums">£25k</span></div>
+        <div style="display: flex; align-items: center; gap: 8px"><div style="flex-grow: 1; height: 5px; background: #E3E6EA; border-radius: 3px; overflow: hidden"><div style="width: 60%; height: 5px; background: #0E6E6B; border-radius: 3px"></div></div><span style="font-size: 11.5px; color: #6B7686; font-variant-numeric: tabular-nums">£15k paid</span></div>
+        <div style="font-size: 12px; color: #4B5563">Next installment 1 Oct</div>
+      </div>
+    </div>
+
+    <!-- Stale prospects panel -->
+    <div style="display: flex; flex-direction: column; gap: 10px; flex-grow: 1; min-width: 0">
+      <div style="font-size: 13px; font-weight: 700; padding: 0 2px">Stale — advance or decide</div>
+      <div style="background: #fff; border: 1px solid #E3E6EA; border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; font-size: 12.5px">
+        <div style="display: flex; justify-content: space-between; gap: 8px"><span><b>Feld Brothers Ltd</b><br><span style="color: #6B7686">no forward move in 96 days</span></span><span style="color: #0E6E6B; font-weight: 600">Review</span></div>
+        <div style="border-top: 1px solid #EEF1F4"></div>
+        <div style="display: flex; justify-content: space-between; gap: 8px"><span><b>M. Stern</b><br><span style="color: #6B7686">no forward move in 122 days</span></span><span style="color: #0E6E6B; font-weight: 600">Review</span></div>
+      </div>
+      <div style="font-size: 11.5px; color: #9AA3AD; padding: 0 2px">Every ask should advance a stage — or get a decision — each quarter.</div>
+    </div>
+  </div>
+
+  <!-- Drop zones -->
+  <div style="display: flex; gap: 12px; padding: 0 24px 18px 24px">
+    <div style="flex-grow: 1; border: 1.5px dashed #7FBF9A; background: #EDF7F1; color: #2E7D46; border-radius: 10px; padding: 10px 0; text-align: center; font-size: 12.5px; font-weight: 700">Drag here — WON → record gift or pledge</div>
+    <div style="flex-grow: 1; border: 1.5px dashed #D8A0A0; background: #FBF0F0; color: #B03030; border-radius: 10px; padding: 10px 0; text-align: center; font-size: 12.5px; font-weight: 700">LOST → record reason</div>
+    <div style="width: 220px; border: 1.5px dashed #C9D0D8; background: #F1F3F6; color: #6B7686; border-radius: 10px; padding: 10px 0; text-align: center; font-size: 12.5px; font-weight: 700">ON HOLD</div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>
