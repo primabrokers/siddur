@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Menu } from '../../components'
 import { cn } from '../../lib/cn'
+import { useWaConversationForContact } from '../../lib/queries/wa'
 import { normalisePhone, waNumber } from './normalise'
 import type { ContactRow } from './types'
 
@@ -71,6 +72,10 @@ export function ProfileActionBar({
   const phone = normalisePhone(contact.phone)
   const wa = waNumber(contact.whatsapp ?? contact.phone)
   const email = contact.email?.trim() ? contact.email.trim() : null
+  // Tier 2 (10 §2): when this donor already has a thread on the business
+  // number, offer it *beside* the wa.me link, never instead of it. A fundraiser
+  // who prefers their own phone keeps their own phone.
+  const { data: waThread } = useWaConversationForContact(contact.id)
 
   return (
     <div className={cn('flex flex-wrap items-center gap-2 lg:flex-nowrap', className)}>
@@ -80,6 +85,11 @@ export function ProfileActionBar({
       <ActionLink href={wa ? `https://wa.me/${wa}` : null} className={accentOutline}>
         WhatsApp
       </ActionLink>
+      {waThread ? (
+        <a href={`/comms?wa=${encodeURIComponent(waThread.id)}`} className={outline} title="Open the thread in the app">
+          Message in app
+        </a>
+      ) : null}
       <ActionLink href={email ? `mailto:${email}` : null} className={outline}>
         Email
       </ActionLink>

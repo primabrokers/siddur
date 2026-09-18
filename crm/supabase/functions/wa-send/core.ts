@@ -1,3 +1,7 @@
+// GENERATED MIRROR — do not edit.
+// Source: crm/src/features/whatsapp/core.ts. The Deno edge runtime cannot reach
+// into src/, so each function carries a byte-identical copy under this header.
+// tests/wa-mirror.test.ts fails the build the moment one drifts.
 /**
  * The pure core of the WhatsApp Business (Cloud API) integration — spec
  * 10 §2 Tier 2, activated on the user's request (18 Sep 2026).

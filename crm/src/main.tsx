@@ -2,6 +2,10 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { App } from './App'
 import './index.css'
+// Side-effect import: registers the WhatsApp pane with the Comms shell's slot
+// registry (features/comms/slots.ts). One line, here, so the registry is
+// populated before any route renders (10 §2 Tier 2).
+import './features/whatsapp/register'
 
 const container = document.getElementById('root')
 if (!container) throw new Error('#root missing from index.html')

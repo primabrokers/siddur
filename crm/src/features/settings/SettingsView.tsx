@@ -4,13 +4,14 @@ import { useAuth } from '../auth/AuthProvider'
 import { useTeamMember } from '../auth/useTeamMember'
 import { CalendarFeedLine } from '../journeys'
 import { PageHeader } from '../shell/PageHeader'
+import { WhatsAppSettingsCard } from '../whatsapp'
 import { AiTab } from './AiTab'
 import { AutomationTab } from './AutomationTab'
 import { LookupsTab } from './LookupsTab'
 import { OrganisationTab } from './OrganisationTab'
 import { TeamTab } from './TeamTab'
 
-type SettingsTab = 'lookups' | 'automation' | 'team' | 'organisation' | 'ai'
+type SettingsTab = 'lookups' | 'automation' | 'team' | 'organisation' | 'ai' | 'whatsapp'
 
 const TABS: Array<{ id: SettingsTab; label: string }> = [
   { id: 'lookups', label: 'Lookups' },
@@ -18,6 +19,7 @@ const TABS: Array<{ id: SettingsTab; label: string }> = [
   { id: 'team', label: 'Team' },
   { id: 'organisation', label: 'Organisation' },
   { id: 'ai', label: 'AI' },
+  { id: 'whatsapp', label: 'WhatsApp' },
 ]
 
 /**
@@ -81,6 +83,10 @@ export function SettingsView() {
       ) : null}
       {tab === 'organisation' ? <OrganisationTab readOnly={readOnly} /> : null}
       {tab === 'ai' ? <AiTab readOnly={readOnly} /> : null}
+      {/* 10 §2 Tier 2 — the connection, the Meta app config, and the rules that
+          cost money if ignored. The card can only probe: a Supabase secret is
+          never readable from the browser. */}
+      {tab === 'whatsapp' ? <WhatsAppSettingsCard readOnly={readOnly} /> : null}
     </>
   )
 }
