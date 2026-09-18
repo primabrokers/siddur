@@ -7,11 +7,12 @@ import { PageHeader } from '../shell/PageHeader'
 import { WhatsAppSettingsCard } from '../whatsapp'
 import { AiTab } from './AiTab'
 import { AutomationTab } from './AutomationTab'
+import { EmailTab } from './EmailTab'
 import { LookupsTab } from './LookupsTab'
 import { OrganisationTab } from './OrganisationTab'
 import { TeamTab } from './TeamTab'
 
-type SettingsTab = 'lookups' | 'automation' | 'team' | 'organisation' | 'ai' | 'whatsapp'
+type SettingsTab = 'lookups' | 'automation' | 'team' | 'organisation' | 'ai' | 'email' | 'whatsapp'
 
 const TABS: Array<{ id: SettingsTab; label: string }> = [
   { id: 'lookups', label: 'Lookups' },
@@ -19,6 +20,7 @@ const TABS: Array<{ id: SettingsTab; label: string }> = [
   { id: 'team', label: 'Team' },
   { id: 'organisation', label: 'Organisation' },
   { id: 'ai', label: 'AI' },
+  { id: 'email', label: 'Email' },
   { id: 'whatsapp', label: 'WhatsApp' },
 ]
 
@@ -83,6 +85,10 @@ export function SettingsView() {
       ) : null}
       {tab === 'organisation' ? <OrganisationTab readOnly={readOnly} /> : null}
       {tab === 'ai' ? <AiTab readOnly={readOnly} /> : null}
+      {/* 10 §3 — the inbox's two secrets, probed rather than stored: the card
+          can say whether sending and receiving are set up without ever being
+          able to read either value. */}
+      {tab === 'email' ? <EmailTab readOnly={readOnly} /> : null}
       {/* 10 §2 Tier 2 — the connection, the Meta app config, and the rules that
           cost money if ignored. The card can only probe: a Supabase secret is
           never readable from the browser. */}

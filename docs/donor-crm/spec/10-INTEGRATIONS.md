@@ -14,12 +14,15 @@ Integrations reduce duplicate entry; they never become load-bearing. Every integ
 | **2 — Business Platform (Cloud API)** `[P3]` | Real 2-way logging: inbound messages auto-file as interactions; templated outbound (invites, receipts). Costs: Meta business verification; UK ≈£0.04/marketing msg, utility cheaper, 1,000 free service conversations/mo, 24-hour service-window rules; BSP markup if via Twilio | Decision point |
 | **3 — Unofficial bridges / WhatsApp Web scraping** | **Rejected permanently**: ToS violation, realistic ban risk to the fundraiser's personal number — an existential risk to the relationships themselves | Never |
 
+**Tier 2 was activated on the user's request on 18 September 2026** and is built as migration `012_whatsapp` plus the `wa-webhook` and `wa-send` edge functions — Cloud API only, with the 24-hour customer-service window enforced in the composer *and* again server-side (free-form outside it answers `409 window_closed`); Tier 3 remains permanently rejected.
+
 Tier 1 + Quick Capture covers ~90% of the need: the durable value is the *summary and next action*, not the transcript.
 
 ## §3 Email
 
 - `[P2/P3]` **Dropbox address** (e.g. `log@crm.…`): forward/BCC any donor email → Edge Function matches sender/recipient → AI-summarised interaction on the timeline; unmatched → review queue ▸ Donorfy Send-To-Donorfy — adopted. Runs at autonomy L2 only after probation (09 §7).
 - Deferred: full Gmail sync, suggested-contacts-from-traffic (▸ Copper), inbox sidebar (▸ Copper/Streak) — highest permissions and effort, smallest marginal value over the dropbox. Register: §8.
+- **Built 2026-09-18, on the user's explicit instruction rather than on the §8 trigger**: the full inbox sidebar — folders (Inbox/Sent/Archive/Trash), threading, compose and reply — as `emails`/`email_attachments` (migration 011) with a provider webhook (`email-inbound`, Resend inbound as the primary payload shape) and outbound over the Resend REST API (`email-send`); no Gmail OAuth and no IMAP, since edge functions cannot hold a mail connection. §1 still holds: a message becomes a CRM record only when a human presses **Log to timeline**, which writes an ordinary `interactions` row.
 
 ## §4 Calendar
 

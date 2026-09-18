@@ -1,3 +1,7 @@
+// GENERATED MIRROR — do not edit.
+// Source: crm/src/features/comms/core.ts. The Deno edge runtime cannot reach into
+// src/, so each function carries a byte-identical copy under this header.
+// tests/comms-core-mirror.test.ts fails the build the moment one drifts.
 /**
  * The pure core of C1 (the email inbox) — everything that must be *decided* the
  * same way in the browser, in the two edge functions and in the tests.

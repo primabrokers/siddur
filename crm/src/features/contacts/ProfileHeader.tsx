@@ -279,9 +279,19 @@ export function ProfileHeader({
         </p>
       ) : null}
 
-      {/* Third line: tags · introduced by. Hidden on the condensed header. */}
-      {tags.length > 0 || introducedBy || contact.introduced_by_note ? (
+      {/* Third line: emails · tags · introduced by. Hidden on the condensed header. */}
+      {contact.email || tags.length > 0 || introducedBy || contact.introduced_by_note ? (
         <div className="hidden flex-wrap items-center gap-2 text-[12.5px] text-nav lg:flex">
+          {/* 10 §3: the inbox filtered to this donor. A chip, not a tab —
+              the correspondence lives in the Inbox, not on the profile. */}
+          {contact.email ? (
+            <Link
+              to={`/comms?contact=${contact.id}`}
+              className="rounded-pill bg-accent-soft px-[9px] py-[2px] font-semibold text-accent-dark hover:opacity-85"
+            >
+              Emails
+            </Link>
+          ) : null}
           {tags.map((tag) => (
             <span key={tag.id} className="rounded-pill bg-row px-[9px] py-[2px]">
               {tag.name}

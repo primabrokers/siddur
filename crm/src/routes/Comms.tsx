@@ -1,11 +1,6 @@
-import { EmptyState } from '../components'
+import { CommsView } from '../features/comms'
 
-/** Unified inbox — email folders + WhatsApp conversations. Replaced by features/comms. */
+/** Unified inbox — email folders (10 §3) plus every registered channel pane. */
 export function CommsRoute() {
-  return (
-    <EmptyState
-      title="Inbox"
-      hint="Email folders and WhatsApp conversations land here."
-    />
-  )
+  return <CommsView />
 }
