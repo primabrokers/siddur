@@ -193,9 +193,18 @@ live('live · acceptance 4 — the keep-in-touch cycle', () => {
     if (!reachable) return
 
     const first = await rpc('run_nightly')
+    const denied =
+      first.status === 403 || (first.body as { code?: string } | null)?.code === '42501'
     if (first.status === 404) {
       // eslint-disable-next-line no-console
       console.log('[live] run_nightly() is not deployed yet — asserting idempotency on existing rows only')
+    } else if (denied) {
+      // 005b revoked run_nightly() from authenticated on purpose: only pg_cron
+      // (service role) runs it. A client that cannot trigger it is the designed
+      // state, so the idempotency assertion runs on the rows the last scheduled
+      // run left behind.
+      // eslint-disable-next-line no-console
+      console.log('[live] run_nightly() is service-role only (005b) — asserting on existing rows')
     } else {
       expect(first.status, `run_nightly() failed: ${JSON.stringify(first.body).slice(0, 200)}`).toBeLessThan(300)
       // The second run is the assertion: a rule must never create a second open
