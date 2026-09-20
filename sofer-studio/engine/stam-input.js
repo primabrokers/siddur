@@ -23,19 +23,27 @@ export function parseStamInput(raw) {
     for (const type of pendingMarks) letterMarks.push({ letter_index: letterIndex, type });
     pendingMarks = [];
   };
-  for (const ch of String(raw || '').replace(/^\ufeff/u, '')) {
+  const input = Array.from(String(raw || '').replace(/^\ufeff/u, ''));
+  for (let index = 0; index < input.length; index++) {
+    const ch = input[index];
     if (/[\u05d0-\u05ea]/u.test(ch)) { appendLetter(ch); continue; }
     if (/[A-Z]/.test(ch)) {
       const mapped = STAM_KEYBOARD[ch];
       if (!mapped || !/[\u05d0-\u05ea]/u.test(mapped)) throw new Error(`Unsupported capital key ${ch}`);
       appendLetter(mapped, true); continue;
     }
-    if (ch === '-') { hyphens.push({ offset: Array.from(letters).length }); continue; }
+    if (ch === '-') {
+      // A single prefix is the owner's small-letter command. Keep standalone,
+      // trailing and repeated hyphen width markers compatible with saved input.
+      if (input[index - 1] !== '-' && /[\u05d0-\u05eaA-Z]/u.test(input[index + 1] || '')) pendingMarks.push('small');
+      else hyphens.push({ offset: Array.from(letters).length });
+      continue;
+    }
     if (ch === '+' || ch === '\u2013' || ch === '\u2212' || ch === '.') {
       pendingMarks.push(ch === '+' ? 'large' : ch === '.' ? 'dotted' : 'small'); continue;
     }
     if (ch === '!') { pendingMarks.push('backward_nun'); appendLetter('נ'); continue; }
-    if ('psl123'.includes(ch)) { flush(); markers.push({ type: ch, after_word: words.length }); continue; }
+    if ('psl123me'.includes(ch)) { flush(); markers.push({ type: ch, after_word: words.length }); continue; }
     if (/\s/u.test(ch)) { flush(); continue; }
     throw new Error(`Unsupported STAM character U+${ch.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')}`);
   }
@@ -55,7 +63,7 @@ export function stamSourceText(parsed) {
       if (marker.type === 'p') out.push('{פ}');
       else if (marker.type === 's') out.push('{ס}');
       else if (marker.type === 'l') out.push('{blank-line}');
-      else if ('123'.includes(marker.type)) out.push(`{song-${marker.type}}`);
+      else if ('123me'.includes(marker.type)) out.push(`{song-${marker.type}}`);
     }
   }
   return out.join(' ');

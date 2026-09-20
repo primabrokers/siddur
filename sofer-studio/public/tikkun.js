@@ -13,6 +13,7 @@
   var util = SS.util;
   var bus = SS.bus;
   var state = SS.state;
+  var API, movingWord = false;
 
   var container = null;   // #tikkun-scroll
   var refEl = null;       // #tikkun-ref
@@ -29,6 +30,7 @@
   var TAGGIN = { '\u05e9': 1, '\u05e2': 1, '\u05d8': 1, '\u05e0': 1, '\u05d6': 1, '\u05d2': 1, '\u05e5': 1 };
 
   function init(ctx) {
+    API = ctx.api || SS.api;
     container = util.byId('tikkun-scroll');
     refEl = util.byId('tikkun-ref');
     buildPreviewControls();
@@ -219,7 +221,20 @@
         if (!m) { ctx.font=font;ctx.textAlign='left';ctx.direction='ltr';m=ctx.measureText(ink.textContent);metrics.set(key,m); }
         fit = glyphFit(natural,target,m.actualBoundingBoxLeft,m.actualBoundingBoxRight);
       }
-      ink.style.transform = 'translateX('+fit.translate+'px) scaleX('+fit.scale+')';
+      var vertical = ink.parentNode.classList.contains('marker-large') ? 1.5 : ink.parentNode.classList.contains('marker-small') ? 0.5 : 1;
+      var offset = 0;
+      if (vertical !== 1 && ctx) {
+        var glyphStyle = window.getComputedStyle(ink);
+        ctx.font = glyphStyle.fontStyle+' '+glyphStyle.fontWeight+' '+glyphStyle.fontSize+' '+glyphStyle.fontFamily;
+        ctx.textAlign = 'left'; ctx.direction = 'ltr';
+        var bounds = ctx.measureText(ink.textContent);
+        var size = parseFloat(glyphStyle.fontSize), height = parseFloat(glyphStyle.lineHeight) || size * 1.5;
+        var ascent = bounds.fontBoundingBoxAscent || size * 0.8, descent = bounds.fontBoundingBoxDescent || size * 0.2;
+        var inkTop = (height - ascent - descent) / 2 + ascent - (bounds.actualBoundingBoxAscent || ascent);
+        offset = (1 - vertical) * inkTop;
+      }
+      ink.style.transformOrigin = vertical === 1 ? 'right bottom' : 'right top';
+      ink.style.transform = 'translateX('+fit.translate+'px) translateY('+offset+'px) scaleX('+fit.scale+') scaleY('+vertical+')';
     });
   }
 
@@ -374,11 +389,6 @@
     var amud = util.el('div', { class: 'amud' + (isYeriaEdge ? ' onde' : '') });
     amud.dataset.amud = String(g.num);
 
-    var head = util.el('div', { class: 'sheet-head' });
-    head.appendChild(util.el('span', { class: 'amud-num', text: 'Amud ' + g.num + ' ' }));
-    head.appendChild(util.el('span', { class: 'amud-num gim', text: '\u05e2\u05de\u05d5\u05d3 ' + util.gimatria(g.num) }));
-    amud.appendChild(head);
-
     var linesWrap = util.el('div', { class: 'lines' });
 
     var geom = layoutGeometry(layout);
@@ -399,6 +409,7 @@
     });
 
     amud.appendChild(linesWrap);
+    amud.appendChild(util.el('div', { class: 'page-footer', dir: 'ltr', text: (gi + 1) + ' of ' + pageGroups.length }));
     return amud;
   }
 
@@ -414,7 +425,7 @@
     el.style.height = pitch + 'mm';
     el.style.minHeight = '0'; el.style.padding = '0';
 
-    var gim = util.el('span', { class: 'lnum', text: romanNumeral(li + 1), dir: 'ltr' });
+    var gim = util.el('span', { class: 'lnum', text: String(li + 1), dir: 'ltr' });
     gim.setAttribute('lang', 'en');
     el.appendChild(gim);
     el.appendChild(shortfallNote(line));
@@ -437,6 +448,7 @@
     }
 
     el.appendChild(txt);
+    el.appendChild(wordMoveControls(line));
 
     // aria label: amud, line, verse ref
     var ref = pick(line, ['verse_ref', 'ref', 'verse'], '');
@@ -456,12 +468,31 @@
     return el;
   }
 
-  function romanNumeral(value) {
-    var n = Math.max(1, Math.floor(Number(value))), text = '';
-    [[1000,'M'],[900,'CM'],[500,'D'],[400,'CD'],[100,'C'],[90,'XC'],[50,'L'],[40,'XL'],[10,'X'],[9,'IX'],[5,'V'],[4,'IV'],[1,'I']].forEach(function (entry) {
-      while (n >= entry[0]) { text += entry[1]; n -= entry[0]; }
+  function wordMoveControls(line) {
+    var controls = util.el('span', { class: 'line-move', dir: 'ltr' });
+    var overflow = Math.max(0, -Number(line.base_leftover_mm || 0));
+    if (overflow) controls.style.marginRight = (overflow + 3) + 'mm';
+    [['up', '↑', 'Bring the first word from the next line up'], ['down', '↓', 'Push the last word down to the next line']].forEach(function(spec) {
+      var button = util.el('button', { type: 'button', class: 'btn btn-ghost btn-sm', text: spec[1], title: spec[2], 'aria-label': spec[2], 'data-move-word': spec[0] });
+      button.disabled = !API || !API.moveWord || !line.line_id || renderedLayout.status === 'locked' || line.fixed_pattern || (line.status && line.status !== 'pending');
+      if (renderedLayout.status === 'locked') button.title = 'Locked layout: compute a new draft before changing line breaks';
+      button.addEventListener('click', async function(event) {
+        event.stopPropagation();
+        if (movingWord) return;
+        movingWord = true;
+        var layout = renderedLayout, index = layout.lines.indexOf(line), next = layout.lines[index + 1];
+        try {
+          await API.moveWord(layout.id, { line_id: line.line_id, direction: spec[0], line_key: line.line_key, next_line_key: next ? next.line_key : null });
+          var refreshed = await API.getLayout(layout.id);
+          if (state.active.layoutId === layout.id || state.layout === layout) {
+            state.layout = refreshed; bus.emit('layout:loaded', refreshed);
+          }
+        } catch(error) { SS.toast(error.message || String(error), 'error'); }
+        finally { movingWord = false; }
+      });
+      controls.appendChild(button);
     });
-    return text;
+    return controls;
   }
 
   function shortfallNote(line) {
@@ -478,12 +509,12 @@
     if (Number.isFinite(units)) {
       // The engine rounds millimetres to 0.001. Remove that rounding noise only.
       if (Math.abs(units - Math.round(units)) * unit <= 0.0011) units = Math.round(units);
-      var absolute = Math.abs(units), whole = Math.floor(absolute), fraction = Math.round((absolute - whole) * 100) / 100;
+      var absolute = Math.abs(units), whole = Math.round(absolute);
       var amount = '';
       while (whole >= 400) { amount += 'ת'; whole -= 400; }
-      amount += whole > 0 ? util.gimatriaLetters(whole) : amount ? '' : '0';
-      if (fraction) amount += '+' + fraction;
-      text = units === 0 ? 'ש״ת' : (units < 0 ? 'י״' : 'ח״') + amount;
+      amount += whole > 0 ? util.gimatriaLetters(whole) : '';
+      var parsha = line.petucha_end || line.has_setuma || line.setuma_at_edge || line.sefer_end || line.fixed_pattern;
+      text = parsha && units >= 0 ? '' : Math.round(absolute) === 0 ? 'ש״ת' : (units < 0 ? 'י״' : 'ח״') + amount;
       title = units === 0 ? 'שורה תמה — complete before stretching' :
         util.fmt(absolute, 2) + ' units ' + (units < 0 ? 'overfull' : 'missing') + ' before stretching';
     }

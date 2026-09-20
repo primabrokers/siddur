@@ -113,7 +113,8 @@ function ketivOnly(raw) {
 
 export function classifyToken(raw) {
   if (raw === '{blank-line}') return { kind: 'blank_line' };
-  if (/^\{song-[123]\}$/u.test(raw)) return { kind: 'song_break', break_kind: raw.at(-2) };
+  if (/^\{song-[123m]\}$/u.test(raw)) return { kind: 'song_break', break_kind: raw.at(-2) };
+  if (raw === '{song-e}') return { kind: 'song_end' };
   const trimmed = unwrap(raw);
   if (trimmed === 'פ') return { kind: 'petucha' };
   if (trimmed === 'ס') return { kind: 'setuma' };
@@ -272,7 +273,7 @@ export function processSource({ name, tradition, text, format = 'txt', label, un
   // JSON/Sefaria remain explicit structured imports, never auto-reinterpreted.
   const input = String(text || '');
   if (format_ === 'txt' || format_ === 'auto') {
-    const markedHebrew = /[\u05d0-\u05ea]/u.test(input) && /[A-Zpsl123+.!\u2013\u2212]/u.test(input);
+    const markedHebrew = /[\u05d0-\u05ea]/u.test(input) && /[A-Zpslme123+.!\u2013\u2212]|-(?=[\u05d0-\u05ea])/u.test(input);
     const capitalOnly = /^[A-Z\s-]+$/u.test(input) && /[A-Z]/u.test(input);
     format_ = markedHebrew || capitalOnly || /\.stam(?:\.txt)?$/i.test(name || '') ? 'stam' : 'txt';
   }

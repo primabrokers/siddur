@@ -1,0 +1,7 @@
+FROM prima-sofer-studio:controls-v15-final
+USER root
+COPY sofer-studio/public /app/sofer-studio/public
+COPY sofer-studio/engine /app/sofer-studio/engine
+COPY sofer-studio/server /app/sofer-studio/server
+COPY sofer-studio/tests /app/sofer-studio/tests
+USER 1000:1000

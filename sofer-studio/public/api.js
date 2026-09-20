@@ -118,6 +118,8 @@
   // Layouts
   api.computeLayout = function (body) { return request('POST', '/layout/compute', body); };
   api.listLayouts = function () { return request('GET', '/layouts'); };
+  api.deleteLayout = function (id) { return request('DELETE', '/layouts/' + encodeURIComponent(id)); };
+  api.moveWord = function (id, body) { return request('POST', '/layouts/' + encodeURIComponent(id) + '/move-word', body); };
   api.getLayout = function (id, opts) {
     var q = '';
     if (opts && (opts.from != null || opts.limit != null)) {

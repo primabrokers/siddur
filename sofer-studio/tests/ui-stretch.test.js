@@ -75,7 +75,7 @@ test('line notes show missing units before stretch, independently of current ali
     f.SS.state.layout={id:'align',snapshot:{profile:{units_per_row:20}},geometry:{lines_per_amud:42,line_width_mm:20,baseline_pitch_mm:8},lines};f.SS.bus.emit('layout:loaded',f.SS.state.layout);await tick();
     const d=f.w.document;assert.equal(d.querySelector('.alignment-aligned .side').textContent,'ח״י');
     assert.equal(d.querySelector('.alignment-short .side').textContent,'ח״י');
-    assert.equal(d.querySelector('.alignment-intentional .side').textContent,'ח״י');
+    assert.equal(d.querySelector('.alignment-intentional .side').textContent,'');
   }finally{f.dom.window.close();}
 });
 

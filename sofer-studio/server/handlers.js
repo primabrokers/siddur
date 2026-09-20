@@ -20,6 +20,7 @@ import { planBookStretch, stretchReport } from './stretch-book.js';
 import { loadReferenceSource } from './reference.js';
 import {fitMarginPlan,applyFitCopy} from './fit-margin.js';
 import {effectiveProfile} from '../engine/stretch-policy.js';
+import { moveWord } from '../engine/line-edit.js';
 
 // Strip internal engine fields for API lines. When a profile is supplied the
 // server-authoritative stretch candidates (cap_mm/letter/word_final/line_end) are
@@ -463,6 +464,21 @@ export function handleComputeJob(ctx) {
 
 export function handleListLayouts(ctx) {
   sendJson(ctx.res, 200, store.listLayouts(ctx.db));
+}
+
+export function handleDeleteLayout(ctx) {
+  if (!store.deleteLayout(ctx.db, ctx.params.id)) throw new HttpError(404, 'layout not found');
+  sendJson(ctx.res, 200, { ok: true });
+}
+
+export function handleMoveWord(ctx) {
+  const layout = store.getLayout(ctx.db, ctx.params.id);
+  if (!layout) throw new HttpError(404, 'layout not found');
+  let result;
+  try { result = moveWord(layout, ctx.body || {}); }
+  catch (error) { throw new HttpError(409, error.message); }
+  store.saveEditedLines(ctx.db, layout.id, result.changed, result.summary, result.validation);
+  sendJson(ctx.res, 200, { ok: true, changed_lines: result.changed.map(line => publicLine(line, layout.snapshot.profile)) });
 }
 
 export function handleGetLayout(ctx) {

@@ -129,6 +129,24 @@
     crud.appendChild(row);
     crud.appendChild(fileInput);
     root.appendChild(crud);
+    var preset = util.el('select', { id: 'cal-preset', 'aria-label': 'Profile preset' }, [
+      util.el('option', { value: '', text: 'Choose a profile preset…' }),
+      util.el('option', { value: '4mm-yad', text: '4mm yad' })
+    ]);
+    preset.addEventListener('change', async function() {
+      if (!preset.value) return;
+      if (dirty && !window.confirm('Replace the unsaved profile draft with the 4mm yad preset?')) { preset.value = ''; return; }
+      try {
+        var response = await fetch('/profiles/4mm-yad.profile.json');
+        if (!response.ok) throw new Error('Cannot load the 4mm yad preset');
+        var profile = await response.json();
+        ++loadRevision; draft = normalizeProfile(profile); draft.id = null;
+        state.active.profileId = null; markDirty(); renderFromDraft();
+        bus.emit('calibration:draft-changed'); SS.toast('4mm yad loaded. Save to add it to your profiles.');
+      } catch(e) { SS.toast(e.message || String(e), 'error'); }
+      preset.value = '';
+    });
+    root.appendChild(util.el('label', { class: 'field' }, [util.el('span', { text: 'Profile preset' }), preset]));
 
     // Master scale controls
     root.appendChild(util.el('div', { class: 'sirtut' }));
@@ -154,6 +172,7 @@
 
     // letter table
     root.appendChild(tableScaffold());
+    root.appendChild(util.el('p', { class: 'profile-help', text: 'Second stretch limits are used only when the first limits cannot fill a line. They are the total maximum increase from the original width, not an additional percentage. Zero leaves the first limit unchanged. Lower second preference numbers are used first.' }));
 
     var songButton = util.el('button', { id: 'cal-song-widths', class: 'btn btn-ghost btn-sm', type: 'button', text: 'Song widths…' });
     songButton.addEventListener('click', openSongDialog);
@@ -175,7 +194,9 @@
       util.el('th', { text: 'Skeleton units' }),
       util.el('th', { text: 'Total mm' }),
       util.el('th', { id: 'cal-cap-heading', text: 'Cap %' }),
-      util.el('th', { text: 'Stretch preference' })
+      util.el('th', { text: 'Stretch preference' }),
+      util.el('th', { text: 'Second maximum increase' }),
+      util.el('th', { text: 'Second stretch preference' })
     ]);
     var thead = util.el('thead', {}, thr);
     tbl.appendChild(thead);
@@ -425,7 +446,7 @@
       tr.appendChild(tdLet);
 
       // Skeleton (editable)
-      var skelInput = util.el('input', { class: 'cell', type: 'number', step: '0.5', value: skel, 'aria-label': 'skeleton units for ' + letter });
+      var skelInput = util.el('input', { class: 'cell', type: 'number', step: '0.1', value: skel, 'aria-label': 'skeleton units for ' + letter });
       skelInput.addEventListener('input', function () {
         draft.letter_widths[letter] = util.parseNum(skelInput.value);
         markDirty();
@@ -454,6 +475,7 @@
       });
       var tdStretch = util.el('td', { class: 'cap' }, btn);
       tr.appendChild(tdStretch);
+      appendSecondaryCells(tr, letter);
 
       // hover preview
       tr.addEventListener('mouseenter', function () { showPreview(letter); });
@@ -467,7 +489,7 @@
       var minimum = key === 'petucha' || key === 'setuma' ? 20 : 0;
       var tr = util.el('tr', { class: 'special-measurement', 'data-measurement': key });
       tr.appendChild(util.el('td', { class: 'let', text: SPECIAL_LABELS[key] }));
-      var width = util.el('input', { class: 'cell', type: 'number', min: String(minimum), step: '0.5', value: draft.stretch_policy.special_widths_units[key] });
+      var width = util.el('input', { class: 'cell', type: 'number', min: String(minimum), step: '0.1', value: draft.stretch_policy.special_widths_units[key] });
       width.addEventListener('input', function () {
         draft.stretch_policy.special_widths_units[key] = Math.max(minimum, util.parseNum(width.value) || minimum);
         if (key === 'hyphen') draft.stretch_policy.stam_hyphen_units = draft.stretch_policy.special_widths_units[key];
@@ -483,8 +505,27 @@
       var priority = util.el('input', { class: 'cell stretch-priority', type: 'number', min: '1', step: '1', value: draft.stretch_policy.priorities[key] });
       priority.addEventListener('input', function () { draft.stretch_policy.priorities[key] = Math.max(1, Math.round(util.parseNum(priority.value) || 1)); markDirty(); });
       tr.appendChild(util.el('td', { class: 'cap' }, priority));
+      appendSecondaryCells(tr, key);
       tbody.appendChild(tr);
     });
+  }
+
+  function appendSecondaryCells(row, key) {
+    if (!hasPreferences()) {
+      row.appendChild(util.el('td', { text: '—' })); row.appendChild(util.el('td', { text: '—' })); return;
+    }
+    var secondary = draft.stretch_policy.secondary || (draft.stretch_policy.secondary = { caps_percent: {}, priorities: {} });
+    function save() { draft.stretch_policy.secondary = secondary; markDirty(); }
+    row.appendChild(capCell('second ' + key, secondary.caps_percent[key] || 0, true, function(value) {
+      secondary.caps_percent[key] = value; save();
+    }));
+    var priority = util.el('input', { class: 'cell stretch-priority', type: 'number', min: '1', step: '1',
+      value: secondary.priorities[key] || draft.stretch_policy.priorities[key] || 3,
+      'aria-label': 'second stretch preference for ' + key });
+    priority.addEventListener('input', function() {
+      secondary.priorities[key] = Math.max(1, Math.round(util.parseNum(priority.value) || 1)); save();
+    });
+    row.appendChild(util.el('td', { class: 'cap' }, priority));
   }
 
   function capCell(key, cap, percentage, save) {

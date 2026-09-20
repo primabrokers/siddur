@@ -38,6 +38,19 @@ export function validateProfileInput(body) {
         if (!validPercent(value)) errs.push('caps_percent[' + letter + '] must be a non-negative percentage or unlimited');
       }
       if (!['equal_percent', 'equal_mm'].includes(policy.distribution)) errs.push('Choose equal_percent or equal_mm distribution');
+      if (policy.secondary != null) {
+        const secondary = policy.secondary;
+        if (policy.version !== 2 || typeof secondary !== 'object' || Array.isArray(secondary)) errs.push('Secondary stretching requires version 2 rules');
+        else {
+          for (const field of ['caps_percent', 'priorities']) {
+            const values = secondary[field];
+            if (!values || typeof values !== 'object' || Array.isArray(values)) errs.push('Secondary ' + field + ' must be an object');
+            else for (const [key, value] of Object.entries(values)) {
+              if (field === 'caps_percent' ? !validPercent(value) : !Number.isInteger(value) || value < 1) errs.push('Invalid secondary ' + field + ' for ' + key);
+            }
+          }
+        }
+      }
       if (policy.version === 2) {
         if (!validPercent(policy.word_space_percent)) errs.push('Word-space cap must be a non-negative percentage or unlimited');
         if (policy.hyphen_percent != null && !validPercent(policy.hyphen_percent)) errs.push('Hyphen cap must be a non-negative percentage or unlimited');

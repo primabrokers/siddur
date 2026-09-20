@@ -70,6 +70,21 @@
     var cmp = util.el('button', { class: 'btn btn-ghost btn-sm', text: 'Compare' });
     cmp.addEventListener('click', function () { bus.emit('compare:request', lay); SS.activateDrawer('compare'); });
     actions.appendChild(cmp);
+    var remove = util.el('button', { class: 'btn btn-danger btn-sm', text: 'Delete', 'aria-label': 'Delete layout ' + (lay.name || lay.id) });
+    remove.addEventListener('click', async function() {
+      if (!window.confirm('Delete "' + (lay.name || lay.id) + '" and its saved lines, progress and candidates? This cannot be undone.')) return;
+      remove.disabled = true;
+      try {
+        await API.deleteLayout(lay.id);
+        state.layouts = await API.listLayouts(); bus.emit('layouts:list', state.layouts);
+        if (state.active.layoutId === lay.id) {
+          state.layout = null; state.active.layoutId = null; state.selectedLine = null;
+          bus.emit('layout:loaded', null);
+        }
+        SS.toast('Layout deleted.');
+      } catch(error) { remove.disabled = false; SS.toast(error.message || String(error), 'error'); }
+    });
+    actions.appendChild(remove);
 
     body.appendChild(actions);
     el.appendChild(body);

@@ -103,6 +103,10 @@ export function normalizeProfile(p) {
     stretch_policy: src.stretch_policy ? {
       version: src.stretch_policy.version === 2 ? 2 : 1,
       caps_percent: Object.fromEntries(HEBREW_LETTERS.map(ch => [ch, src.stretch_policy.caps_percent?.[ch] ?? 0])),
+      ...(src.stretch_policy.secondary ? { secondary: {
+        caps_percent: { ...src.stretch_policy.secondary.caps_percent },
+        priorities: { ...src.stretch_policy.secondary.priorities },
+      } } : {}),
       distribution: src.stretch_policy.distribution === 'equal_mm' ? 'equal_mm' : 'equal_percent',
       word_space_percent: src.stretch_policy.version === 2 && src.stretch_policy.word_space_percent === 'unlimited' ? 'unlimited' : Number(src.stretch_policy.word_space_percent ?? 50),
       ...(src.stretch_policy.hyphen_percent != null ? {hyphen_percent:src.stretch_policy.hyphen_percent} : {}),

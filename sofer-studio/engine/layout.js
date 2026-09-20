@@ -284,6 +284,12 @@ export function fitLines(source, profile, geometry, opts = {}) {
   const { units, verseLetters } = buildWordUnits(source);
   const overrideMap = buildOverrideMap(source, verseLetters);
   const passageMap = opts.passageMap || null;
+  const nextMarkers = new Array(units.length);
+  let nextMarker = null;
+  for (let i = units.length - 1; i >= 0; i--) {
+    nextMarkers[i] = nextMarker;
+    if (units[i].type !== 'word') nextMarker = units[i];
+  }
 
   const lines = [];
   let current = [];
@@ -293,6 +299,15 @@ export function fitLines(source, profile, geometry, opts = {}) {
 
   const pushLine = (flags = {}) => {
     if (current.length === 0 && !flags.force) return;
+    if (flags.songEnd) {
+      const gaps = current.filter(item => item.type === 'segment_gap');
+      if (gaps.length > 2) throw new Error('A song line may contain at most two m breaks before e');
+      const song = profile.stretch_policy?.song_widths_mm || {};
+      const target = Number(song.page) > 0 ? Number(song.page) : lineW;
+      const automatic = gaps.filter(item => item.width_mm === 0);
+      const extra = automatic.length ? Math.max(0, target - currentWidth) / automatic.length : 0;
+      automatic.forEach(item => { item.width_mm = extra; currentWidth += extra; });
+    }
     const line = makeLine(current, currentWidth, lineW, profile, flags);
     if (currentSong) line.fixed_pattern = true;
     if (flags.blankLine) line.blank_line = true;
@@ -329,6 +344,12 @@ export function fitLines(source, profile, geometry, opts = {}) {
     }
 
     if (u.type === 'word') {
+      // m/e defines the row explicitly, including its first segment. Never
+      // wrap the first segment before encountering its middle-break marker.
+      if (!currentSong) {
+        const marker = nextMarkers[i];
+        if (marker?.type === 'song_end' || (marker?.type === 'song_break' && marker.break_kind === 'm')) currentSong = true;
+      }
       const w = measureWord(u, profile, overrideMap);
       const reserve = current.some(item => item.type === 'segment_gap') ? 0 : paragraphReserve(units, i, profile, geometry, overrideMap);
       const joinsSetuma = profile.stretch_policy?.version === 2 && current.at(-1)?.type === 'setuma_gap';
@@ -337,7 +358,7 @@ export function fitLines(source, profile, geometry, opts = {}) {
       if (current.length === 0) {
         current.push({ ...u, width_mm: w, override: wordOverrides(u, overrideMap, profile) });
         currentWidth = w;
-      } else if (joinsSetuma || currentWidth + addW + reserve <= lineW + 1e-9) {
+      } else if (currentSong || joinsSetuma || currentWidth + addW + reserve <= lineW + 1e-9) {
         current.push({ ...u, width_mm: w, override: wordOverrides(u, overrideMap, profile) });
         currentWidth += addW;
       } else {
@@ -364,9 +385,13 @@ export function fitLines(source, profile, geometry, opts = {}) {
       pushLine({ endedBy: u.type, endVerse: u.verse });
     } else if (u.type === 'song_break') {
       const song = profile.stretch_policy?.song_widths_mm || {};
-      const width = Math.max(0, Number(u.break_kind === '1' ? song.middle : song.side) || 0);
-      current.push({ type: 'segment_gap', break_kind: u.break_kind === '1' ? 'middle' : 'side', width_mm: width, verse: u.verse });
+      const middle = u.break_kind === '1' || u.break_kind === 'm';
+      const width = Math.max(0, Number(middle ? song.middle : song.side) || 0);
+      current.push({ type: 'segment_gap', break_kind: middle ? 'middle' : 'side', width_mm: width, verse: u.verse });
       currentWidth += width; prevWasWord = false; currentSong = true;
+    } else if (u.type === 'song_end') {
+      currentSong = true;
+      pushLine({ songEnd: true });
     } else if (u.type === 'blank_line') {
       pushLine();
       pushLine({ force: true, blankLine: true });
@@ -377,7 +402,7 @@ export function fitLines(source, profile, geometry, opts = {}) {
   return { lines, totalLetters: verseLetters.reduce((s, vl) => s + vl.letters.length, 0) };
 }
 
-function makeLine(items, width, lineW, profile, flags = {}) {
+export function makeLine(items, width, lineW, profile, flags = {}) {
   const words = items.filter((i) => i.type === 'word');
   const setumaGaps = items.filter((i) => i.type === 'setuma_gap');
   const hasSetuma = setumaGaps.length > 0;
@@ -451,7 +476,7 @@ function startsWithVav(word) {
 
 // ---- Stretch candidates & justification ----------------------------------
 
-export function stretchCandidatesOf(line, profile, lettersById) {
+function primaryStretchCandidatesOf(line, profile) {
   // A paragraph-break line is gap-only. A finite gap cap must never cause
   // fallback stretching of letters or normal spaces on that same line.
   if (profile.stretch_policy && (line.has_setuma || line.petucha_end)) {
@@ -496,14 +521,43 @@ export function stretchCandidatesOf(line, profile, lettersById) {
   return cands.concat(spaceCandidatesOf(line, profile));
 }
 
+// The second maximum is a TOTAL increase from the original width. It becomes
+// available only when every first-pass target together cannot fill this row.
+export function stretchCandidatesOf(line, profile) {
+  const primary = primaryStretchCandidatesOf(line, profile);
+  const secondary = profile.stretch_policy?.version === 2 && profile.stretch_policy.secondary;
+  if (!secondary || primary.reduce((sum, c) => sum + c.cap_mm, 0) >= baseBudget(line) - 0.001) return primary;
+  const larger = (a, b) => a === 'unlimited' || b === 'unlimited' ? 'unlimited' : Math.max(Number(a) || 0, Number(b) || 0);
+  const policy = profile.stretch_policy;
+  const expanded = { ...profile, stretch_priorities: { ...profile.stretch_priorities, ...secondary.priorities },
+    stretch_policy: { ...policy, caps_percent: { ...policy.caps_percent } } };
+  for (const [key, cap] of Object.entries(secondary.caps_percent || {})) {
+    if (['word_space', 'hyphen', 'petucha', 'setuma'].includes(key)) expanded.stretch_policy[key + '_percent'] = larger(policy[key + '_percent'], cap);
+    else expanded.stretch_policy.caps_percent[key] = larger(policy.caps_percent[key], cap);
+  }
+  const originals = new Map(primary.map(c => [c.letter_occurrence_id, c.cap_mm]));
+  return primaryStretchCandidatesOf(line, expanded).map(c => ({ ...c, primary_cap_mm: originals.get(c.letter_occurrence_id) || 0 }));
+}
+
 export function autoSuggestLine(line, profile, opts = {}) {
   if (line.fixed_pattern || (line.petucha_end && profile.stretch_policy?.version !== 2) || line.sefer_end || line.setuma_at_edge || (line.has_setuma && !profile.stretch_policy)) {
     return { suggestions: [], unjustifiable: false, shortfall_mm: 0, skipped: 'intentional spacing or fixed passage' };
   }
-  const cands = stretchCandidatesOf(line, profile);
+  const cands = primaryStretchCandidatesOf(line, profile);
   if (profile.stretch_policy) {
     const budget = baseBudget(line);
     const suggestions = balancedSuggestions(cands, budget, profile.stretch_policy.distribution);
+    const remaining = budget - suggestions.reduce((n, d) => n + d.stretch_mm, 0);
+    if (remaining >= 0.001 && profile.stretch_policy.secondary) {
+      const used = new Map(suggestions.map(d => [d.letter_occurrence_id, d]));
+      const fallback = stretchCandidatesOf(line, profile).map(c => ({ ...c,
+        cap_mm: Math.max(0, c.cap_mm - (used.get(c.letter_occurrence_id)?.stretch_mm || 0)) }));
+      for (const extra of balancedSuggestions(fallback, remaining, profile.stretch_policy.distribution)) {
+        const existing = used.get(extra.letter_occurrence_id);
+        if (existing) existing.stretch_mm = round(existing.stretch_mm + extra.stretch_mm);
+        else suggestions.push(extra);
+      }
+    }
     const shortfall = round(Math.max(0, budget - suggestions.reduce((n, d) => n + d.stretch_mm, 0)));
     return { suggestions, unjustifiable: shortfall >= 0.001, shortfall_mm: shortfall };
   }
@@ -1029,16 +1083,32 @@ export async function computeLayoutAsync(source, profile, geometry, opts = {}) {
   const gap_word = interWordGap(profile);
   const sgap = setumaGapMm(profile, geometry);
 
+  const nextMarkers = new Array(units.length);
+  let nextMarker = null;
+  for (let i = units.length - 1; i >= 0; i--) {
+    nextMarkers[i] = nextMarker;
+    if (units[i].type !== 'word') nextMarker = units[i];
+  }
   const lines = [];
+  let currentSong = false;
   let current = [];
   let currentWidth = 0;
   let prevWasWord = false;
   const pushLine = (flags = {}) => {
     if (current.length === 0 && !flags.force) return;
+    if (flags.songEnd) {
+      const gaps = current.filter(item => item.type === 'segment_gap');
+      if (gaps.length > 2) throw new Error('A song line may contain at most two m breaks before e');
+      const song = profile.stretch_policy?.song_widths_mm || {};
+      const target = Number(song.page) > 0 ? Number(song.page) : lineW;
+      const automatic = gaps.filter(item => item.width_mm === 0);
+      const extra = automatic.length ? Math.max(0, target - currentWidth) / automatic.length : 0;
+      automatic.forEach(item => { item.width_mm = extra; currentWidth += extra; });
+    }
     const line = makeLine(current, currentWidth, lineW, profile, flags);
-    if (current.some(item => item.type === 'segment_gap')) line.fixed_pattern = true;
+    if (currentSong || current.some(item => item.type === 'segment_gap')) line.fixed_pattern = true;
     lines.push(line);
-    current = []; currentWidth = 0; prevWasWord = false;
+    current = []; currentWidth = 0; prevWasWord = false; currentSong = false;
   };
 
   const yieldEvery = opts.progressChunk || 256;
@@ -1066,6 +1136,8 @@ export async function computeLayoutAsync(source, profile, geometry, opts = {}) {
       continue;
     }
     if (u.type === 'word') {
+      const marker = nextMarkers[i];
+      if (marker?.type === 'song_end' || (marker?.type === 'song_break' && marker.break_kind === 'm')) currentSong = true;
       const w = measureWord(u, profile, overrideMap);
       const reserve = current.some(item => item.type === 'segment_gap') ? 0 : paragraphReserve(units, i, profile, geometry, overrideMap);
       const joinsSetuma = profile.stretch_policy?.version === 2 && current.at(-1)?.type === 'setuma_gap';
@@ -1073,7 +1145,7 @@ export async function computeLayoutAsync(source, profile, geometry, opts = {}) {
       if (current.length === 0) {
         current.push({ ...u, width_mm: w, override: wordOverrides(u, overrideMap, profile) });
         currentWidth = w;
-      } else if (joinsSetuma || currentWidth + addGap + w + reserve <= lineW + 1e-9) {
+      } else if (currentSong || joinsSetuma || currentWidth + addGap + w + reserve <= lineW + 1e-9) {
         current.push({ ...u, width_mm: w, override: wordOverrides(u, overrideMap, profile) });
         currentWidth += addGap + w;
       } else {
@@ -1099,9 +1171,13 @@ export async function computeLayoutAsync(source, profile, geometry, opts = {}) {
       pushLine({ endedBy: u.type, endVerse: u.verse });
     } else if (u.type === 'song_break') {
       const song = profile.stretch_policy?.song_widths_mm || {};
-      const width = Math.max(0, Number(u.break_kind === '1' ? song.middle : song.side) || 0);
-      current.push({ type: 'segment_gap', break_kind: u.break_kind === '1' ? 'middle' : 'side', width_mm: width, verse: u.verse });
-      currentWidth += width; prevWasWord = false;
+      const middle = u.break_kind === '1' || u.break_kind === 'm';
+      const width = Math.max(0, Number(middle ? song.middle : song.side) || 0);
+      current.push({ type: 'segment_gap', break_kind: middle ? 'middle' : 'side', width_mm: width, verse: u.verse });
+      currentWidth += width; prevWasWord = false; currentSong = true;
+    } else if (u.type === 'song_end') {
+      currentSong = true;
+      pushLine({ songEnd: true });
     } else if (u.type === 'blank_line') {
       pushLine();
       const blank = makeLine([], 0, lineW, profile, { force: true });

@@ -24,7 +24,7 @@ test('requested defaults save, custom lines remain editable even at a preset, an
     assert.equal(f.SS.calibration.getDraft().letter_height_units,2.5);
     for(const id of ['cal-policy-mode','cal-unit-mode','cal-stretch-distribution','cal-stretch-position','geom-small_letter_reference','geom-setuma_reference_letter']) assert.equal(f.d.getElementById(id),null);
     for(const key of ['unit_mm','min_inter_word_gap_mm','max_inter_word_gap_mm','max_inter_word_gap_factor']) assert.equal(f.d.querySelector('[data-field="'+key+'"]'),null);
-    assert.deepEqual([...f.d.querySelectorAll('.letter-table th')].map(el=>el.textContent),['Letter','Skeleton units','Total mm','Maximum increase','Stretch preference']);
+    assert.deepEqual([...f.d.querySelectorAll('.letter-table th')].map(el=>el.textContent),['Letter','Skeleton units','Total mm','Maximum increase','Stretch preference','Second maximum increase','Second stretch preference']);
     const input=f.d.getElementById('geom-lines-custom-input'),custom=f.d.querySelector('[data-lines="custom"]');
     custom.click();assert.equal(f.d.getElementById('geom-lines-custom').hidden,false);assert.equal(custom.getAttribute('aria-pressed'),'true');
     for(const value of [45,42,53]) {input.value=value;input.dispatchEvent(new f.w.Event('input'));assert.equal(f.SS.geometry.getDraft().lines_per_amud,value);assert.equal(f.d.getElementById('geom-lines-custom').hidden,false);}
@@ -40,9 +40,9 @@ test('shortfall is the immutable original gap in row units, with line numbers fu
     f.w.eval(source('tikkun.js'));f.SS.tikkun.init({});
     const lines=[0,2,4,6,5,-2].map((missing,i)=>({amud:1,line_index:i+1,text:'אב',width_mm:125-missing,base_leftover_mm:missing,leftover_mm:0,words:[],stretch_decisions:[{stretch_mm:Math.max(0,missing)}]}));
     f.SS.tikkun.render({id:'shortfall',geometry:{line_width_mm:125,lines_per_amud:42,baseline_pitch_mm:7.5},snapshot:{profile:{units_per_row:62.5}},lines});
-    assert.deepEqual([...f.d.querySelectorAll('.side')].map(el=>el.textContent),['ש״ת','ח״א','ח״ב','ח״ג','ח״ב+0.5','י״א']);
-    assert.deepEqual([...f.d.querySelectorAll('.lnum')].map(el=>el.textContent),['I','II','III','IV','V','VI']);
-    assert.deepEqual([...f.d.querySelector('.line').children].map(el=>el.className),['lnum','side','ltext']);
+    assert.deepEqual([...f.d.querySelectorAll('.side')].map(el=>el.textContent),['ש״ת','ח״א','ח״ב','ח״ג','ח״ג','י״א']);
+    assert.deepEqual([...f.d.querySelectorAll('.lnum')].map(el=>el.textContent),['1','2','3','4','5','6']);
+    assert.deepEqual([...f.d.querySelector('.line').children].map(el=>el.className),['lnum','side','ltext','line-move']);
     assert.equal(f.d.querySelector('.sirtut-grid'),null);
     assert.equal(lines[1].base_leftover_mm,2);assert.equal(lines[1].leftover_mm,0);
   }finally{f.dom.window.close();}

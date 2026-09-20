@@ -422,7 +422,11 @@ table.data tr.sev-warn td { background: rgba(199,154,63,.08); }
 .sheet-head .amud-num .gim { font-family: var(--font-he); font-weight: 700; margin-left: 6px; }
 
 .amudim-row { display: flex; flex-direction: column; gap: 24px; align-items: stretch; }
-.page-placeholder { width: calc(var(--line-width) + 122px); }
+.page-placeholder { width: calc(var(--line-width) + 170px); }
+.page-footer { margin-top: 14px; text-align: center; font: 11px/1.5 var(--font-ui); color: var(--muted); }
+.line-move { display: inline-flex; flex: 0 0 48px; align-self: center; padding-right: 6px; }
+.line-move .btn { padding: 2px 4px; font-size: 12px; }
+@media print { .line-move { visibility: hidden; } }
 
 .amud {
   flex: 0 0 auto;
@@ -485,8 +489,7 @@ table.data tr.sev-warn td { background: rgba(199,154,63,.08); }
   text-decoration-skip-ink: none;
   text-shadow: 0 0 1px #111;
 }
-.marker-large { font-size: 1.5em; line-height: .66; }
-.marker-small { font-size: .5em; }
+.marker-large, .marker-small { font-size: inherit; }
 .marker-dotted::before { content: '\2022'; position: absolute; inset-inline-start: 40%; top: -.65em; color: currentColor; }
 .marker-dotted { position: relative; }
 .marker-backward_nun { transform: scaleX(-1); }

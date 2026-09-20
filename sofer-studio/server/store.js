@@ -174,11 +174,6 @@ export function saveLayout(db, meta, computed) {
   const insertLayout = db.prepare(`INSERT INTO layouts (id, name, source_id, profile_id, geometry_id, pattern_ids,
     annotations, source_hash, profile_snapshot, geometry_snapshot, status, summary, validation, created_at)
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
-  const insertLine = db.prepare(`INSERT INTO layout_lines (
-    id, layout_id, line_id, line_key, line_index, amud, tokens, text, consonant_text, width_mm,
-    leftover_mm, stretch_decisions, letter_occurrence_ids, shem, uncertain_shem, first_word, last_word, verse_refs,
-    words, items, base_leftover_mm, stretched_width_mm, status, created_at
-  ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
   const tx = db.transaction((lines) => {
     insertLayout.run(
       id, meta.name || null, meta.source_id, meta.profile_id, meta.geometry_id,
@@ -186,6 +181,18 @@ export function saveLayout(db, meta, computed) {
       json(meta.profile_snapshot), json(meta.geometry_snapshot), 'draft',
       json(computed.summary), json(meta.validation), nowIso()
     );
+    insertLayoutLines(db, id, lines);
+  });
+  tx(computed.lines);
+  return id;
+}
+
+function insertLayoutLines(db, id, lines) {
+  const insertLine = db.prepare(`INSERT INTO layout_lines (
+    id, layout_id, line_id, line_key, line_index, amud, tokens, text, consonant_text, width_mm,
+    leftover_mm, stretch_decisions, letter_occurrence_ids, shem, uncertain_shem, first_word, last_word, verse_refs,
+    words, items, base_leftover_mm, stretched_width_mm, status, created_at
+  ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
     for (const l of lines) {
       insertLine.run(
         getId(), id, l.line_id, l.line_key || null, l.line_index, l.amud, json(l.tokens), l.text || l.tokens.join(' '),
@@ -201,9 +208,24 @@ export function saveLayout(db, meta, computed) {
         json({petucha_end:!!l.petucha_end,sefer_end:!!l.sefer_end,fixed_pattern:!!l.fixed_pattern,book_boundary_blank:!!l.book_boundary_blank,reference_page:l.reference_page||null}),id,l.line_id
       );
     }
-  });
-  tx(computed.lines);
-  return id;
+}
+
+export function saveEditedLines(db, id, lines, summary, validation) {
+  db.transaction(() => {
+    for (const line of lines) db.prepare('DELETE FROM layout_lines WHERE layout_id=? AND line_id=?').run(id, line.line_id);
+    insertLayoutLines(db, id, lines);
+    db.prepare('UPDATE layouts SET summary=?, validation=? WHERE id=?').run(json(summary), json(validation), id);
+  })();
+}
+
+export function deleteLayout(db, id) {
+  return db.transaction(() => {
+    if (!getLayoutRow(db, id)) return false;
+    db.prepare('DELETE FROM candidates WHERE parent_layout_id=?').run(id);
+    db.prepare('DELETE FROM layout_lines WHERE layout_id=?').run(id);
+    db.prepare('DELETE FROM layouts WHERE id=?').run(id);
+    return true;
+  })();
 }
 
 export function listLayouts(db) {

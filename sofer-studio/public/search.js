@@ -103,7 +103,7 @@
     var tradInput = util.el('input', { type: 'text', placeholder: 'Tradition (optional)', 'data-i': 'tradition' });
     var fmtSel = util.el('select', { 'data-i': 'format' },
       [util.el('option', { value: 'txt', text: 'Text / STAM — detect English markers automatically' }),
-       util.el('option', { value: 'stam', text: 'STAM keyboard text (capitals, p / s / l)' }),
+       util.el('option', { value: 'stam', text: 'STAM keyboard text (capitals, p / s / l, m / e, + / -)' }),
        util.el('option', { value: 'json', text: 'JSON' }),
        util.el('option', { value: 'sefaria', text: 'Sefaria' })]);
     imp.appendChild(util.el('div', { class: 'import-row' }, [nameInput, tradInput]));
@@ -124,7 +124,7 @@
 
     var aside = util.el('details', { class: 'import-hint' },
       [util.el('summary', { text: 'Import notes' }),
-       util.el('p', { class: 't--2 faint', text: 'The original is preserved. Capitals use the Hebrew keyboard and mark only those letters as holy (שמות קודש), with a white strike. Lowercase p = pesucha, s = setuma, l = blank line, even attached to a word. The program never decides holiness from a word’s spelling. Unsupported STAM characters are reported, not silently removed.' })]);
+       util.el('p', { class: 't--2 faint', text: 'The original is preserved. Capitals use the Hebrew keyboard and mark only those letters as holy (שמות קודש), with a white strike. Lowercase p = pesucha, s = setuma, l = blank line, even attached to a word. Put + immediately before a letter for 1.5× width and height, or - for half size; both align at the top. For a song row, m makes a middle break and e ends the row: use one m for two sections or two for three. The program never decides holiness from a word’s spelling. Unsupported STAM characters are reported, not silently removed.' })]);
     imp.appendChild(aside);
     root.appendChild(imp);
 
