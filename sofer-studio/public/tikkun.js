@@ -22,7 +22,8 @@
   var pageIndex = 0, pageEls = [], fitMode = 'width', frame = null, currentSheet = null;
   var toolbar, pageSelect, fitSelect, scaleLabel, prevButton, nextButton, expandButton;
   var fitPending = false, renderedLayout = null, renderedCount = 0;
-  var buildPage = null, pageGroups = [], printReady = false;
+  var buildPage = null, pageGroups = [], printReady = false, preparingPrint = false;
+  var scrollPending = false;
 
   // The seven letters that traditionally receive taggin (visual only).
   var TAGGIN = { '\u05e9': 1, '\u05e2': 1, '\u05d8': 1, '\u05e0': 1, '\u05d6': 1, '\u05d2': 1, '\u05e5': 1 };
@@ -31,6 +32,7 @@
     container = util.byId('tikkun-scroll');
     refEl = util.byId('tikkun-ref');
     buildPreviewControls();
+    container.addEventListener('scroll', scheduleVisiblePages, { passive: true });
     if (window.ResizeObserver) new ResizeObserver(scheduleFit).observe(container);
     window.addEventListener('resize', scheduleFit);
     if (document.fonts) document.fonts.load('24px "Stam Ashkenaz CLM"', 'אבגד').then(scheduleFit).catch(function () {
@@ -68,7 +70,7 @@
     var sectionLabel = util.el('label', { class: 'toggle' }, [sectionToggle,
       util.el('span', { text: 'פ/ס guides' })]);
     sectionLabel.title = 'Section markers are screen-only guides and are not printed.';
-    var help = util.el('details', { class: 'preview-help' }, [util.el('summary', { text: 'Reading the preview' }), util.el('p', { text: 'Vertical guides mark the measured text margins. Green = aligned; amber = still short. Section and book-end spaces stay open. Downloads include all pages.' })]);
+    var help = util.el('details', { class: 'preview-help' }, [util.el('summary', { text: 'Reading the preview' }), util.el('p', { text: 'Scroll down through every page. The note to the right of each line shows its missing units before stretching: ש״ת = complete, ח״א = 1 unit, ח״ב = 2 units. Section and book-end spaces stay open. Downloads include all pages.' })]);
     [prevButton, pageSelect, nextButton, fitSelect, scaleLabel, expandButton, printButton].forEach(function (e) { toolbar.appendChild(e); });
     toolbar.appendChild(sectionLabel);
     sectionToggle.addEventListener('change', function () {
@@ -99,30 +101,60 @@
     pageIndex = Math.max(0, Math.min(pageEls.length - 1, index));
     printReady = false;
     container.classList.remove('print-ready');
-    pageEls.forEach(function (el, i) {
-      if (i === pageIndex && !el.dataset.rendered) {
-        var built = buildPage(i); el.replaceWith(built); pageEls[i] = el = built;
-      } else if (i !== pageIndex && el.dataset.rendered) {
-        // Keep only the visible page's glyph/word DOM, not an entire book.
-        var placeholder = el.cloneNode(false); delete placeholder.dataset.rendered;
-        el.replaceWith(placeholder); pageEls[i] = el = placeholder;
-      }
-      el.classList.toggle('screen-page-hidden', i !== pageIndex);
-    });
+    renderPageWindow(pageIndex, pageIndex);
+    updatePageControls();
+    fitPage();
+    pageEls[pageIndex].scrollIntoView({ block: 'start' });
+    scheduleVisiblePages();
+  }
+
+  function updatePageControls() {
     pageSelect.value = String(pageIndex);
     prevButton.disabled = pageIndex === 0; nextButton.disabled = pageIndex === pageEls.length - 1;
-    container.scrollTop = 0; container.scrollLeft = 0;
-    scheduleFit();
+  }
+
+  function renderPageWindow(first, last) {
+    if (printReady || preparingPrint) return false;
+    var changed = false;
+    pageEls.forEach(function (el, i) {
+      var needed = i >= first - 1 && i <= last + 1;
+      if (needed === !!el.dataset.rendered) return;
+      var replacement = buildPage(i, !needed);
+      el.replaceWith(replacement); pageEls[i] = replacement; changed = true;
+    });
+    return changed;
+  }
+
+  function scheduleVisiblePages() {
+    if (scrollPending || printReady || preparingPrint) return;
+    scrollPending = true;
+    requestAnimationFrame(function () {
+      scrollPending = false;
+      if (!pageEls.length || renderedCount !== pageEls.length || !container.clientHeight || printReady || preparingPrint) return;
+      var viewport = container.getBoundingClientRect(), first = -1, last = -1;
+      pageEls.forEach(function (el, i) {
+        var rect = el.getBoundingClientRect();
+        if (rect.bottom > viewport.top && rect.top < viewport.bottom) {
+          if (first < 0) first = i;
+          last = i;
+        }
+      });
+      if (first < 0) return;
+      pageIndex = first; updatePageControls();
+      if (renderPageWindow(first, last)) scheduleFit();
+    });
   }
 
   async function preparePrint() {
     if (document.fonts) await document.fonts.load('24px "Stam Ashkenaz CLM"', 'אבגד');
     if (!pageEls.length || !buildPage) return false;
+    preparingPrint = true;
+    try {
     var token = renderToken;
     for (var i = 0; i < pageEls.length; i++) {
       if (token !== renderToken) return false;
       if (!pageEls[i].dataset.rendered) {
-        var built = buildPage(i); built.classList.toggle('screen-page-hidden', i !== pageIndex);
+        var built = buildPage(i);
         pageEls[i].replaceWith(built); pageEls[i] = built;
       }
       if (i % 2 === 1) await new Promise(function (resolve) { setTimeout(resolve, 0); });
@@ -133,6 +165,7 @@
     try { fitGlyphs(); } finally { container.classList.remove('print-measuring'); }
     printReady = true; container.classList.add('print-ready');
     return true;
+    } finally { preparingPrint = false; }
   }
 
   function finishPrint() { if (pageEls.length) selectPage(pageIndex); }
@@ -157,11 +190,13 @@
     fitGlyphs();
     var width = Math.max(currentSheet.offsetWidth, currentSheet.scrollWidth);
     var height = Math.max(currentSheet.offsetHeight, currentSheet.scrollHeight);
-    var scale = fitScale(fitMode, width, height, Math.max(1, container.clientWidth - 56), Math.max(1, container.clientHeight - 56));
+    var pageHeight = pageEls[pageIndex].offsetHeight + 44;
+    var scale = fitScale(fitMode, width, pageHeight, Math.max(1, container.clientWidth - 56), Math.max(1, container.clientHeight - 56));
     currentSheet.style.transform = 'scale(' + scale + ')';
     frame.style.width = Math.ceil(width * scale) + 'px';
     frame.style.height = Math.ceil(height * scale) + 'px';
     scaleLabel.textContent = Math.round(scale * 100) + '%';
+    scheduleVisiblePages();
   }
 
   function fitGlyphs() {
@@ -227,6 +262,7 @@
   function renderEmpty() {
     if (!container) return;
     util.clear(container);
+    printReady = false; container.classList.remove('print-ready');
     currentSheet = null; frame = null; pageEls = []; pageGroups = []; buildPage = null; printReady = false;
     if (pageSelect) { util.clear(pageSelect); pageSelect.disabled = true; prevButton.disabled = true; nextButton.disabled = true; scaleLabel.textContent = ''; }
     var msg = util.el('div', { class: 'empty' },
@@ -247,6 +283,7 @@
     }
     util.clear(container);
     var sameLayout = renderedLayout && renderedLayout.id === layout.id;
+    printReady = false; container.classList.remove('print-ready');
     renderedLayout = layout;
     if (!sameLayout) pageIndex = 0;
 
@@ -291,21 +328,21 @@
     // Lazy page DOM. A full book contains hundreds of thousands of glyph spans;
     // constructing all of them up front freezes the browser unnecessarily.
     pageGroups = amudim;
-    buildPage = function (gi) {
+    buildPage = function (gi, placeholder) {
       var g = amudim[gi];
       var lastYeria = layout.summary && layout.summary.amudim_per_yeria &&
         (g.num % layout.summary.amudim_per_yeria === 0);
-      var el = buildAmud(g, gi, layout, lastYeria);
+      var el = buildAmud(g, gi, layout, lastYeria, placeholder);
       el.appendChild(util.el('div', { class: 'print-study-label', text: 'Sofer Studio · ' + (layout.summary && layout.summary.layout_mode==='reflow' ? 'Reflowed from Tikkun · '+layout.summary.units_per_row+' units per line — new pagination; sofer review required' : layout.summary && layout.summary.reference ? 'Tikkun reference column '+g.lines[0].reference_page+' — sofer review required' : isStudyPreview ? 'STUDY PREVIEW — NOT WRITING-READY' : isExcerpt ? 'SAMPLE TEXT — NOT A FULL TORAH LAYOUT' : 'Study layout — verify source, calibration and special passages before writing.') }));
       // Reserve the complete column height even for a short sample. This is a
       // viewport treatment only; no lines, words or measured boxes are changed.
       var geometry = layoutGeometry(layout) || {};
       var fullHeight = Number(geometry.lines_per_amud || g.lines.length) * Number(geometry.baseline_pitch_mm || 8);
       if (Number.isFinite(fullHeight) && fullHeight > 0) el.style.minHeight = fullHeight + 'mm';
-      el.dataset.rendered = 'true';
+      if (!placeholder) el.dataset.rendered = 'true';
       return el;
     };
-    var amudEls = amudim.map(function (g) { var el = util.el('div', { class: 'amud screen-page-hidden' }); el.dataset.amud = String(g.num); return el; });
+    var amudEls = amudim.map(function (g, i) { return buildPage(i, true); });
     pageEls = amudEls;
     util.clear(pageSelect);
     amudim.forEach(function (g, i) { pageSelect.appendChild(util.el('option', { value: String(i), text: 'Page ' + (i + 1) + ' of ' + amudim.length + ' · Amud ' + g.num })); });
@@ -316,11 +353,15 @@
     (function appendNext(start) {
       if (token !== renderToken) return;
       var end = Math.min(start + chunk, amudEls.length);
-      for (var i = start; i < end; i++) row.appendChild(amudEls[i]);
+      for (var i = start; i < end; i++) row.appendChild(pageEls[i]);
       renderedCount = end;
       if (end < amudEls.length) {
         setTimeout(function () { appendNext(end); }, 0);
-      } else { bus.emit('preview:ready'); scheduleFit(); }
+      } else {
+        // Restore a selected page even when it was beyond the first append chunk.
+        if (frame) selectPage(pageIndex);
+        bus.emit('preview:ready'); scheduleFit();
+      }
     })(0);
 
     frame = util.el('div', { class: 'preview-page-frame' });
@@ -329,7 +370,7 @@
     fillPrintNote(layout);
   }
 
-  function buildAmud(g, gi, layout, isYeriaEdge) {
+  function buildAmud(g, gi, layout, isYeriaEdge, placeholder) {
     var amud = util.el('div', { class: 'amud' + (isYeriaEdge ? ' onde' : '') });
     amud.dataset.amud = String(g.num);
 
@@ -340,10 +381,6 @@
 
     var linesWrap = util.el('div', { class: 'lines' });
 
-    // sirtut grid (uniform baseline pitch)
-    var grid = util.el('div', { class: 'sirtut-grid' });
-    linesWrap.appendChild(grid);
-
     var geom = layoutGeometry(layout);
     var pitch = (geom && geom.baseline_pitch_mm) || 10;
     var profile = layout.snapshot && layout.snapshot.profile;
@@ -351,13 +388,14 @@
     if (geom && geom.line_width_mm) linesWrap.style.setProperty('--line-width', geom.line_width_mm + 'mm');
     linesWrap.style.minHeight = ((geom && geom.lines_per_amud) || g.lines.length) * pitch + 'mm';
 
-    g.lines.forEach(function (line, li) {
+    if (placeholder) {
+      // Keep the page's full geometry in the scroll track without its glyph DOM.
+      // Metadata gutters have fixed widths so lazy pages never shift the text.
+      linesWrap.classList.add('page-placeholder');
+    } else g.lines.forEach(function (line, li) {
       var lineEl = renderLine(line, g.num, li, g.lines.length, pitch);
       linesWrap.appendChild(lineEl);
 
-      var lr = util.el('span', { class: 'lr' });
-      lr.style.top = (li * pitch) + 'mm';
-      grid.appendChild(lr);
     });
 
     amud.appendChild(linesWrap);
@@ -376,9 +414,10 @@
     el.style.height = pitch + 'mm';
     el.style.minHeight = '0'; el.style.padding = '0';
 
-    var gim = util.el('span', { class: 'lnum', text: util.gimatria(li + 1) });
-    gim.setAttribute('lang', 'he');
+    var gim = util.el('span', { class: 'lnum', text: romanNumeral(li + 1), dir: 'ltr' });
+    gim.setAttribute('lang', 'en');
     el.appendChild(gim);
+    el.appendChild(shortfallNote(line));
 
     var txt = util.el('span', { class: 'ltext' });
     txt.setAttribute('lang', 'he');
@@ -399,21 +438,6 @@
 
     el.appendChild(txt);
 
-    // side note: leftover / width
-    var leftover = pick(line, ['leftover_mm', 'leftover'], null);
-    var width = pick(line, ['stretched_width_mm', 'width_mm', 'width'], null);
-    var side = [];
-    side.push(alignment==='intentional'?'Section / fixed space':alignment==='aligned'?'Aligned':alignment==='short'?'Still short':alignment==='overfull'?'Overfull':'Unmeasured');
-    if (leftover !== null && leftover !== undefined && util.isFiniteNum(leftover) && Number(leftover) !== 0) {
-      side.push((Number(leftover) > 0 ? '+' : '') + util.fmt(leftover) + '\u00a0mm');
-    }
-    if (width !== null && width !== undefined && util.isFiniteNum(width)) {
-      side.push(util.fmt(width) + '\u00a0mm');
-    }
-    if (side.length) {
-      el.appendChild(util.el('span', { class: 'side', text: side.join(' · ') }));
-    }
-
     // aria label: amud, line, verse ref
     var ref = pick(line, ['verse_ref', 'ref', 'verse'], '');
     el.setAttribute('aria-label', 'Amud ' + amudNum + ', line ' + num + (ref ? ', ' + ref : ''));
@@ -430,6 +454,41 @@
     // store estimate for sirtut placement
     el.estimatedHeight = 18 * 1.5 + 4; // approx em height
     return el;
+  }
+
+  function romanNumeral(value) {
+    var n = Math.max(1, Math.floor(Number(value))), text = '';
+    [[1000,'M'],[900,'CM'],[500,'D'],[400,'CD'],[100,'C'],[90,'XC'],[50,'L'],[40,'XL'],[10,'X'],[9,'IX'],[5,'V'],[4,'IV'],[1,'I']].forEach(function (entry) {
+      while (n >= entry[0]) { text += entry[1]; n -= entry[0]; }
+    });
+    return text;
+  }
+
+  function shortfallNote(line) {
+    var geometry = layoutGeometry(renderedLayout) || {};
+    var profile = renderedLayout && renderedLayout.snapshot && renderedLayout.snapshot.profile || {};
+    var summary = renderedLayout && renderedLayout.summary || {};
+    var rowUnits = Number(profile.units_per_row || summary.units_per_row);
+    var unit = rowUnits > 0 && profile.unit_basis !== 'skeleton' ? Number(geometry.line_width_mm) / rowUnits :
+      Number(profile.unit_mm) * Number(profile.letter_height_mm || 1) / Number(profile.reference_height_mm || 1);
+    var missing = line.base_leftover_mm != null ? Number(line.base_leftover_mm) :
+      line.width_mm != null ? Number(geometry.line_width_mm) - Number(line.width_mm) :
+      line.leftover_mm != null ? Number(line.leftover_mm) + (line.stretch_decisions || []).reduce(function (sum, d) { return sum + Number(d.stretch_mm || 0); }, 0) : NaN;
+    var units = unit > 0 ? missing / unit : NaN, text = '—', title = 'Original line units unavailable';
+    if (Number.isFinite(units)) {
+      // The engine rounds millimetres to 0.001. Remove that rounding noise only.
+      if (Math.abs(units - Math.round(units)) * unit <= 0.0011) units = Math.round(units);
+      var absolute = Math.abs(units), whole = Math.floor(absolute), fraction = Math.round((absolute - whole) * 100) / 100;
+      var amount = '';
+      while (whole >= 400) { amount += 'ת'; whole -= 400; }
+      amount += whole > 0 ? util.gimatriaLetters(whole) : amount ? '' : '0';
+      if (fraction) amount += '+' + fraction;
+      text = units === 0 ? 'ש״ת' : (units < 0 ? 'י״' : 'ח״') + amount;
+      title = units === 0 ? 'שורה תמה — complete before stretching' :
+        util.fmt(absolute, 2) + ' units ' + (units < 0 ? 'overfull' : 'missing') + ' before stretching';
+    }
+    return util.el('span', { class: 'side', text: text, title: title, 'aria-label': title, lang: 'he', dir: 'rtl',
+      'data-missing-units': Number.isFinite(units) ? String(units) : '' });
   }
 
   /* Render a line's content from MEASURED boxes (F-11): one positioned box per

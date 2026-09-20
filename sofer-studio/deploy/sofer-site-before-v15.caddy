@@ -1,0 +1,151 @@
+sofer.primainsurance.tech {
+    header Cache-Control "no-store"
+    header X-Content-Type-Options "nosniff"
+    header Referrer-Policy "no-referrer"
+    header X-Frame-Options "DENY"
+
+    handle_path /_prima_auth/* {
+        reverse_proxy prima-openhands-auth:3021
+    }
+    handle {
+        route {
+            request_header -X-Auth-User
+            reverse_proxy prima-openhands-auth:3021 {
+                method GET
+                rewrite /check
+                header_up X-Forwarded-Method {method}
+                header_up X-Forwarded-Uri {uri}
+                @signed_in {
+                    status 200
+                    header X-Auth-User anthony
+                }
+                handle_response @signed_in {
+                    request_header X-Auth-User {rp.header.X-Auth-User}
+                    reverse_proxy sofer-studio-app-v14:8080
+                }
+                @guest status 302
+                handle_response @guest {
+                    route {
+                        @v14 {
+                            header_regexp v14demo Cookie "(^|;[ ]*)__Host-sofer_demo_v14=[a-f0-9]{64}(;|$)"
+                        }
+                        handle @v14 {
+                            reverse_proxy sofer-studio-demo-v14:8080
+                        }
+                        @upgrade_v14 query upgrade=paragraphs-v14
+                        handle @upgrade_v14 {
+                            reverse_proxy sofer-studio-demo-v14:8080
+                        }
+                        @v13 {
+                            header_regexp v13demo Cookie "(^|;[ ]*)__Host-sofer_demo_v13=[a-f0-9]{64}(;|$)"
+                        }
+                        handle @v13 {
+                            reverse_proxy sofer-studio-demo-v13:8080
+                        }
+                        @upgrade_v13 query upgrade=measurements-v13
+                        handle @upgrade_v13 {
+                            reverse_proxy sofer-studio-demo-v13:8080
+                        }
+                        @v12 {
+                            header_regexp v12demo Cookie "(^|;[ ]*)__Host-sofer_demo_v12=[a-f0-9]{64}(;|$)"
+                        }
+                        handle @v12 {
+                            reverse_proxy sofer-studio-demo-v12:8080
+                        }
+                        @upgrade_v12 query upgrade=regression-v12
+                        handle @upgrade_v12 {
+                            reverse_proxy sofer-studio-demo-v12:8080
+                        }
+                        @v11 {
+                            header_regexp v11demo Cookie "(^|;[ ]*)__Host-sofer_demo_v11=[a-f0-9]{64}(;|$)"
+                        }
+                        handle @v11 {
+                            reverse_proxy sofer-studio-demo-v11:8080
+                        }
+                        @v10 {
+                            header_regexp v10demo Cookie "(^|;[ ]*)__Host-sofer_demo_v10=[a-f0-9]{64}(;|$)"
+                            not header_regexp v11demo Cookie "(^|;[ ]*)__Host-sofer_demo_v11=[a-f0-9]{64}(;|$)"
+                            not query upgrade=stam-v11
+                        }
+                        handle @v10 {
+                            reverse_proxy sofer-studio-demo-v10:8080
+                        }
+                        @v8 {
+                            header_regexp v8demo Cookie "(^|;[ ]*)__Host-sofer_demo_v8=[a-f0-9]{64}(;|$)"
+                            not header_regexp v9demo Cookie "(^|;[ ]*)__Host-sofer_demo_v9=[a-f0-9]{64}(;|$)"
+                            not query upgrade=stam-v9
+                            not query upgrade=stam-v11
+                            not header_regexp v11demo Cookie "(^|;[ ]*)__Host-sofer_demo_v11=[a-f0-9]{64}(;|$)"
+                        }
+                        handle @v8 {
+                            reverse_proxy sofer-studio-demo-v8:8080
+                        }
+                        @v5 {
+                            header_regexp v5demo Cookie "(^|;[ ]*)__Host-sofer_demo_v5=[a-f0-9]{64}(;|$)"
+                            not header_regexp v6demo Cookie "(^|;[ ]*)__Host-sofer_demo_v6=[a-f0-9]{64}(;|$)"
+                            not header_regexp v8demo Cookie "(^|;[ ]*)__Host-sofer_demo_v8=[a-f0-9]{64}(;|$)"
+                            not header_regexp v9demo Cookie "(^|;[ ]*)__Host-sofer_demo_v9=[a-f0-9]{64}(;|$)"
+                            not query upgrade=margin-v6
+                            not query upgrade=stretch-v8
+                            not query upgrade=stam-v9
+                            not query upgrade=stam-v11
+                            not header_regexp v11demo Cookie "(^|;[ ]*)__Host-sofer_demo_v11=[a-f0-9]{64}(;|$)"
+                        }
+                        handle @v5 {
+                            reverse_proxy sofer-studio-demo-v5:8080
+                        }
+                        @legacy {
+                            header_regexp olddemo Cookie "(^|;[ ]*)__Host-sofer_demo=[a-f0-9]{64}(;|$)"
+                            not header_regexp newdemo Cookie "(^|;[ ]*)__Host-sofer_demo_v5=[a-f0-9]{64}(;|$)"
+                            not header_regexp latestdemo Cookie "(^|;[ ]*)__Host-sofer_demo_v6=[a-f0-9]{64}(;|$)"
+                            not header_regexp stretchdemo Cookie "(^|;[ ]*)__Host-sofer_demo_v8=[a-f0-9]{64}(;|$)"
+                            not header_regexp stamdemo Cookie "(^|;[ ]*)__Host-sofer_demo_v9=[a-f0-9]{64}(;|$)"
+                            not query upgrade=tikkun-v5
+                            not query upgrade=margin-v6
+                            not query upgrade=stretch-v8
+                            not query upgrade=stam-v9
+                            not query upgrade=stam-v11
+                            not header_regexp v11demo Cookie "(^|;[ ]*)__Host-sofer_demo_v11=[a-f0-9]{64}(;|$)"
+                        }
+                        handle @legacy {
+                            @legacy_ui {
+                                method GET HEAD
+                                path /tikkun.js /export.js /styles.css /app.js /search.js /api.js /calibration.js
+                            }
+                            handle @legacy_ui {
+                                reverse_proxy sofer-studio-ui:8080
+                            }
+                            handle {
+                                reverse_proxy sofer-studio-demo:8080
+                            }
+                        }
+                        @v6 {
+                            header_regexp v6demo Cookie "(^|;[ ]*)__Host-sofer_demo_v6=[a-f0-9]{64}(;|$)"
+                            not header_regexp v8demo Cookie "(^|;[ ]*)__Host-sofer_demo_v8=[a-f0-9]{64}(;|$)"
+                            not header_regexp v9demo Cookie "(^|;[ ]*)__Host-sofer_demo_v9=[a-f0-9]{64}(;|$)"
+                            not query upgrade=stretch-v8
+                            not query upgrade=stam-v9
+                            not query upgrade=stam-v11
+                            not header_regexp v11demo Cookie "(^|;[ ]*)__Host-sofer_demo_v11=[a-f0-9]{64}(;|$)"
+                        }
+                        handle @v6 {
+                            @workspace_demo_assets {
+                                method GET HEAD
+                                path /app.js /styles.css /tikkun.js /stretch.js /layouts.js /export.js
+                            }
+                            handle @workspace_demo_assets {
+                                reverse_proxy sofer-studio-ui-v7:8080
+                            }
+                            handle {
+                                reverse_proxy sofer-studio-demo-v6:8080
+                            }
+                        }
+                        handle {
+                            reverse_proxy sofer-studio-demo-v14:8080
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

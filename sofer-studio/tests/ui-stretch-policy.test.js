@@ -20,24 +20,24 @@ test('new profile matches requested groups and caps, with column-derived units',
     for(const ch of 'דהרת')assert.equal(p.stretch_policy.caps_percent[ch],'unlimited');
     for(const ch of 'אטלמםק')assert.equal(p.stretch_policy.caps_percent[ch],50);
     for(const ch of 'דהרתאטלמםק')assert(!p.non_stretchable.includes(ch));
-    assert.equal(p.stretch_policy.caps_percent['ב'],50);assert.equal(p.stretch_policy.distribution,'equal_mm');
+    assert.equal(p.stretch_policy.caps_percent['ב'],50);assert.equal(p.stretch_policy.distribution,'equal_percent');
     assert.equal(p.stretch_policy.word_space_percent,50);assert.equal(p.stretch_policy.setuma_percent,'unlimited');
     assert.equal(p.units_per_row,62);assert.equal(p.layout_mode,'reflow');assert.equal(p.unit_basis,'line_units');
-    assert.equal(f.d.querySelector('#geom-lw-unit-toggle').disabled,true);
-    const width=f.d.querySelector('#geometry-body [data-field="line_width_mm"]');assert.equal(width.value,'180');
+    assert.equal(f.d.querySelector('#geom-lw-unit-toggle'),null);
+    const width=f.d.querySelector('#geometry-body [data-field="line_width_mm"]');assert.equal(width.value,'125');
     width.value='200';width.dispatchEvent(new f.w.Event('input'));
     const units=f.d.getElementById('cal-units-per-row');units.value='80';units.dispatchEvent(new f.w.Event('input'));
     assert(Math.abs(2*p.unit_mm*(p.letter_height_mm/p.reference_height_mm)-2*200/80)<1e-9);
     assert.match(f.d.getElementById('cal-unit-formula').textContent,/200 mm column ÷ 80 units/);
   }finally{f.dom.window.close();}
 });
-test('legacy profile only adopts requested rules after explicit preset action',async()=>{
+test('legacy profile adopts fixed choices in its draft, retaining caps until preset action',async()=>{
   const f=fixture();try{
     f.SS.state.active.profileId='legacy';f.SS.activeProfile=()=>({id:'legacy'});
     f.w.eval(source('calibration.js'));f.SS.calibration.init({api:{getProfile:async()=>({id:'legacy',name:'Existing',unit_mm:.7})}});await tick();
-    assert.equal(f.SS.calibration.getDraft().stretch_policy,null);assert.equal(f.SS.calibration.getDraft().unit_mm,.7);
+    assert.equal(f.SS.calibration.getDraft().stretch_policy.version,1);assert.equal(f.SS.calibration.getDraft().stretch_policy.distribution,'equal_percent');assert.equal(f.SS.calibration.getDraft().unit_mm,.7);
     [...f.d.querySelectorAll('button')].find(b=>b.textContent==='Use requested stretch rules').click();
-    const p=f.SS.calibration.getDraft();assert.equal(p.stretch_policy.caps_percent['ד'],'unlimited');assert.equal(p.unit_mm,.7);assert.equal(p.units_per_row,null);assert(f.SS.calibration.isDirty());
+    const p=f.SS.calibration.getDraft();assert.equal(p.stretch_policy.caps_percent['ד'],'unlimited');assert.equal(p.unit_mm,.7);assert(p.units_per_row>0);assert.equal(p.unit_basis,'line_units');assert(f.SS.calibration.isDirty());
   }finally{f.dom.window.close();}
 });
 test('setumah and word-space increases render once, retaining words and measured margins',async()=>{

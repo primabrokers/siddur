@@ -42,7 +42,7 @@
   }
   function defaultPolicy() {
     var caps = {}; SS.LETTERS.forEach(function (ch) { caps[ch] = '\u05d3\u05d4\u05e8\u05ea'.indexOf(ch) >= 0 ? 'unlimited' : 50; });
-    return { version: 2, caps_percent: caps, distribution: 'equal_mm', word_space_percent: 50, hyphen_percent: 0,
+    return { version: 2, caps_percent: caps, distribution: 'equal_percent', word_space_percent: 50, hyphen_percent: 0,
       petucha_percent: 'unlimited', setuma_percent: 'unlimited', stam_hyphen_units: 1,
       special_widths_units: Object.assign({}, SPECIAL_DEFAULTS), priorities: defaultPriorities(),
       song_widths_mm: { page: 0, middle: 0, side: 0 } };
@@ -133,7 +133,6 @@
     // Master scale controls
     root.appendChild(util.el('div', { class: 'sirtut' }));
     var master = util.el('div', { class: 'master-grid' });
-    master.appendChild(mmField('Skeleton unit size', 'unit_mm', 0.01, 'Calculated from the column in automatic modes; editable in manual mode.'));
     master.appendChild(mmField('Letter height', 'letter_height_units', 0.1, 'Height in the same units as the measurement table.', 'units'));
     root.appendChild(master);
     buildPolicyControls();
@@ -143,13 +142,6 @@
     var legacySpace = mmField('Inter-word gap', 'gaps.inter_word', 0.1, 'Saved spacing for earlier profiles');
     legacySpace.id = 'cal-legacy-word-gap';
     gaps.appendChild(legacySpace);
-    var pos = util.el('label', { class: 'field full' },
-      [util.el('span', { text: 'Stretch position' }),
-       util.el('select', { id: 'cal-stretch-position', 'data-field': 'stretch_position' },
-         [util.el('option', { value: 'anywhere', text: 'Anywhere on line' }),
-          util.el('option', { value: 'word_final', text: 'Word-final only' }),
-          util.el('option', { value: 'line_end', text: 'Line-end only' })])]);
-    gaps.appendChild(pos);
     root.appendChild(gaps);
 
     // hover letter preview chip
@@ -181,8 +173,6 @@
     var thr = util.el('tr', {}, [
       util.el('th', { text: 'Letter' }),
       util.el('th', { text: 'Skeleton units' }),
-      util.el('th', { text: '+Stroke mm' }),
-      util.el('th', { text: 'Skeleton mm' }),
       util.el('th', { text: 'Total mm' }),
       util.el('th', { id: 'cal-cap-heading', text: 'Cap %' }),
       util.el('th', { text: 'Stretch preference' })
@@ -237,7 +227,7 @@
       id: null,
       name: 'Classic Sefer Torah',
       letter_height_mm: 4.5,
-      letter_height_units: 2,
+      letter_height_units: 2.5,
       stroke_mm: 0,
       unit_mm: 0.5,
       min_letter_height_mm: 3.0,
@@ -351,7 +341,7 @@
     setFieldValue('reference_height_mm', draft.reference_height_mm);
     setFieldValue('gaps.inter_letter', draft.gaps.inter_letter);
     setFieldValue('gaps.inter_word', draft.gaps.inter_word);
-    util.byId('cal-stretch-position').value = draft.stretch_position || 'anywhere';
+    applyFixedChoices();
     renderPolicy();
 
     renderScaleNote();
@@ -362,6 +352,33 @@
     if (status) status.textContent = draft.id
       ? (dirty ? 'Unsaved changes — save before computing a layout.' : 'Saved profile — ready to choose a source and column geometry.')
       : 'New, unsaved profile — name it, enter your measurements, then Save. Existing profiles are unchanged.';
+  }
+
+  function applyFixedChoices() {
+    var changed = false;
+    if (draft.units_per_row == null) {
+      // Preserve the old physical table-unit width when adopting row units.
+      var physicalUnit = Number(draft.unit_mm) * scale();
+      draft.units_per_row = physicalUnit > 0 ? columnWidth() / physicalUnit : 62;
+      changed = true;
+    }
+    if (draft.unit_basis !== 'line_units') { draft.unit_basis = 'line_units'; changed = true; }
+    if (draft.stretch_position !== 'anywhere') { draft.stretch_position = 'anywhere'; changed = true; }
+    if (draft.stretch_policy && draft.stretch_policy.distribution !== 'equal_percent') {
+      draft.stretch_policy.distribution = 'equal_percent'; changed = true;
+    }
+    if (!draft.stretch_policy) {
+      refreshColumnUnit();
+      var caps = {};
+      SS.LETTERS.forEach(function (letter) {
+        var width = computeTotal(letter);
+        caps[letter] = width > 0 ? Number(draft.max_stretch[letter] || 0) / width * 100 : 0;
+      });
+      draft.stretch_policy = { version: 1, caps_percent: caps, distribution: 'equal_percent',
+        word_space_percent: 0, setuma_percent: 0, setuma_first: true, stam_hyphen_units: 1 };
+      changed = true;
+    }
+    if (changed && draft.id) { dirty = true; state.calibrationDraftDirty = true; }
   }
 
   function scale() {
@@ -409,21 +426,13 @@
 
       // Skeleton (editable)
       var skelInput = util.el('input', { class: 'cell', type: 'number', step: '0.5', value: skel, 'aria-label': 'skeleton units for ' + letter });
-      var skelMmCell = util.el('td', { class: 'num', text: util.fmt(skeletonMm(letter)) });
       skelInput.addEventListener('input', function () {
         draft.letter_widths[letter] = util.parseNum(skelInput.value);
         markDirty();
         totalCell.textContent = util.fmt(computeTotal(letter));
-        skelMmCell.textContent = util.fmt(skeletonMm(letter));
       });
       skelInput.addEventListener('change',refreshColumnUnit);
       tr.appendChild(util.el('td', { class: 'num' }, skelInput));
-
-      // +Stroke (same for all)
-      tr.appendChild(util.el('td', { class: 'num', text: util.fmt(draft.stroke_mm*Number(draft.stroke_factors[letter]==null?1:draft.stroke_factors[letter])) }));
-
-      // Skeleton mm (units × unit_mm × scale, no stroke)
-      tr.appendChild(skelMmCell);
 
       // Total
       var totalCell = util.el('td', { class: 'num', text: util.fmt(total) });
@@ -466,8 +475,6 @@
         refreshColumnUnit();
       });
       tr.appendChild(util.el('td', { class: 'num' }, width));
-      tr.appendChild(util.el('td', { class: 'num', text: '—' }));
-      tr.appendChild(util.el('td', { class: 'num', text: util.fmt(specialWidthMm(key)) }));
       tr.appendChild(util.el('td', { class: 'num', text: util.fmt(specialWidthMm(key)) }));
       var capKey = key === 'word_space' ? 'word_space_percent' : key + '_percent';
       tr.appendChild(capCell(key, draft.stretch_policy[capKey] == null ? 0 : draft.stretch_policy[capKey], true, function(value) {
@@ -600,7 +607,7 @@
   }
 
   function bindInputEvents() {
-    util.qsa('input[data-field], select#cal-stretch-position', root).forEach(function (el) {
+    util.qsa('input[data-field]', root).forEach(function (el) {
       el.addEventListener('input', onFieldInput);
       el.addEventListener('change', onFieldInput);
     });
@@ -776,22 +783,15 @@
       SS.toast('Requested rules loaded into this profile draft. Save, then compute a new layout. Existing layouts are unchanged.');
     });
     box.appendChild(requested);
-    box.appendChild(util.el('p',{class:'profile-help',text:'Requested preset: ד ה ר ת unlimited; other letters and word spaces +50% maximum. Gaps have preference 1, אדהטלמםקרת preference 2, and the rest preference 3. Equal added millimetres within each preference, stopping at each cap.'}));
+    box.appendChild(util.el('p',{class:'profile-help',text:'Requested preset: ד ה ר ת unlimited; other letters and word spaces +50% maximum. Gaps have preference 1, אדהטלמםקרת preference 2, and the rest preference 3. Equal percentage increases within each preference, stopping at each cap. Stretch can be placed anywhere on the line.'}));
     function field(label, element) { box.appendChild(util.el('label',{class:'field'},[util.el('span',{text:label}),element])); return element; }
     var layoutMode=field('Line breaks and amudim',util.el('select',{id:'cal-layout-mode'},[
       util.el('option',{value:'reflow',text:'Reflow words to units per line — recalculate amudim'}),
       util.el('option',{value:'reference',text:'Exact reference columns — keep original word positions'})]));
     layoutMode.addEventListener('change',function(){draft.layout_mode=layoutMode.value;markDirty();});
-    var unitsMode = field('Unit size calculation',util.el('select',{id:'cal-unit-mode'},[
-      util.el('option',{value:'line',text:'Row units — use the letter widths in the table'}),
-      util.el('option',{value:'column',text:'Reference-height skeleton units (legacy)'}),util.el('option',{value:'manual',text:'Manual millimetres per unit (legacy)'})]));
     var units = field('Units per row',util.el('input',{id:'cal-units-per-row',type:'number',min:'0.001',step:'1','aria-label':'Units per row'}));
     var hyphenUnits = field('Width per STAM hyphen (line units)',util.el('input',{id:'cal-hyphen-units',type:'number',min:'0',step:'0.25','aria-label':'Width assigned to each STAM hyphen marker'}));
     box.appendChild(util.el('p',{id:'cal-unit-formula',class:'profile-help',role:'status'}));
-    var mode = field('Stretch caps',util.el('select',{id:'cal-policy-mode'},[
-      util.el('option',{value:'percent',text:'Percentage / unlimited per letter'}),util.el('option',{value:'legacy',text:'Saved millimetre caps (legacy)'})]));
-    var distribution = field('Share remaining stretch equally',util.el('select',{id:'cal-stretch-distribution'},[
-      util.el('option',{value:'equal_percent',text:'Same percentage increase'}),util.el('option',{value:'equal_mm',text:'Same added millimetres'})]));
     var spaces = field('Word-space maximum increase (%) — up to 50%',util.el('input',{id:'cal-space-percent',type:'number',min:'0',max:'50',step:'1'}));
     var setumaMode = field('Setumah-gap limit',util.el('select',{id:'cal-setuma-mode'},[
       util.el('option',{value:'percent',text:'Percentage increase'}),util.el('option',{value:'unlimited',text:'Unlimited within the column'})]));
@@ -799,21 +799,8 @@
     box.appendChild(util.el('p',{class:'profile-help',text:'Paragraph lines: gap only. Internal setumah gaps expand before anything else, with no letter or word-space stretching on that line. A petuchah keeps all remaining width as its end-of-line paragraph space. Fixed passages and invalid edge gaps stay unchanged.'}));
     box.appendChild(util.el('p',{class:'profile-help',text:'Save measurements before computing a new layout. Existing saved and written layouts keep their original measurements and stretch decisions.'}));
     root.appendChild(box);
-    unitsMode.addEventListener('change',function(){draft.unit_basis=unitsMode.value==='line'?'line_units':'skeleton';draft.units_per_row=unitsMode.value==='manual'?null:(draft.units_per_row||62);markDirty();renderPolicy();renderRows();});
     units.addEventListener('input',function(){draft.units_per_row=Number(units.value);markDirty();refreshColumnUnit();});
     hyphenUnits.addEventListener('input',function(){if(draft.stretch_policy){draft.stretch_policy.stam_hyphen_units=Math.max(0,Number(hyphenUnits.value));markDirty();refreshColumnUnit();}});
-    mode.addEventListener('change',function(){
-      if(mode.value==='percent') {
-        draft.stretch_policy=newPolicy();
-        SS.LETTERS.forEach(function(letter){var width=computeTotal(letter);draft.stretch_policy.caps_percent[letter]=width>0?Math.floor((Number(draft.max_stretch[letter])||0)/width*100000)/1000:0;});
-      } else {
-        if(draft.stretch_policy && Object.values(draft.stretch_policy.caps_percent).includes('unlimited')) {SS.toast('Choose finite percentage caps before switching back to legacy millimetres.','error');mode.value='percent';return;}
-        if(draft.stretch_policy) SS.LETTERS.forEach(function(letter){draft.max_stretch[letter]=computeTotal(letter)*Number(draft.stretch_policy.caps_percent[letter]||0)/100;});
-        draft.stretch_policy=null;
-      }
-      markDirty();renderPolicy();renderRows();
-    });
-    distribution.addEventListener('change',function(){if(draft.stretch_policy){draft.stretch_policy.distribution=distribution.value;markDirty();}});
     spaces.addEventListener('input',function(){if(draft.stretch_policy){draft.stretch_policy.word_space_percent=Number(spaces.value);markDirty();}});
     setumaMode.addEventListener('change',function(){if(draft.stretch_policy){draft.stretch_policy.setuma_percent=setumaMode.value==='unlimited'?'unlimited':50;markDirty();renderPolicy();}});
     setumaPercent.addEventListener('input',function(){if(draft.stretch_policy){draft.stretch_policy.setuma_percent=Number(setumaPercent.value);markDirty();}});
@@ -821,7 +808,7 @@
   function columnWidth() {
     var current = SS.geometry && SS.geometry.getDraft && SS.geometry.getDraft();
     if (!current) current = (state.geometries||[]).find(function(g){return g.id===state.active.geometryId;});
-    return Number(current && current.line_width_mm) || 180;
+    return Number(current && current.line_width_mm) || 125;
   }
   function heightUnitMm() {
     return draft.units_per_row > 0 ? columnWidth() / draft.units_per_row : Number(draft.unit_mm);
@@ -831,10 +818,11 @@
     if (draft.letter_height_units != null) draft.letter_height_mm = Number(draft.letter_height_units) * heightUnitMm();
     setFieldValue('letter_height_units', draft.letter_height_units == null ? Number((draft.letter_height_mm / heightUnitMm()).toFixed(6)) : draft.letter_height_units);
     if (draft.units_per_row != null && Number(draft.units_per_row)>0) {
-      draft.unit_mm=columnWidth()/Number(draft.units_per_row);
+      var nextUnitMm=columnWidth()/Number(draft.units_per_row);
       if(draft.unit_basis==='line_units'){
-        draft.unit_mm/=draft.letter_height_mm/draft.reference_height_mm;
+        nextUnitMm/=draft.letter_height_mm/draft.reference_height_mm;
       }
+      if (Math.abs(nextUnitMm - draft.unit_mm) > 1e-12) draft.unit_mm=nextUnitMm;
       setFieldValue('unit_mm',draft.unit_mm);
     }
     renderRows();
@@ -858,16 +846,11 @@
     var songButton = util.byId('cal-song-widths');
     if (songButton) songButton.disabled = !preferences;
     util.byId('cal-layout-mode').value=draft.layout_mode;
-    util.byId('cal-unit-mode').value=draft.units_per_row==null?'manual':draft.unit_basis==='line_units'?'line':'column';
-    util.byId('cal-units-per-row').disabled=draft.units_per_row==null;
     util.byId('cal-units-per-row').value=draft.units_per_row==null?'':draft.units_per_row;
-    var unit=util.qs('[data-field="unit_mm"]',root);unit.readOnly=draft.units_per_row!=null;unit.disabled=draft.units_per_row!=null;
-    util.byId('cal-policy-mode').value=policy?'percent':'legacy';
-    ['cal-stretch-distribution','cal-space-percent','cal-setuma-mode','cal-setuma-percent','cal-hyphen-units'].forEach(function(id){util.byId(id).disabled=!policy;});
+    ['cal-space-percent','cal-setuma-mode','cal-setuma-percent','cal-hyphen-units'].forEach(function(id){util.byId(id).disabled=!policy;});
     ['cal-space-percent','cal-setuma-mode','cal-setuma-percent','cal-hyphen-units'].forEach(function(id){util.byId(id).parentNode.hidden=preferences;});
     util.byId('cal-cap-heading').textContent=policy?'Maximum increase':'Cap mm';
     if(policy){
-      util.byId('cal-stretch-distribution').value=policy.distribution;
       util.byId('cal-space-percent').value=policy.word_space_percent;
       util.byId('cal-setuma-mode').value=policy.setuma_percent==='unlimited'?'unlimited':'percent';
       util.byId('cal-setuma-percent').disabled=policy.setuma_percent==='unlimited';

@@ -59,7 +59,7 @@
       try {
         var rules=SS.calibration&&SS.calibration.requestedRules&&SS.calibration.requestedRules();
         if(!state.active.profileId){
-          var p=await API.createProfile({name:'Classic Sefer Torah — starter measurements',letter_height_units:2,letter_height_mm:4.5,unit_mm:.5,stroke_mm:0,min_nib_mm:0,
+          var p=await API.createProfile({name:'Classic Sefer Torah — starter measurements',letter_height_units:2.5,letter_height_mm:4.5,unit_mm:.5,stroke_mm:0,min_nib_mm:0,
             ...(rules?{units_per_row:62,unit_basis:'line_units',layout_mode:'reflow',stretch_policy:rules,non_stretchable:SS.LETTERS.filter(function(ch){return !rules.caps_percent[ch];})}:{})});
           state.profiles=await API.listProfiles();state.active.profileId=p.id;
           if(SS.calibration.selectSaved)SS.calibration.selectSaved();bus.emit('profiles:list');bus.emit('profileId:changed');
@@ -80,7 +80,7 @@
             if(SS.calibration.selectSaved)SS.calibration.selectSaved();bus.emit('profiles:list');bus.emit('profileId:changed');
           }
         }
-        var g=await API.createGeometry({name:'Layout 1 · editable 42-line measurements',line_width_mm:180,lines_per_amud:42,baseline_pitch_mm:8,max_letters_per_line:0});
+        var g=await API.createGeometry({name:'45 cm Torah',line_width_mm:125,lines_per_amud:42,baseline_pitch_mm:7.5,top_margin_mm:60,bottom_margin_mm:75,outer_margin_mm:30,inter_column_gap_mm:20,amudim_per_yeria:4,max_letters_per_line:0});
         state.geometries=await API.listGeometries();state.active.geometryId=g.id;bus.emit('geometryId:changed');
         await loadBuiltin('tikkun:'+select.value);
         await SS.app.compute();

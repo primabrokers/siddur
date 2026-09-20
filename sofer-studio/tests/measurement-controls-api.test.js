@@ -28,14 +28,14 @@ test('HTTP saves, reloads and duplicates special caps and height units; computed
     const p=await call('POST','/api/profiles',{...defaults,name:'Requested measurements',stroke_mm:0,
       stretch_policy:{...defaults.stretch_policy,caps_percent:{},word_space_percent:'unlimited',hyphen_percent:50,petucha_percent:125,setuma_percent:'unlimited'}});
     const reloaded=await call('GET','/api/profiles/'+p.id);
-    assert.equal(reloaded.letter_height_units,2);assert.equal(reloaded.stretch_policy.hyphen_percent,50);assert.equal(reloaded.stretch_policy.word_space_percent,'unlimited');
+    assert.equal(reloaded.letter_height_units,2.5);assert.equal(reloaded.stretch_policy.hyphen_percent,50);assert.equal(reloaded.stretch_policy.word_space_percent,'unlimited');
     const copy=await call('POST','/api/profiles/'+p.id+'/duplicate',{name:'Copy'});
-    assert.equal(copy.letter_height_units,2);assert.deepEqual(copy.stretch_policy,reloaded.stretch_policy);
+    assert.equal(copy.letter_height_units,2.5);assert.deepEqual(copy.stretch_policy,reloaded.stretch_policy);
     const g=await call('POST','/api/geometries',{name:'Column',line_width_mm:124});
     const s=await call('POST','/api/sources/import',{name:'Synthetic measurement test',format:'stam',text:'א--ב'});
     const computed=await call('POST','/api/layout/compute',{profile_id:p.id,geometry_id:g.id,source_id:s.id});
     const path='/api/layouts/'+computed.layout_id, saved=await call('GET',path);
-    assert.equal(saved.snapshot.profile.letter_height_mm,4);assert.equal(saved.snapshot.profile.letter_height_units,2);
+    assert.equal(saved.snapshot.profile.letter_height_mm,5);assert.equal(saved.snapshot.profile.letter_height_units,2.5);
     assert.equal(saved.lines[0].stretch_decisions[0].kind,'hyphen');assert.equal(saved.lines[0].stretch_decisions[0].stretch_mm,2);
     const report=await call('GET',path+'/stretch-report');assert.equal(report.entries[0].kind,'hyphen');assert.equal(report.entries[0].word,'אב');
     await call('PUT','/api/profiles/'+p.id,{...reloaded,letter_height_units:3,stretch_policy:{...reloaded.stretch_policy,hyphen_percent:'unlimited'}});

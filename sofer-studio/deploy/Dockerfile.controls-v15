@@ -1,0 +1,6 @@
+FROM prima-sofer-studio:paragraphs-v14-final
+USER root
+COPY sofer-studio/public /app/sofer-studio/public
+COPY sofer-studio/engine /app/sofer-studio/engine
+COPY sofer-studio/tests /app/sofer-studio/tests
+USER 1000:1000

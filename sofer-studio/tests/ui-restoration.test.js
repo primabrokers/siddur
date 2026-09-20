@@ -43,9 +43,9 @@ test('measurement table follows column width and row units and matches the engin
       assert(Math.abs(draft.unit_mm - calculated.unit_mm) < 1e-10);
       assert(Math.abs(totalWidth('א', calculated) - (2 * width / units + calculated.stroke_mm * calculated.stroke_factors['א'])) < 1e-10);
       const row = f.d.querySelector('[data-letter="א"]');
-      assert(Math.abs(Number(row.children[4].textContent) - totalWidth('א', calculated)) < .006);
+      assert(Math.abs(Number(row.children[2].textContent) - totalWidth('א', calculated)) < .006);
       const space = f.d.querySelector('[data-measurement="word_space"]');
-      assert(Math.abs(Number(space.children[4].textContent) - calculated.gaps.inter_word) < .006);
+      assert(Math.abs(Number(space.children[2].textContent) - calculated.gaps.inter_word) < .006);
       assert.equal(calculated.units_per_row, units);
     };
     check(180, 62); check(180, 80); check(140, 80);
@@ -55,7 +55,7 @@ test('measurement table follows column width and row units and matches the engin
 });
 
 for (const policyKind of ['manual', 'percentage']) {
-  test('opening and saving a ' + policyKind + ' profile preserves its saved rules and measurements', async () => {
+  test('opening and saving a ' + policyKind + ' profile changes only fixed choices in a draft and preserves physical measurements', async () => {
     const original = normalizeProfile({ ...defaultProfile(), id: 'saved', name: 'Saved calibration', units_per_row: null, letter_height_units: null,
       unit_basis: 'skeleton', layout_mode: 'reference', unit_mm: .37, stroke_factors: { 'א': 1.75 },
       non_stretchable: ['א', 'ב'], gaps: { inter_word: 2.75, inter_letter: .13 },
@@ -71,9 +71,15 @@ for (const policyKind of ['manual', 'percentage']) {
       f.d.querySelector('#calibration-body .grid-crud .btn-primary').click();
       await tick();
       assert(body, 'Save did not submit the profile');
-      for (const field of ['units_per_row', 'unit_basis', 'layout_mode', 'unit_mm', 'stretch_policy', 'non_stretchable', 'stroke_factors', 'letter_widths', 'gaps', 'max_stretch']) {
+      for (const field of ['layout_mode', 'unit_mm', 'non_stretchable', 'stroke_factors', 'letter_widths', 'gaps', 'max_stretch']) {
         assert.deepEqual(JSON.parse(JSON.stringify(body[field])), before[field], field + ' changed without an edit');
       }
+      assert.equal(body.unit_basis,'line_units');assert.equal(body.stretch_position,'anywhere');
+      assert.equal(body.stretch_policy.distribution,'equal_percent');
+      assert(Math.abs(body.units_per_row - 125/(before.unit_mm*before.letter_height_mm/before.reference_height_mm))<1e-8);
+      for (const letter of HEBREW_LETTERS) assert(Math.abs(totalWidth(letter,normalizeProfile(body))-totalWidth(letter,before))<1e-8);
+      if(policyKind==='percentage') assert.deepEqual(JSON.parse(JSON.stringify(body.stretch_policy)),before.stretch_policy);
+      else for(const letter of HEBREW_LETTERS) assert(Math.abs(totalWidth(letter,normalizeProfile(body))*body.stretch_policy.caps_percent[letter]/100-before.max_stretch[letter])<1e-8);
       assert.deepEqual(original, before, 'Source profile was mutated');
     } finally { f.dom.window.close(); }
   });

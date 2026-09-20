@@ -19,7 +19,28 @@ const layout={id:'synthetic-preview-test',geometry:{line_width_mm:130,lines_per_
 async function load(f,extra={}){f.SS.state.active.layoutId=layout.id;f.SS.state.layout={...layout,...extra};f.SS.bus.emit('layout:loaded',f.SS.state.layout);await new Promise(r=>setTimeout(r,30));}
 
 test('fit whole page uses both dimensions, including very small viewports',()=>{const f=fixture();try{const fit=f.SS.tikkun.fitScale;assert.equal(fit('page',1000,2000,500,400),.2);assert.equal(fit('width',1000,2000,500,400),.5);assert.equal(fit('actual',1000,2000,500,400),1);assert.equal(fit('page',1000,2000,50,40),.02);assert.equal(fit('page',0,0,0,0),1);}finally{f.dom.window.close();}});
-test('pagination renders one page; print preparation includes every original line',async()=>{const f=fixture();try{await load(f);assert.equal(f.w.document.querySelectorAll('.line').length,42);assert.equal(f.w.document.querySelectorAll('.amud').length,2);assert.equal(f.w.document.querySelectorAll('.amud:not(.screen-page-hidden)').length,1);assert.match(f.w.document.querySelector('.watermark').textContent,/SAMPLE TEXT/);const next=f.w.document.querySelector('[aria-label="Next page"]');next.click();assert.equal(f.w.document.querySelector('.amud:not(.screen-page-hidden)').dataset.amud,'2');assert.equal(next.disabled,true);f.SS.tikkun.jumpToLine({amud:1,line:1});assert.equal(f.w.document.querySelector('.amud:not(.screen-page-hidden)').dataset.amud,'1');await f.SS.tikkun.preparePrint();assert.equal(f.w.document.querySelectorAll('.line').length,84);assert.equal(f.w.document.querySelectorAll('.print-study-label').length,2);assert.equal(f.SS.tikkun.isPrintReady(),true);f.SS.tikkun.finishPrint();assert.equal(f.w.document.querySelectorAll('.line').length,42);assert.equal(f.SS.tikkun.isPrintReady(),false);assert.equal(f.SS.state.layout.lines.length,84);}finally{f.dom.window.close();}});
+test('all pages remain in the vertical scroll track, navigation is lazy, and print retains every line',async()=>{
+  const f=fixture();try{
+    const many={...layout,id:'many-pages',lines:Array.from({length:420},(_,i)=>({...layout.lines[i%84],amud:Math.floor(i/42)+1,line_index:i%42+1}))};
+    await load(f,many);
+    const d=f.w.document;
+    assert.equal(d.querySelectorAll('.amud').length,10);
+    assert.equal(d.querySelectorAll('.screen-page-hidden').length,0);
+    assert.equal(d.querySelectorAll('.line').length,84);
+    assert.equal(d.querySelector('.amud:last-child .lines').style.minHeight,'336mm');
+    const select=d.querySelector('[aria-label="Preview page"]');select.value='9';select.dispatchEvent(new f.w.Event('change'));
+    assert.equal(select.value,'9');assert(d.querySelector('[aria-label="Next page"]').disabled);
+    assert(d.querySelector('.amud[data-amud="10"]').dataset.rendered);
+    assert(!d.querySelector('.amud[data-amud="1"]').dataset.rendered);
+    f.SS.tikkun.jumpToLine({amud:5,line:1});assert.equal(select.value,'4');
+    assert(d.querySelector('.amud[data-amud="5"] .line'));
+    assert.equal(d.querySelectorAll('.line').length,126);
+    await f.SS.tikkun.preparePrint();assert.equal(d.querySelectorAll('.line').length,420);
+    assert.equal(d.querySelectorAll('.print-study-label').length,10);assert(f.SS.tikkun.isPrintReady());
+    f.SS.tikkun.finishPrint();assert.equal(d.querySelectorAll('.line').length,126);
+    assert.equal(f.SS.tikkun.isPrintReady(),false);assert.equal(f.SS.state.layout.lines.length,420);
+  }finally{f.dom.window.close();}
+});
 test('expanded view can be closed with Escape',()=>{const f=fixture();try{const b=f.w.document.querySelector('[aria-pressed]');b.click();assert.equal(b.getAttribute('aria-pressed'),'true');f.w.document.dispatchEvent(new f.w.KeyboardEvent('keydown',{key:'Escape'}));assert.equal(b.getAttribute('aria-pressed'),'false');}finally{f.dom.window.close();}});
 test('print needs a loaded ready layout and uses persisted geometry, not current selector',async()=>{const f=fixture();try{await f.SS.export.printLayout();assert.equal(f.prints(),0);await load(f);await f.SS.export.printLayout();assert.equal(f.prints(),1);const note=f.w.document.getElementById('print-note').textContent;assert.match(note,/130/);assert.doesNotMatch(note,/999/);assert.equal(f.w.document.querySelectorAll('.amud').length,2);}finally{f.dom.window.close();}});
 test('study preview export restrictions also apply to the PDF print action',async()=>{const f=fixture();try{await load(f,{summary:{study_preview:true,total_lines:84}});for(const b of f.w.document.querySelectorAll('[data-format]'))assert.equal(b.disabled,true);assert.match(f.w.document.querySelector('.watermark').textContent,/NOT WRITING-READY/);f.SS.export.printLayout();assert.equal(f.prints(),0);assert.equal(f.requests(),0);}finally{f.dom.window.close();}});

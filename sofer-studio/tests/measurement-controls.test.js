@@ -44,11 +44,11 @@ test('all special rows share numeric percentage and Unlimited controls, includin
     finally { reloaded.dom.window.close(); }
   } finally { f.dom.window.close(); }
 });
-test('only Letter height is editable, in units defaulting to 2, and changes preserve the horizontal row budget',()=>{
+test('only Letter height is editable, in units defaulting to 2.5, and changes preserve the horizontal row budget',()=>{
   const f=ui(null);
   try {
     const field=f.d.querySelector('[data-field="letter_height_units"]');
-    assert.equal(field.value,'2'); assert.equal(field.closest('label').querySelector('.unit').textContent,'units');
+    assert.equal(field.value,'2.5'); assert.equal(field.closest('label').querySelector('.unit').textContent,'units');
     for(const name of ['letter_height_mm','reference_height_mm','min_letter_height_mm','stroke_mm','min_nib_mm','gaps.inter_letter']) assert.equal(f.d.querySelector('[data-field="'+name+'"]'),null);
     assert.equal(f.SS.calibration.getDraft().stroke_mm,0);
     assert.equal(f.SS.calibration.getDraft().min_nib_mm,0);
@@ -57,7 +57,7 @@ test('only Letter height is editable, in units defaulting to 2, and changes pres
     assert.equal(defaultProfile().special_widths_units.word_space,1);
     assert.equal(defaultProfile().stroke_mm,0);
     f.input('#geometry-body [data-field="line_width_mm"]',124); // one row unit = 2mm.
-    const p=f.SS.calibration.getDraft(); assert.equal(p.letter_height_mm,4);
+    const p=f.SS.calibration.getDraft(); assert.equal(p.letter_height_mm,5);
     const before=totalWidth('א',effectiveProfile(normalizeProfile(p),{line_width_mm:124}));
     f.input('[data-field="letter_height_units"]',3); assert.equal(p.letter_height_mm,6);
     assert.equal(totalWidth('א',effectiveProfile(normalizeProfile(p),{line_width_mm:124})),before);
@@ -106,7 +106,7 @@ test('hyphen caps and priorities control marked width; two hyphens count twice a
 });
 test('letter height units resolve per column without mutating input or changing old mm profiles',()=>{
   const prof=defaultProfile(), before=JSON.stringify(prof);
-  for(const width of [124,186]) { const r=effectiveProfile(prof,{line_width_mm:width});assert.equal(r.letter_height_mm,2*width/62);assert.deepEqual(effectiveProfile(r,{line_width_mm:width}),r); }
+  for(const width of [124,186]) { const r=effectiveProfile(prof,{line_width_mm:width});assert.equal(r.letter_height_mm,2.5*width/62);assert.deepEqual(effectiveProfile(r,{line_width_mm:width}),r); }
   assert.equal(JSON.stringify(prof),before);
   const old=normalizeProfile({units_per_row:62,unit_basis:'line_units',letter_height_mm:4.25});
   assert.equal(effectiveProfile(old,{line_width_mm:186}).letter_height_mm,4.25);

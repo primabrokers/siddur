@@ -30,7 +30,7 @@ export const DEFAULT_STRETCH_PRIORITIES = Object.freeze({
 export const DEFAULT_STRETCH_POLICY = Object.freeze({
   version: 2,
   caps_percent: Object.freeze(Object.fromEntries(HEBREW_LETTERS.map((ch) => [ch, 'דהרת'.includes(ch) ? 'unlimited' : 50]))),
-  distribution: 'equal_mm',
+  distribution: 'equal_percent',
   word_space_percent: 50,
   hyphen_percent: 0,
   petucha_percent: 'unlimited',
@@ -132,7 +132,7 @@ export function defaultProfile(name) {
   return normalizeProfile({
     name: name || 'Classic Sefer Torah',
     units_per_row: 62,
-    letter_height_units: 2,
+    letter_height_units: 2.5,
     stroke_mm: 0,
     min_nib_mm: 0,
     unit_basis: 'line_units',

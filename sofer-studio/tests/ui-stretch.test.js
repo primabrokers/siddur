@@ -11,17 +11,17 @@ function fixture() {
   const w=dom.window;w.eval(source('core.js'));w.confirm=()=>true;w.HTMLElement.prototype.scrollIntoView=function(){};
   const SS=w.SS;SS.toast=()=>{};return{dom,w,SS};
 }
-test('units field changes actual mm budget and hides old letter-count limit',async()=>{
+test('column width changes actual mm budget and hides old letter-count limit',async()=>{
   const f=fixture();try{
     let saved;f.SS.activeProfile=()=>({unit_mm:.5});f.SS.activeGeometry=()=>null;
     f.w.eval(source('geometry.js'));f.SS.geometry.init({api:{createGeometry:async body=>(saved=body,{...body,id:'g'}),listGeometries:async()=>[saved]}});
     const root=f.w.document.getElementById('geometry-body'),input=root.querySelector('[data-field="line_width_mm"]');
-    assert.match(input.closest('label').textContent,/Maximum units per line/);assert.equal(Number(input.value),360);
+    assert.match(input.closest('label').textContent,/Column width \(mm\)/);assert.equal(Number(input.value),125);
     assert.equal(root.querySelector('[data-field="max_letters_per_line"]'),null);
-    input.value='400';input.dispatchEvent(new f.w.Event('input'));
+    input.value='200';input.dispatchEvent(new f.w.Event('input'));
     [...root.querySelectorAll('button')].find(b=>b.textContent==='Save as new').click();await tick();
     assert.equal(saved.line_width_mm,200);assert.equal(saved.max_letters_per_line,0);
-    assert.match(saved.name,/draft/);
+    assert.equal(saved.name,'45 cm Torah');
   }finally{f.dom.window.close();}
 });
 
@@ -66,16 +66,16 @@ test('preview widths include stretching exactly once and keep word/letter gaps',
   }finally{f.dom.window.close();}
 });
 
-test('alignment guides distinguish filled, short and intentional lines using stretched widths',async()=>{
+test('line notes show missing units before stretch, independently of current alignment',async()=>{
   const f=fixture();try{
     f.SS.activeSource=()=>null;f.w.eval(source('tikkun.js'));f.SS.tikkun.init({});
     const lines=[{line_index:1,amud:1,text:'בר',words:[],width_mm:10,stretched_width_mm:20,leftover_mm:0},
       {line_index:2,amud:1,text:'בר',words:[],width_mm:10,stretched_width_mm:15,leftover_mm:5},
       {line_index:3,amud:1,text:'בר',words:[],width_mm:10,leftover_mm:10,petucha_end:true}];
-    f.SS.state.layout={id:'align',geometry:{lines_per_amud:42,line_width_mm:20,baseline_pitch_mm:8},lines};f.SS.bus.emit('layout:loaded',f.SS.state.layout);await tick();
-    const d=f.w.document;assert.match(d.querySelector('.alignment-aligned .side').textContent,/Aligned.*20\.00/);
-    assert.match(d.querySelector('.alignment-short .side').textContent,/Still short.*5\.00/);
-    assert.match(d.querySelector('.alignment-intentional .side').textContent,/Section/);
+    f.SS.state.layout={id:'align',snapshot:{profile:{units_per_row:20}},geometry:{lines_per_amud:42,line_width_mm:20,baseline_pitch_mm:8},lines};f.SS.bus.emit('layout:loaded',f.SS.state.layout);await tick();
+    const d=f.w.document;assert.equal(d.querySelector('.alignment-aligned .side').textContent,'ח״י');
+    assert.equal(d.querySelector('.alignment-short .side').textContent,'ח״י');
+    assert.equal(d.querySelector('.alignment-intentional .side').textContent,'ח״י');
   }finally{f.dom.window.close();}
 });
 
