@@ -174,9 +174,7 @@
     root.appendChild(tableScaffold());
     root.appendChild(util.el('p', { class: 'profile-help', text: 'Second stretch limits are used only when the first limits cannot fill a line. They are the total maximum increase from the original width, not an additional percentage. Zero leaves the first limit unchanged. Lower second preference numbers are used first.' }));
 
-    var songButton = util.el('button', { id: 'cal-song-widths', class: 'btn btn-ghost btn-sm', type: 'button', text: 'Song widths…' });
-    songButton.addEventListener('click', openSongDialog);
-    root.appendChild(songButton);
+
 
     // footer contract note
     root.appendChild(util.el('div', { class: 'panel-foot' },
@@ -560,28 +558,6 @@
       return Math.max(width, minimum);
     }
     return width;
-  }
-
-  function openSongDialog() {
-    if (!hasPreferences()) return;
-    var widths = draft.stretch_policy.song_widths_mm;
-    var modal = util.el('div', { class: 'modal-backdrop' });
-    var box = util.el('div', { class: 'modal song-width-dialog' });
-    box.appendChild(util.el('h2', { text: 'Song layout widths' }));
-    box.appendChild(util.el('p', { text: 'Applied to the whole page containing the song, including lines before and after it.' }));
-    [['Page width', 'page'], ['Middle break width', 'middle'], ['Side break width', 'side']].forEach(function (entry) {
-      var input = util.el('input', { type: 'number', min: '0', step: '0.1', value: widths[entry[1]], 'data-song-width': entry[1] });
-      box.appendChild(util.el('label', { class: 'field' }, [util.el('span', { text: entry[0] + ' (mm)' }), input]));
-    });
-    var save = util.el('button', { class: 'btn btn-primary', type: 'button', text: 'Apply song widths' });
-    save.addEventListener('click', function () {
-      util.qsa('[data-song-width]', box).forEach(function (input) { widths[input.dataset.songWidth] = Math.max(0, util.parseNum(input.value) || 0); });
-      markDirty(); modal.remove();
-    });
-    var cancel = util.el('button', { class: 'btn btn-ghost', type: 'button', text: 'Cancel' });
-    cancel.addEventListener('click', function () { modal.remove(); });
-    box.appendChild(util.el('div', { class: 'btn-row' }, [save, cancel]));
-    modal.appendChild(box); document.body.appendChild(modal);
   }
 
   function showPreview(letter) {

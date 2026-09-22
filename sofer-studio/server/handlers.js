@@ -21,6 +21,7 @@ import { loadReferenceSource } from './reference.js';
 import {fitMarginPlan,applyFitCopy} from './fit-margin.js';
 import {effectiveProfile} from '../engine/stretch-policy.js';
 import { moveWord } from '../engine/line-edit.js';
+import { loadTefillinSource } from './tefillin-source.js';
 
 // Strip internal engine fields for API lines. When a profile is supplied the
 // server-authoritative stretch candidates (cap_mm/letter/word_final/line_end) are
@@ -47,13 +48,14 @@ export function publicLine(l, profile) {
     sefer_end: !!l.sefer_end, fixed_pattern: !!l.fixed_pattern,
     spacing_metadata_complete: !!l.spacing_metadata_complete,
     reference_page: l.reference_page || null,
+    column_width_mm: l.column_width_mm || null, song_layout: l.song_layout || null, tefillin_section: l.tefillin_section || null,
     words: words.map((w) => ({
       text: w.text, consonant: w.consonant, isShem: !!w.isShem, uncertain: !!w.uncertain,
       shem: w.shem || null, letters: (w.letters || []).map((lt) => {
         const override = (w.override || []).find(o => o.id === lt.id);
         let width = override ? Number(override.mm) : profile ? totalWidth(lt.base, profile) : Number(lt.width_mm);
         if (!override && lt.stam_letter_mark?.type === 'large') width *= 1.5;
-        if (!override && lt.stam_letter_mark?.type === 'small') width *= 0.5;
+        if (!override && lt.stam_letter_mark?.type === 'small') width *= profile?.small_letter_scale ?? 0.5;
         return { id: lt.id, base: lt.base, holy: !!lt.holy, stam_letter_mark: lt.stam_letter_mark || null,
           width_mm: width };
       }),
@@ -80,6 +82,7 @@ function getEngineSource(db, sourceId) {
     excerpt: s.excerpt, partial_corpus: !!s.partial_corpus, label: s.label, source_label: s.source_label,
     verses: s.verses || [], unusual_letters: s.unusual_letters || [],
     format: s.format,
+    tefillin: s.format === 'tefillin' ? s.canonical?.tefillin : null,
     reference: s.format==='tikkun-reference' && s.canonical ? s.canonical.reference : null,
   };
 }
@@ -151,6 +154,10 @@ export function handleListBuiltinSources(ctx) {
 
 export function handleImportSource(ctx) {
   const body = ctx.body;
+  if (body?.builtin === 'tefillin') {
+    const doc = loadTefillinSource(), id = store.insertSource(ctx.db, doc);
+    return sendJson(ctx.res, 200, { id, name: doc.name, letter_count: doc.letter_count, warnings: doc.warnings });
+  }
   if(body && typeof body.builtin==='string' && body.builtin.startsWith('tikkun:')) {
     let doc;
     try {doc=loadReferenceSource(body.builtin.slice(7));}catch(e){throw new HttpError(400,e.message);}
@@ -682,6 +689,7 @@ export async function handleCreateCandidate(ctx) {
     if (e instanceof HttpError) throw e;
     throw new HttpError(422, e.message);
   }
+  if (geometry.tefillin) applyInitialStretch(computed, profile);
   const parentLines = store.getLayoutLines(ctx.db, lid).map((l) => publicLine(l));
   const newLines = computed.lines.map((l) => publicLine(l, profile));
   const diff = computeLineDiff(parentLines, newLines);
@@ -706,6 +714,18 @@ function measurementDeltas(o, n) {
   cmp('width_mm', o.width_mm, n.width_mm);
   cmp('leftover_mm', o.leftover_mm, n.leftover_mm);
   cmp('base_leftover_mm', o.base_leftover_mm, n.base_leftover_mm);
+  cmp('column_width_mm', o.column_width_mm, n.column_width_mm);
+  cmp('tefillin_section', o.tefillin_section, n.tefillin_section);
+  const os=o.song_layout?.segments||[], ns=n.song_layout?.segments||[];
+  for(let i=0;i<Math.max(os.length,ns.length);i++){
+    cmp('song_part_'+(i+1)+'_start_mm',os[i]?.start_mm,ns[i]?.start_mm);
+    cmp('song_part_'+(i+1)+'_width_mm',os[i]?.width_mm,ns[i]?.width_mm);
+  }
+  if(o.song_layout||n.song_layout){
+    const old=new Map((o.stretch_decisions||[]).map(d=>[d.letter_occurrence_id,d.stretch_mm]));
+    const next=new Map((n.stretch_decisions||[]).map(d=>[d.letter_occurrence_id,d.stretch_mm]));
+    for(const id of new Set([...old.keys(),...next.keys()]))cmp('song_stretch_'+id,old.get(id),next.get(id));
+  }
   const ow = o.words || []; const nw = n.words || [];
   const wlen = Math.max(ow.length, nw.length);
   for (let i = 0; i < wlen; i++) {
@@ -763,6 +783,9 @@ export function handleDiff(ctx) {
 // the SERVER re-checks against the parent — never on the client's word alone.
 function lineUnchanged(parentLine, candLine) {
   if (!parentLine || !candLine) return false;
+  if (parentLine.column_width_mm !== candLine.column_width_mm || parentLine.tefillin_section !== candLine.tefillin_section) return false;
+  if (JSON.stringify(parentLine.song_layout || null) !== JSON.stringify(candLine.song_layout || null)) return false;
+  if ((parentLine.song_layout || candLine.song_layout) && JSON.stringify(parentLine.stretch_decisions || []) !== JSON.stringify(candLine.stretch_decisions || [])) return false;
   if (JSON.stringify(parentLine.tokens || []) !== JSON.stringify(candLine.tokens || [])) return false;
   if (JSON.stringify(parentLine.letter_occurrence_ids || []) !== JSON.stringify(candLine.letter_occurrence_ids || [])) return false;
   const itemsGeo = (l) => (l.items || []).map((it) => ({ type: it.type, width_mm: it.width_mm }));

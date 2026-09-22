@@ -16,6 +16,7 @@ export function moveWord(layout, { line_id, direction, line_key, next_line_key }
     if (line.fixed_pattern || line.book_boundary_blank) throw new Error('Song and fixed passage lines keep their assigned words');
   }
   if (current.petucha_end || current.sefer_end) throw new Error('Words cannot be moved across a paragraph or book ending');
+  if (layout.snapshot.geometry.tefillin && (!following || current.tefillin_section !== following.tefillin_section)) throw new Error('Tefillin words stay within their own passage');
   if (direction === 'up' && !following) throw new Error('There is no following line');
   const a = structuredClone(current.items || []), b = structuredClone(following?.items || []);
   if (direction === 'down') {
@@ -27,6 +28,7 @@ export function moveWord(layout, { line_id, direction, line_key, next_line_key }
     a.push(b.shift());
   }
   for (const items of [a, b]) {
+    if (layout.snapshot.geometry.tefillin && !items.some(item => item.type === 'word')) throw new Error('Keep at least one word on each fixed Tefillin line');
     if (items[0]?.type === 'setuma_gap' || items.at(-1)?.type === 'setuma_gap') throw new Error('Keep the setumah gap together with its adjacent words');
   }
   const profile = layout.snapshot.profile, geometry = layout.snapshot.geometry;
@@ -36,8 +38,9 @@ export function moveWord(layout, { line_id, direction, line_key, next_line_key }
       width += Number(item.width_mm) || 0;
       if (i && item.type === 'word' && items[i - 1].type === 'word') width += interWordGap(profile);
     });
-    const line = makeLine(items, width, geometry.line_width_mm, profile, { endedBy: original?.petucha_end ? 'petucha' : original?.sefer_end ? 'sefer' : null });
+    const line = makeLine(items, width, original?.column_width_mm || geometry.line_width_mm, profile, { endedBy: original?.petucha_end ? 'petucha' : original?.sefer_end ? 'sefer' : null });
     line.sefer_end = !!original?.sefer_end;
+    line.column_width_mm = original?.column_width_mm || null; line.tefillin_section = original?.tefillin_section || null;
     line.spacing_metadata_complete = true;
     line.line_key = computeLineKey(line);
     if (line.base_leftover_mm >= 0) {
@@ -48,11 +51,11 @@ export function moveWord(layout, { line_id, direction, line_key, next_line_key }
   };
   const changed = [rebuild(current, a), rebuild(following, b)];
   const output = lines.slice(); output.splice(index, following ? 2 : 1, ...changed);
-  groupAndAnnotate(output, geometry, profile);
+  groupAndAnnotate(output, geometry, geometry.tefillin ? { ...profile, vavei_haamudim: false } : profile);
   const totalAmudim = Math.ceil(output.length / geometry.lines_per_amud);
   const yerios = computeYerios(totalAmudim, geometry, profile);
   const summary = { ...layout.summary, total_lines: output.length, total_amudim: totalAmudim,
-    total_yerios: yerios.total_yerios, klaf_length_m: yerios.klaf_length_m,
+    total_yerios: geometry.tefillin ? 1 : yerios.total_yerios, klaf_length_m: geometry.tefillin ? layout.summary.klaf_length_m : yerios.klaf_length_m,
     partial_final_columns: yerios.partial_final_columns, manual_line_breaks: true,
     overfull_lines: output.filter(line => line.leftover_mm < -0.001).length };
   return { lines: output, changed, summary, validation: validateLayout(output, profile, geometry) };

@@ -61,7 +61,7 @@ test('large and small letter marks count their scaled widths before fitting', ()
   const result = flow(Array(50).fill('+א').join(' '));
   assert.equal(count(result.lines[0]), 20); // each marked letter is 3 units.
   const small = flow(Array(80).fill('–א').join(' '));
-  assert.equal(count(small.lines[0]), 62); // each marked letter is 1 unit.
+  assert.equal(count(small.lines[0]), 46); // each marked letter is 4/3 units.
 });
 
 test('reflow preserves whole words and flags an indivisible overfull word', () => {

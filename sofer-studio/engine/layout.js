@@ -4,6 +4,9 @@
 // Chunked computation with a progress callback for large corpora.
 
 import { createHash } from 'node:crypto';
+import { copyColumnOptions, songSettings } from './column-options.js';
+import { composeSongLine } from './song-layout.js';
+import { computeTefillin } from './tefillin.js';
 import { totalWidth, interLetterGap, interWordGap, wordWidth, minColumnWidth, measurementUnitMm } from './width.js';
 import { lettersOf, letterKeyOf } from './profile.js';
 import { stripNekud } from './text.js';
@@ -21,6 +24,9 @@ export function computeLineKey(line) {
     tokens: (line.tokens || []).map((t) => String(t)),
     widths: (line.words || []).map((w) => Number(w.width_mm || 0)),
     ids: Array.isArray(line.letter_occurrence_ids) ? line.letter_occurrence_ids : [],
+    ...(line.column_width_mm ? { column_width_mm: line.column_width_mm } : {}),
+    ...(line.song_layout ? { song_layout: line.song_layout, stretch: line.stretch_decisions } : {}),
+    ...(line.tefillin_section ? { tefillin_section: line.tefillin_section } : {}),
   });
   return createHash('sha256').update(payload, 'utf8').digest('hex');
 }
@@ -229,7 +235,7 @@ function measuredOccurrenceWidth(letter, profile, overrideByOccId) {
   const override = overrideByOccId.get(letter.id);
   let base = override != null ? Number(override.mm) : totalWidth(letter.base, profile);
   if (letter.stam_letter_mark?.type === 'large') base *= 1.5;
-  if (letter.stam_letter_mark?.type === 'small') base *= 0.5;
+  if (letter.stam_letter_mark?.type === 'small') base *= profile.small_letter_scale ?? 0.5;
   const mark = letter.stam_width_mark;
   if (!mark) return base;
   const units = Math.max(0, Number(profile.stretch_policy?.version === 2
@@ -239,7 +245,7 @@ function measuredOccurrenceWidth(letter, profile, overrideByOccId) {
   return mark.mode === 'replace' ? markerWidth : base + markerWidth;
 }
 
-function measureWord(wordUnit, profile, overrideByOccId) {
+export function measureWord(wordUnit, profile, overrideByOccId) {
   const letters = wordUnit.letters;
   let w = 0;
   for (let i = 0; i < letters.length; i++) {
@@ -249,7 +255,7 @@ function measureWord(wordUnit, profile, overrideByOccId) {
   return w;
 }
 
-function wordOverrides(wordUnit, overrideMap, profile) {
+export function wordOverrides(wordUnit, overrideMap, profile) {
   const entries = [];
   for (const l of wordUnit.letters) {
     const ov = overrideMap.get(l.id);
@@ -299,16 +305,9 @@ export function fitLines(source, profile, geometry, opts = {}) {
 
   const pushLine = (flags = {}) => {
     if (current.length === 0 && !flags.force) return;
-    if (flags.songEnd) {
-      const gaps = current.filter(item => item.type === 'segment_gap');
-      if (gaps.length > 2) throw new Error('A song line may contain at most two m breaks before e');
-      const song = profile.stretch_policy?.song_widths_mm || {};
-      const target = Number(song.page) > 0 ? Number(song.page) : lineW;
-      const automatic = gaps.filter(item => item.width_mm === 0);
-      const extra = automatic.length ? Math.max(0, target - currentWidth) / automatic.length : 0;
-      automatic.forEach(item => { item.width_mm = extra; currentWidth += extra; });
-    }
-    const line = makeLine(current, currentWidth, lineW, profile, flags);
+    const line = flags.songEnd && current.some(item => item.type === 'segment_gap')
+      ? composeSongLine(current, profile, geometry, geometry.song_layouts?.manual || 'hayam')
+      : makeLine(current, currentWidth, lineW, profile, flags);
     if (currentSong) line.fixed_pattern = true;
     if (flags.blankLine) line.blank_line = true;
     lines.push(line);
@@ -626,6 +625,7 @@ function computeLeftover(line, profile) {
 // must obey the active position filter; and any unknown/human-marked/non-stretchable/
 // over-cap violation fails ATOMICALLY (throws, no partial mutation).
 export function applyStretch(line, decisions, profile) {
+  if (line.song_layout) throw new Error("Song segments are stretched separately; recompute the layout after editing their settings");
   if (line.fixed_pattern) throw new Error('fixed passage stretch is frozen');
   if (profile.stretch_policy) {
     if ((line.petucha_end && profile.stretch_policy.version !== 2) || line.sefer_end || line.setuma_at_edge) throw new Error('intentional line-end spacing is frozen');
@@ -893,9 +893,9 @@ function computeReferenceLayout(source, profile, geometry, derived, opts) {
   const overrides=buildOverrideMap(source,verseLetters),seen=new Set();
   const lineW=Number(geometry.line_width_mm),gap=interWordGap(profile),setuma=setumaGapMm(profile,geometry);
   const songPages=new Set(reference.lines.filter(line=>line.items.some(item=>item.type==='segment_gap')).map(line=>line.page));
-  const songWidths=profile.stretch_policy?.song_widths_mm || {};
   const lines=reference.lines.map((ref,li)=>{
-    const effectiveLineW=songPages.has(ref.page)&&Number(songWidths.page)>0?Number(songWidths.page):lineW;
+    const songKind=ref.page===78?'hayam':'haazinu';
+    const effectiveLineW=songPages.has(ref.page)?songSettings(geometry,songKind).total_mm:lineW;
     let width=0,prevWord=false;
     const items=ref.items.map(it=>{
       if(it.type==='word') {
@@ -908,18 +908,13 @@ function computeReferenceLayout(source, profile, geometry, derived, opts) {
       const w=it.type==='setuma_gap'?setuma:it.type==='nun_hafucha'?totalWidth('נ',profile):0;
       width+=w;return {type:it.type,width_mm:w,...(it.break_kind?{break_kind:it.break_kind}:{})};
     });
-    // Poetry segments remain side by side in their reference order. Distribute
-    // only their explicit blank gaps; never classify song spacing as setumah.
+    // Song columns use their own physical width and the document's unchanged
+    // letter measurements. Explicit poetry gaps remain distinct from setumah.
     const gaps=items.filter(it=>it.type==='segment_gap');
-    if(gaps.length){
-      const fallbackGap = Math.max(0,effectiveLineW-width)/gaps.length;
-      for(const item of gaps){
-        const chosen=item.break_kind==='middle'||gaps.length===1?Number(songWidths.middle):Number(songWidths.side);
-        item.width_mm=chosen>0?chosen:fallbackGap;
-        width+=item.width_mm;
-      }
-    }
-    const line=makeLine(items,width,effectiveLineW,profile,{endedBy:ref.petucha_end?'petucha':null});
+    const line=gaps.length || (ref.fixed_pattern && ref.page===78 && ref.source_record===6)
+      ? composeSongLine(items,profile,geometry,songKind)
+      : makeLine(items,width,effectiveLineW,profile,{endedBy:ref.petucha_end?'petucha':null});
+    if(songPages.has(ref.page))line.column_width_mm=effectiveLineW;
     const lastIndex=ref.items.filter(it=>it.type==='word').at(-1)?.word_index;
     if(lastIndex!=null && (!words[lastIndex+1] || verseBooks.get(words[lastIndex].verse)!==verseBooks.get(words[lastIndex+1].verse)))line.sefer_end=true;
     line.fixed_pattern=!!ref.fixed_pattern||ref.blank;line.reference_page=ref.page;line.reference_record=ref.source_record;
@@ -1021,6 +1016,8 @@ function reflowMeasuredReference(referenceLines,lineW,profile) {
 
 export function computeLayout(source, profile, geometry, opts = {}) {
   profile = effectiveProfile(profile, geometry);
+  if (source.tefillin && !geometry.tefillin) throw new Error('Choose Tefillin in Column settings, enter four page widths, and save the geometry first');
+  if (geometry.tefillin) return computeTefillin(source, profile, geometry);
   const g = deriveGeometry(geometry, profile);
   if(source.reference)return computeReferenceLayout(source,profile,geometry,g,opts);
   const patternDefs = opts.patterns || [];
@@ -1066,6 +1063,8 @@ function finalizeLayout(lines, totalLetters, geometry, profile, g, blockers = []
 // advance, not a timer animation.
 export async function computeLayoutAsync(source, profile, geometry, opts = {}) {
   profile = effectiveProfile(profile, geometry);
+  if (source.tefillin && !geometry.tefillin) throw new Error('Choose Tefillin in Column settings, enter four page widths, and save the geometry first');
+  if (geometry.tefillin) return computeTefillin(source, profile, geometry);
   const g = deriveGeometry(geometry, profile);
   if(source.reference) {
     // Reference membership is fixed, not a normal fit with wrapping enabled.
@@ -1096,16 +1095,9 @@ export async function computeLayoutAsync(source, profile, geometry, opts = {}) {
   let prevWasWord = false;
   const pushLine = (flags = {}) => {
     if (current.length === 0 && !flags.force) return;
-    if (flags.songEnd) {
-      const gaps = current.filter(item => item.type === 'segment_gap');
-      if (gaps.length > 2) throw new Error('A song line may contain at most two m breaks before e');
-      const song = profile.stretch_policy?.song_widths_mm || {};
-      const target = Number(song.page) > 0 ? Number(song.page) : lineW;
-      const automatic = gaps.filter(item => item.width_mm === 0);
-      const extra = automatic.length ? Math.max(0, target - currentWidth) / automatic.length : 0;
-      automatic.forEach(item => { item.width_mm = extra; currentWidth += extra; });
-    }
-    const line = makeLine(current, currentWidth, lineW, profile, flags);
+    const line = flags.songEnd && current.some(item => item.type === 'segment_gap')
+      ? composeSongLine(current, profile, geometry, geometry.song_layouts?.manual || 'hayam')
+      : makeLine(current, currentWidth, lineW, profile, flags);
     if (currentSong || current.some(item => item.type === 'segment_gap')) line.fixed_pattern = true;
     lines.push(line);
     current = []; currentWidth = 0; prevWasWord = false; currentSong = false;
@@ -1209,7 +1201,8 @@ export function normalizeGeometry(g) {
   return {
     id: src.id || null,
     name: src.name || 'unnamed geometry',
-    lines_per_amud: int(src.lines_per_amud, 42),
+    ...copyColumnOptions(src),
+    lines_per_amud: src.tefillin ? (src.tefillin.kind === 'rosh' ? 4 : 7) : int(src.lines_per_amud, 42),
     baseline_pitch_mm: num(src.baseline_pitch_mm, 8.0),
     top_margin_mm: num(src.top_margin_mm, 10),
     bottom_margin_mm: num(src.bottom_margin_mm, 10),

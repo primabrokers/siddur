@@ -34,7 +34,7 @@ test('ASCII minus and plus are single-letter size commands, retaining exact holy
   const doc = processSource({ text: '+א -א א' });
   assert.equal(doc.format, 'stam');
   const line = computeLayout(doc, profile(), normalizeGeometry({ line_width_mm: 80 })).lines[0];
-  assert.deepEqual(line.words.map(w => w.width_mm), [3, 1, 2]);
+  assert.deepEqual(line.words.map(w => w.width_mm), [3, 4/3, 2]);
 });
 
 test('m/e gives two or three complete song segments, identical through the web and sync fitters', async () => {
@@ -44,8 +44,8 @@ test('m/e gives two or three complete song segments, identical through the web a
   assert.deepEqual(web.lines.map(l => [l.text, l.width_mm, l.fixed_pattern]), result.lines.map(l => [l.text, l.width_mm, l.fixed_pattern]));
   assert.deepEqual(result.lines.map(l => l.text), ['אב גד הו', 'זח טי כל', 'מנ']);
   assert.deepEqual(result.lines.slice(0, 2).map(l => l.items.filter(i => i.type === 'segment_gap').length), [1, 2]);
-  for (const line of result.lines.slice(0, 2)) { assert(line.fixed_pattern); assert.equal(line.width_mm, 40); assert.equal(autoSuggestLine(line, p).suggestions.length, 0); }
-  const overfull = await computeLayoutAsync(processSource({ text: 'אב אב אבmאבe' }), p, normalizeGeometry({ line_width_mm: 5 }));
+  for (const line of result.lines.slice(0, 2)) { assert(line.fixed_pattern); assert.equal(line.width_mm, 180); assert.equal(autoSuggestLine(line, p).suggestions.length, 0); }
+  const overfull = await computeLayoutAsync(processSource({ text: 'אב אב אבmאבe' }), p, normalizeGeometry({ line_width_mm: 5, song_layouts:{hayam:{total_mm:5,right_mm:1.5,left_mm:1.5}} }));
   assert.equal(overfull.lines.length, 1); assert(overfull.lines[0].leftover_mm < 0);
 });
 

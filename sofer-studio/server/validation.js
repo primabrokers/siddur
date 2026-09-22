@@ -1,3 +1,4 @@
+import { columnOptionsErrors } from '../engine/column-options.js';
 // server/validation.js
 // Strict input validation for mutation bodies. Rejects negative, non-finite and
 // out-of-range physical inputs with a clear 400 message instead of silently
@@ -135,7 +136,7 @@ export function validateProfileInput(body) {
 }
 
 export function validateGeometryInput(body) {
-  const errs = [];
+  const errs = columnOptionsErrors(body);
   checkNonNegative(errs, body, 'line_width_mm', 'line_width_mm', { allowZero: false });
   checkNonNegative(errs, body, 'baseline_pitch_mm', 'baseline_pitch_mm', { allowZero: false });
   checkNonNegative(errs, body, 'top_margin_mm', 'top_margin_mm');

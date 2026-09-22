@@ -34,10 +34,10 @@ test('large and small controls change both measured and public preview widths', 
   const [large, small] = result.lines[0].words;
   const base = totalWidth('א', profile);
   assert.equal(large.width_mm, base * 1.5);
-  assert.equal(small.width_mm, base * .5);
-  const preview = publicLine(result.lines[0], profile);
+  assert.equal(small.width_mm, base * (2/3));
+  const preview = publicLine(result.lines[0], {...profile,small_letter_scale:2/3});
   assert.equal(preview.words[0].letters[0].width_mm, base * 1.5);
-  assert.equal(preview.words[1].letters[0].width_mm, base * .5);
+  assert.equal(preview.words[1].letters[0].width_mm, base * (2/3));
 });
 
 test('ordinary txt upload and paste automatically preserve English markers', () => {

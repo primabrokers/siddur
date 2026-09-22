@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { openDatabase } from '../db/db.js';
-import { applyMigrations } from '../db/schema.js';
+import { applyMigrations, SCHEMA_VERSION } from '../db/schema.js';
 import * as store from '../server/store.js';
 import { defaultProfile } from '../engine/profile.js';
 import { startTestServer, getToken, jsonHeaders, request } from './helpers.js';
@@ -10,9 +10,9 @@ test('height-unit migration adds a nullable column without changing existing pro
   const db=openDatabase(':memory:');
   try {
     const profile=store.insertProfile(db,{name:'Existing measured profile',letter_height_mm:4.25,reference_height_mm:3,min_letter_height_mm:2.8});
-    db.exec('ALTER TABLE profiles DROP COLUMN letter_height_units; DELETE FROM schema_migrations WHERE version=8');
+    db.exec('ALTER TABLE profiles DROP COLUMN letter_height_units; DROP TABLE geometry_options; DELETE FROM schema_migrations WHERE version>=8');
     const before=db.prepare('SELECT * FROM profiles').all();
-    assert.equal(applyMigrations(db),8);assert.equal(applyMigrations(db),8);
+    assert.equal(applyMigrations(db),SCHEMA_VERSION);assert.equal(applyMigrations(db),SCHEMA_VERSION);
     const after=db.prepare('SELECT * FROM profiles').all();assert.equal(after[0].letter_height_units,null);
     assert.deepEqual(after.map(({letter_height_units,...old})=>old),before);
     assert.equal(store.getProfile(db,profile.id).letter_height_mm,4.25);

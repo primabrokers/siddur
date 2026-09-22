@@ -117,6 +117,7 @@ export function deleteProfile(db, id) {
 export function insertGeometry(db, g) {
   const n = normalizeGeometry(g);
   const id = getId();
+  db.transaction(() => {
   db.prepare(`INSERT INTO geometries (
     id, name, lines_per_amud, baseline_pitch_mm, top_margin_mm, bottom_margin_mm,
     inter_column_gap_mm, outer_margin_mm, line_width_mm, max_letters_per_line,
@@ -131,17 +132,21 @@ export function insertGeometry(db, g) {
     n.max_inter_word_gap_factor != null ? n.max_inter_word_gap_factor : null,
     n.small_letter_reference, n.vavei_haamudim ? 1 : 0, nowIso()
   );
+  if (n.song_layouts || n.tefillin) db.prepare('INSERT INTO geometry_options (geometry_id,options) VALUES (?,?)').run(id,json({song_layouts:n.song_layouts,tefillin:n.tefillin}));
+  })();
   return { ...n, id };
 }
 
+function geometryOptions(db,id) { return parse(db.prepare('SELECT options FROM geometry_options WHERE geometry_id=?').get(id)?.options) || {}; }
+
 export function listGeometries(db) {
-  return db.prepare('SELECT * FROM geometries ORDER BY created_at DESC').all().map(r => ({ ...r, vavei_haamudim: !!r.vavei_haamudim }));
+  return db.prepare('SELECT * FROM geometries ORDER BY created_at DESC').all().map(r => ({ ...r, ...geometryOptions(db,r.id), vavei_haamudim: !!r.vavei_haamudim }));
 }
 
 export function getGeometry(db, id) {
   const row = db.prepare('SELECT * FROM geometries WHERE id = ?').get(id);
   if (!row) return null;
-  return normalizeGeometry({ ...row, vavei_haamudim: !!row.vavei_haamudim });
+  return normalizeGeometry({ ...row, ...geometryOptions(db,id), vavei_haamudim: !!row.vavei_haamudim });
 }
 
 // ---- patterns -------------------------------------------------------------
@@ -205,7 +210,7 @@ function insertLayoutLines(db, id, lines) {
         l.status || 'pending', nowIso()
       );
       db.prepare('UPDATE layout_lines SET layout_flags=? WHERE layout_id=? AND line_id=?').run(
-        json({petucha_end:!!l.petucha_end,sefer_end:!!l.sefer_end,fixed_pattern:!!l.fixed_pattern,book_boundary_blank:!!l.book_boundary_blank,reference_page:l.reference_page||null}),id,l.line_id
+        json({petucha_end:!!l.petucha_end,sefer_end:!!l.sefer_end,fixed_pattern:!!l.fixed_pattern,book_boundary_blank:!!l.book_boundary_blank,reference_page:l.reference_page||null,column_width_mm:l.column_width_mm||null,song_layout:l.song_layout||null,tefillin_section:l.tefillin_section||null}),id,l.line_id
       );
     }
 }
@@ -263,6 +268,7 @@ export function getLayoutLines(db, layoutId, page) {
         petucha_end: !!(flags && flags.petucha_end), sefer_end: !!(flags && flags.sefer_end),
         spacing_metadata_complete: flags != null,
         reference_page: flags && flags.reference_page || null,
+        column_width_mm: flags?.column_width_mm || null, song_layout: flags?.song_layout || null, tefillin_section: flags?.tefillin_section || null,
         line_in_amud: flags && flags.reference_page ? (r.line_index-1)%42+1 : null,
       };
     });
@@ -373,7 +379,7 @@ export function createLockedLayout(db, meta, lines, summary) {
         l.status || 'pending', nowIso()
       );
       db.prepare('UPDATE layout_lines SET layout_flags=? WHERE layout_id=? AND line_id=?').run(
-        json({petucha_end:!!l.petucha_end,sefer_end:!!l.sefer_end,fixed_pattern:!!l.fixed_pattern,reference_page:l.reference_page||null}),id,l.line_id);
+        json({petucha_end:!!l.petucha_end,sefer_end:!!l.sefer_end,fixed_pattern:!!l.fixed_pattern,reference_page:l.reference_page||null,column_width_mm:l.column_width_mm||null,song_layout:l.song_layout||null,tefillin_section:l.tefillin_section||null}),id,l.line_id);
     }
   });
   tx(lines);

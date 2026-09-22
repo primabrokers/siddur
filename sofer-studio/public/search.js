@@ -98,6 +98,13 @@
     root.appendChild(util.el('div', { class: 'eyebrow', text: 'Built-in study text' }));
     root.appendChild(util.el('div', { id: 'builtin-list', class: 'builtin-list' }));
 
+    var tefillin=util.el('button',{class:'btn btn-ghost',text:'Load Tefillin — four passages'});
+    tefillin.addEventListener('click',async function(){
+      tefillin.disabled=true;
+      try {await loadBuiltin('tefillin');if(SS.geometry)SS.geometry.selectTefillin('rosh');if(SS.workspace)SS.workspace.open('setup','geometry');SS.toast('Four passages loaded. Set the four page widths in Column settings, then save.');}
+      catch(e){} finally{tefillin.disabled=false;}
+    });
+    root.appendChild(tefillin);
     var imp = util.el('div', { class: 'import-block' });
     var nameInput = util.el('input', { type: 'text', placeholder: 'Source name', 'data-i': 'name' });
     var tradInput = util.el('input', { type: 'text', placeholder: 'Tradition (optional)', 'data-i': 'tradition' });
@@ -124,7 +131,7 @@
 
     var aside = util.el('details', { class: 'import-hint' },
       [util.el('summary', { text: 'Import notes' }),
-       util.el('p', { class: 't--2 faint', text: 'The original is preserved. Capitals use the Hebrew keyboard and mark only those letters as holy (שמות קודש), with a white strike. Lowercase p = pesucha, s = setuma, l = blank line, even attached to a word. Put + immediately before a letter for 1.5× width and height, or - for half size; both align at the top. For a song row, m makes a middle break and e ends the row: use one m for two sections or two for three. The program never decides holiness from a word’s spelling. Unsupported STAM characters are reported, not silently removed.' })]);
+       util.el('p', { class: 't--2 faint', text: 'The original is preserved. Capitals use the Hebrew keyboard and mark only those letters as holy (שמות קודש), with a white strike. Lowercase p = pesucha, s = setuma, l = blank line, even attached to a word. Put + immediately before a letter for 1.5× width and height, or - for two-thirds width and height; both align at the top. For a song row, m makes a middle break and e ends the row: use one m for two sections or two for three. The program never decides holiness from a word’s spelling. Unsupported STAM characters are reported, not silently removed.' })]);
     imp.appendChild(aside);
     root.appendChild(imp);
 

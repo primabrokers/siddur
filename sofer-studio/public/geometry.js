@@ -84,6 +84,8 @@
       max_inter_word_gap_mm: (g.max_inter_word_gap_mm != null) ? toNum(g.max_inter_word_gap_mm, null) : null,
       max_inter_word_gap_factor: (g.max_inter_word_gap_factor != null) ? toNum(g.max_inter_word_gap_factor, null) : null,
       small_letter_reference: g.small_letter_reference || 'י',
+      song_layouts: g.song_layouts ? JSON.parse(JSON.stringify(g.song_layouts)) : null,
+      tefillin: g.tefillin ? JSON.parse(JSON.stringify(g.tefillin)) : null,
       vavei_haamudim: g.vavei_haamudim !== false
     };
   }
@@ -116,6 +118,24 @@
     root.appendChild(crud);
     root.appendChild(util.el('p', {class:'profile-help',text:'This is a custom measurement draft, not the verified Simanim Layout 1. Computing it reflows text. Save a copy and adjust measurements with your sofer; do not use it as an exact printed tikkun reference.'}));
     root.appendChild(util.el('div', { class: 'sirtut' }));
+
+    var mode = util.el('select', {id:'geom-document-mode'}, [
+      util.el('option',{value:'torah',text:'Torah / other text'}),
+      util.el('option',{value:'rosh',text:'Tefillin shel rosh — 4 lines per page'}),
+      util.el('option',{value:'yad',text:'Tefillin shel yad — 7 lines per page'})]);
+    mode.addEventListener('change', function(){ selectTefillin(mode.value); });
+    root.appendChild(util.el('label',{class:'field'},[util.el('span',{text:'Document type'}),mode]));
+    var tefillin = util.el('div',{id:'geom-tefillin',class:'geom-grid',hidden:true});
+    ['קדש','והיה כי יביאך','שמע','והיה אם שמוע'].forEach(function(name,index){
+      var input=util.el('input',{type:'number',min:'0.01',step:'0.1',id:'tefillin-width-'+index,placeholder:'Enter width in mm'});
+      input.addEventListener('input',function(){draft.tefillin.widths_mm[index]=input.value===''?null:Number(input.value);bus.emit('geometry:draft-changed');});
+      tefillin.appendChild(util.el('label',{class:'field'},[util.el('span',{text:(index+1)+'. '+name+' — width (mm)'}),input]));
+    });
+    var paper=util.el('select',{id:'tefillin-paper'},[util.el('option',{value:'A4',text:'A4 landscape'}),util.el('option',{value:'A3',text:'A3 landscape'})]);
+    paper.addEventListener('change',function(){draft.tefillin.paper=paper.value;});
+    tefillin.appendChild(util.el('label',{class:'field'},[util.el('span',{text:'Print all four pages on'}),paper]));
+    tefillin.appendChild(util.el('p',{class:'profile-help full',text:'Load the four Tefillin passages in Book & source. Choose each page width, then save and compute. The letter-width table and the calibration column width below keep the same physical letter size on all four pages.'}));
+    root.appendChild(tefillin);
 
     // lines per amud selector
     var linesWrap = util.el('div', { class: 'lines-selector' });
@@ -154,6 +174,23 @@
        util.el('span', { text: "Vavei ha'amudim (column-initial vavs)" })]));
     root.appendChild(spGrid);
 
+    var songs=util.el('details',{class:'song-settings'},[util.el('summary',{text:'Song column settings'})]);
+    songs.appendChild(util.el('p',{class:'profile-help',text:'Letters keep the same physical size as the rest of the document. Wider song columns contain more units.'}));
+    ['hayam','haazinu'].forEach(function(kind){
+      songs.appendChild(util.el('strong',{text:kind==='hayam'?'Shiras Hayam':'Shiras Haazinu'}));
+      var grid=util.el('div',{class:'geom-grid'});
+      [['total_mm','Total width'],['right_mm','Right column width'],['left_mm','Left column width']].forEach(function(pair){
+        var input=util.el('input',{type:'number',min:'0.01',step:'any',id:'song-'+kind+'-'+pair[0]});
+        input.addEventListener('input',function(){ensureSongs();draft.song_layouts[kind][pair[0]]=Number(input.value);bus.emit('geometry:draft-changed');});
+        grid.appendChild(util.el('label',{class:'field'},[util.el('span',{text:pair[1]+' (mm)'}),input]));
+      });
+      songs.appendChild(grid);
+    });
+    var manual=util.el('select',{id:'song-manual'},[util.el('option',{value:'hayam',text:'Hayam'}),util.el('option',{value:'haazinu',text:'Haazinu'})]);
+    manual.addEventListener('change',function(){ensureSongs();draft.song_layouts.manual=manual.value;});
+    songs.appendChild(util.el('label',{class:'field'},[util.el('span',{text:'Imported m / e song rows use'}),manual]));
+    root.appendChild(songs);
+
     // min-width guard (live)
     guardEl = util.el('div', { class: 'guard', id: 'geom-guard' });
     root.appendChild(guardEl);
@@ -168,6 +205,16 @@
 
     derivedEl = util.el('div', { class: 'derived-stack', id: 'geom-derived' });
     root.appendChild(derivedEl);
+  }
+
+  function ensureSongs() {
+    var saved=draft.song_layouts||{};
+    draft.song_layouts={manual:saved.manual||'hayam',hayam:Object.assign({total_mm:180,right_mm:60,left_mm:60},saved.hayam),haazinu:Object.assign({total_mm:170,right_mm:170/3,left_mm:170/3},saved.haazinu)};
+  }
+  function selectTefillin(kind) {
+    if(kind==='torah'){draft.tefillin=null;draft.lines_per_amud=42;}
+    else {draft.tefillin=Object.assign({widths_mm:[null,null,null,null],paper:'A4'},draft.tefillin,{kind:kind});draft.lines_per_amud=kind==='rosh'?4:7;draft.vavei_haamudim=false;draft.amudim_per_yeria=4;}
+    renderFromDraft();
   }
 
   function setLinesPerAmud(which) {
@@ -274,6 +321,13 @@
     var k = util.qs('[data-field="amudim_per_yeria"]', root);
     if (k) k.value = draft.amudim_per_yeria;
     syncLineWidthDisplay();
+    util.byId('geom-document-mode').value=draft.tefillin?draft.tefillin.kind:'torah';
+    util.byId('geom-tefillin').hidden=!draft.tefillin;
+    util.byId('geom-lines-seg').closest('.lines-selector').hidden=!!draft.tefillin;
+    if(draft.tefillin){draft.tefillin.widths_mm.forEach(function(width,i){util.byId('tefillin-width-'+i).value=width==null?'':width;});util.byId('tefillin-paper').value=draft.tefillin.paper||'A4';}
+    ensureSongs();
+    ['hayam','haazinu'].forEach(function(kind){['total_mm','right_mm','left_mm'].forEach(function(key){util.byId('song-'+kind+'-'+key).value=draft.song_layouts[kind][key];});});
+    util.byId('song-manual').value=draft.song_layouts.manual;
     ['setuma_gap_mm', 'min_inter_letter_gap_mm', 'min_inter_word_gap_mm', 'max_inter_word_gap_mm', 'max_inter_word_gap_factor'].forEach(function (p) {
       var el = util.qs('[data-field="' + p + '"]', root);
       if (el) el.value = (draft[p] != null && !Number.isNaN(draft[p])) ? draft[p] : '';
@@ -454,6 +508,8 @@
       small_letter_reference: draft.small_letter_reference || '\u05d9',
       vavei_haamudim: !!draft.vavei_haamudim
     };
+    body.song_layouts=draft.song_layouts;
+    if(draft.tefillin) body.tefillin=draft.tefillin;
     try {
       var saved = await API.createGeometry(body);
       await refreshGeometries();
@@ -472,5 +528,5 @@
     } catch (e) { /* ignore */ }
   }
 
-  SS.geometry = { init: init, starter: defaultDraft, getDraft:function(){return draft;} };
+  SS.geometry = { init: init, selectTefillin: selectTefillin, starter: defaultDraft, getDraft:function(){return draft;} };
 })();

@@ -13,7 +13,7 @@ test('migration 6→7 preserves legacy rows; new policy survives close/reopen an
   const dir=mkdtempSync(join(tmpdir(),'sofer-policy-')),path=join(dir,'test.sqlite');let db=openDatabase(path);
   try{
     const legacy=store.insertProfile(db,{name:'Legacy evidence',unit_mm:.7});
-    db.exec('ALTER TABLE profiles DROP COLUMN letter_height_units; DELETE FROM schema_migrations WHERE version=8; ALTER TABLE profiles DROP COLUMN stretch_policy; ALTER TABLE profiles DROP COLUMN units_per_row; ALTER TABLE profiles DROP COLUMN unit_basis; ALTER TABLE profiles DROP COLUMN layout_mode; DELETE FROM schema_migrations WHERE version=7');
+    db.exec('ALTER TABLE profiles DROP COLUMN letter_height_units; DROP TABLE geometry_options; DELETE FROM schema_migrations WHERE version>=8; ALTER TABLE profiles DROP COLUMN stretch_policy; ALTER TABLE profiles DROP COLUMN units_per_row; ALTER TABLE profiles DROP COLUMN unit_basis; ALTER TABLE profiles DROP COLUMN layout_mode; DELETE FROM schema_migrations WHERE version=7');
     const before=db.prepare('SELECT * FROM profiles').all();assert.equal(applyMigrations(db),SCHEMA_VERSION);
     const after=db.prepare('SELECT * FROM profiles').all().map(({stretch_policy,units_per_row,unit_basis,layout_mode,letter_height_units,...rest})=>rest);
     assert.deepEqual(after,before);assert.equal(store.getProfile(db,legacy.id).stretch_policy,null);

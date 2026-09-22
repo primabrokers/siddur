@@ -42,6 +42,11 @@
 
     row.appendChild(bPrint);
     root.appendChild(row);
+    var paper=util.el('select',{id:'export-tefillin-paper'},[util.el('option',{value:'A4',text:'A4 landscape'}),util.el('option',{value:'A3',text:'A3 landscape'})]);
+    root.appendChild(util.el('label',{id:'export-tefillin',class:'field',hidden:true},[util.el('span',{text:'All four Tefillin pages on one sheet'}),paper]));
+    root.appendChild(util.el('div',{class:'offline-download'},[
+      util.el('a',{class:'btn btn-ghost',href:'/downloads/Sofer-Studio-Windows-x64.zip',download:'Sofer-Studio-Windows-x64.zip',text:'Download Sofer for Windows — work offline'}),
+      util.el('p',{class:'profile-help',text:'Extract the ZIP to a folder, then open Start Sofer.cmd. Includes the program, fonts and Torah text. Offline work is saved in that folder; it is separate from your online workspace.'})]));
     root.appendChild(util.el('ol', { class: 'download-instructions' }, [
       util.el('li', { text: 'Click Print / Save PDF and wait while all pages are prepared.' }),
       util.el('li', { text: 'Choose “Save as PDF” as the destination, select All pages, then Save.' }),
@@ -54,6 +59,9 @@
 
   function updateState() {
     if (!root) return;
+    var t=state.layout&&state.layout.summary&&state.layout.summary.tefillin;
+    util.byId('export-tefillin').hidden=!t;
+    if(t)util.byId('export-tefillin-paper').value=t.paper||'A4';
     var has = !!state.active.layoutId;
     var study = !!(state.layout && state.layout.summary && state.layout.summary.study_preview);
     util.qsa('button', root).forEach(function (b) { b.disabled = !has || study; });
@@ -80,6 +88,7 @@
     try {
       if (!await SS.tikkun.preparePrint()) { SS.toast('Layout changed. Please try printing again.', 'error'); finishPrint(); return; }
       SS.tikkun.refreshPrintNote();
+      if(SS.tikkun.prepareTefillinPaper)SS.tikkun.prepareTefillinPaper(util.byId('export-tefillin-paper').value);
       // Browser print includes every amud, not only the page on screen.
       window.print();
     } catch (e) { finishPrint(); SS.toast(e.message || String(e), 'error'); }

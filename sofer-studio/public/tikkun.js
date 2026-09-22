@@ -170,7 +170,25 @@
     } finally { preparingPrint = false; }
   }
 
-  function finishPrint() { if (pageEls.length) selectPage(pageIndex); }
+  function finishPrint() {
+    if(currentSheet)currentSheet.classList.remove('tefillin-print');
+    document.body.classList.remove('printing-tefillin');
+    var style=util.byId('tefillin-page-style');if(style)style.remove();
+    if (pageEls.length) selectPage(pageIndex);
+  }
+  function prepareTefillinPaper(paper) {
+    var t=renderedLayout&&renderedLayout.summary&&renderedLayout.summary.tefillin;
+    if(!t)return;
+    var geometry=layoutGeometry(renderedLayout),available=(paper==='A3'?420:297)-20,height=(paper==='A3'?297:210)-20;
+    var widths=t.widths_mm,gap=10,rowHeight=geometry.lines_per_amud*geometry.baseline_pitch_mm+12;
+    var one=widths.reduce(function(a,b){return a+b;},0)+gap*3<=available&&rowHeight<=height;
+    var cols=one?widths:[Math.max(widths[0],widths[2]),Math.max(widths[1],widths[3])];
+    if(!one&&(cols[0]+cols[1]+gap>available||rowHeight*2+gap>height))throw new Error('These four page measurements do not fit '+paper+'. Choose A3 or adjust the page widths / line height. Text will not be shrunk.');
+    if(renderedLayout.lines.some(function(l){return l.leftover_mm<-.01;}))throw new Error('Resolve the overfull Tefillin lines before printing at their chosen page widths.');
+    currentSheet.classList.add('tefillin-print');document.body.classList.add('printing-tefillin');
+    currentSheet.style.setProperty('--tefillin-columns',cols.map(function(w){return w+'mm';}).join(' '));
+    var style=util.el('style',{id:'tefillin-page-style',text:'@page { size: '+paper+' landscape; margin: 10mm; }'});document.head.appendChild(style);
+  }
 
   // Fit the entire rendered page, not just its font. Width and height both
   // constrain the scale. No minimum zoom is imposed that could cause clipping.
@@ -188,7 +206,13 @@
 
   function fitPage() {
     if (!currentSheet || !frame || !pageEls.length || !container.clientWidth || !container.clientHeight) return;
-    currentSheet.style.transform = 'none';
+    // Preserve the same place in the document when zoom or viewport size changes.
+    // offsetWidth/Height already ignore transforms; removing the transform first
+    // changes the scroll range and can send a later page to an empty placeholder.
+    var viewportTop = container.getBoundingClientRect().top;
+    var before = currentSheet.getBoundingClientRect();
+    var oldScale = currentSheet.offsetWidth ? before.width / currentSheet.offsetWidth : 1;
+    var anchor = oldScale > 0 ? (viewportTop - before.top) / oldScale : 0;
     fitGlyphs();
     var width = Math.max(currentSheet.offsetWidth, currentSheet.scrollWidth);
     var height = Math.max(currentSheet.offsetHeight, currentSheet.scrollHeight);
@@ -197,6 +221,7 @@
     currentSheet.style.transform = 'scale(' + scale + ')';
     frame.style.width = Math.ceil(width * scale) + 'px';
     frame.style.height = Math.ceil(height * scale) + 'px';
+    if (oldScale > 0) container.scrollTop += currentSheet.getBoundingClientRect().top + anchor * scale - viewportTop;
     scaleLabel.textContent = Math.round(scale * 100) + '%';
     scheduleVisiblePages();
   }
@@ -221,7 +246,7 @@
         if (!m) { ctx.font=font;ctx.textAlign='left';ctx.direction='ltr';m=ctx.measureText(ink.textContent);metrics.set(key,m); }
         fit = glyphFit(natural,target,m.actualBoundingBoxLeft,m.actualBoundingBoxRight);
       }
-      var vertical = ink.parentNode.classList.contains('marker-large') ? 1.5 : ink.parentNode.classList.contains('marker-small') ? 0.5 : 1;
+      var vertical = ink.parentNode.classList.contains('marker-large') ? 1.5 : ink.parentNode.classList.contains('marker-small') ? Number(renderedLayout?.snapshot?.profile?.small_letter_scale ?? 0.5) : 1;
       var offset = 0;
       if (vertical !== 1 && ctx) {
         var glyphStyle = window.getComputedStyle(ink);
@@ -395,7 +420,7 @@
     var pitch = (geom && geom.baseline_pitch_mm) || 10;
     var profile = layout.snapshot && layout.snapshot.profile;
     if (profile && profile.letter_height_mm) linesWrap.style.fontSize = (Number(profile.letter_height_mm) * 1.3) + 'mm';
-    if (geom && geom.line_width_mm) linesWrap.style.setProperty('--line-width', geom.line_width_mm + 'mm');
+    if (geom && geom.line_width_mm) linesWrap.style.setProperty('--line-width', Math.max.apply(null,g.lines.map(function(l){return l.column_width_mm||geom.line_width_mm;})) + 'mm');
     linesWrap.style.minHeight = ((geom && geom.lines_per_amud) || g.lines.length) * pitch + 'mm';
 
     if (placeholder) {
@@ -431,6 +456,7 @@
     el.appendChild(shortfallNote(line));
 
     var txt = util.el('span', { class: 'ltext' });
+    if(line.column_width_mm) txt.style.width=line.column_width_mm+'mm';
     txt.setAttribute('lang', 'he');
     txt.setAttribute('dir', 'rtl');
     var gap=Number(line.leftover_mm),intentional=!!(line.fixed_pattern||line.petucha_end||line.sefer_end||line.setuma_at_edge||(line.has_setuma&&!line.setuma_stretch_enabled));
@@ -495,6 +521,14 @@
     return controls;
   }
 
+  function suggestsDrop(line, next) {
+    var blocked=function(l){return !l||l.fixed_pattern||l.petucha_end||l.sefer_end||l.has_setuma||l.setuma_at_edge||(l.status&&l.status!=='pending');};
+    if(blocked(line)||blocked(next)||line.tefillin_section!==next.tefillin_section||!line.words||line.words.length<2||!next.words||!next.words.length) return false;
+    var before=Number(line.base_leftover_mm),after=Number(next.base_leftover_mm),word=Number(line.words[line.words.length-1].width_mm);
+    var freed=word+Number(line.inter_word_gap_mm||0),used=word+Number(next.inter_word_gap_mm||0);
+    return Number.isFinite(before)&&Number.isFinite(after)&&before>=-.001&&after-used>=-.001&&Math.max(before+freed,after-used)<Math.max(before,after)-.01;
+  }
+
   function shortfallNote(line) {
     var geometry = layoutGeometry(renderedLayout) || {};
     var profile = renderedLayout && renderedLayout.snapshot && renderedLayout.snapshot.profile || {};
@@ -505,6 +539,12 @@
     var missing = line.base_leftover_mm != null ? Number(line.base_leftover_mm) :
       line.width_mm != null ? Number(geometry.line_width_mm) - Number(line.width_mm) :
       line.leftover_mm != null ? Number(line.leftover_mm) + (line.stretch_decisions || []).reduce(function (sum, d) { return sum + Number(d.stretch_mm || 0); }, 0) : NaN;
+    // A petuchah can be overfull even if its ink fits: reserve its required
+    // end gap before deciding whether to hide an intentional-space indicator.
+    if (line.petucha_end && !line.fixed_pattern && profile.stretch_policy?.version === 2) {
+      var reserved = Math.max(20, Number(profile.special_widths_units?.petucha || profile.stretch_policy?.special_widths_units?.petucha || 20)) * unit;
+      if (missing < reserved - 0.001) missing -= reserved;
+    }
     var units = unit > 0 ? missing / unit : NaN, text = '—', title = 'Original line units unavailable';
     if (Number.isFinite(units)) {
       // The engine rounds millimetres to 0.001. Remove that rounding noise only.
@@ -518,7 +558,7 @@
       title = units === 0 ? 'שורה תמה — complete before stretching' :
         util.fmt(absolute, 2) + ' units ' + (units < 0 ? 'overfull' : 'missing') + ' before stretching';
     }
-    return util.el('span', { class: 'side', text: text, title: title, 'aria-label': title, lang: 'he', dir: 'rtl',
+    return util.el('span', { class: 'side'+(units<-.001?' is-overfull':''), text: text, title: title, 'aria-label': title, lang: 'he', dir: 'rtl',
       'data-missing-units': Number.isFinite(units) ? String(units) : '' });
   }
 
@@ -546,6 +586,9 @@
         box.style.width = measuredWidth + 'mm';
         box.dataset.widthMm = String(measuredWidth);
         box.title = 'word width ' + util.mm(measuredWidth);
+      }
+      if(wordIndex===words.length-1&&renderedLayout&&renderedLayout.status!=='locked'&&suggestsDrop(line,renderedLayout.lines[renderedLayout.lines.indexOf(line)+1])){
+        box.classList.add('suggested-drop');box.title='Suggested: use the down arrow to move this word to the next line and reduce uneven stretching.';
       }
       if (Number.isFinite(letterGap)) box.style.gap = letterGap + 'mm';
       var isShem = !!word.isShem;
@@ -629,7 +672,15 @@
       return g;
     }
 
-    if (items.length) {
+    if(line.song_layout){
+      line.song_layout.segments.forEach(function(segment){
+        var original=parent,part=util.el('span',{class:'song-segment'});
+        part.style.right=segment.start_mm+'mm';part.style.width=segment.width_mm+'mm';
+        parent.appendChild(part);parent=part;
+        for(var index=0;index<segment.word_count;index++){wi=segment.word_start+index;if(index)appendWordGap();parent.appendChild(wordBox(words[wi]));}
+        parent=original;
+      });
+    } else if (items.length) {
       // Authoritative: render one element per items[] entry, consuming words in order.
       items.forEach(function (it, index) {
         if (it.type === 'word') {
@@ -778,6 +829,8 @@
     preparePrint: preparePrint,
     finishPrint: finishPrint,
     isPrintReady: function () { return printReady; },
+    prepareTefillinPaper: prepareTefillinPaper,
+    suggestsDrop: suggestsDrop,
     refreshPrintNote: function () { if (renderedLayout) fillPrintNote(renderedLayout); }
   };
 })();

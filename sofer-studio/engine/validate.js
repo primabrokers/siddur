@@ -48,7 +48,7 @@ export function validateSpacingBounds(profile, geometry) {
 export function validateLine(line, profile, geometry) {
   const errors = [];
   const warnings = [];
-  const lineW = Number(geometry.line_width_mm);
+  const lineW = Number(line.column_width_mm || geometry.line_width_mm);
 
   // Setuma at a line edge is impossible by definition.
   if (line.setuma_at_edge || (line.has_setuma && !line.words.length)) {
@@ -86,7 +86,7 @@ export function validateLine(line, profile, geometry) {
   }
 
   // Override validation: no stretch decision may exceed its per-letter cap.
-  if (profile.stretch_policy && line.stretch_decisions?.length) {
+  if (profile.stretch_policy && line.stretch_decisions?.length && !line.song_layout) {
     try { applyStretch({...line}, line.stretch_decisions, profile); }
     catch (error) { errors.push(error.message); }
   }

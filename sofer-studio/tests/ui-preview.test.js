@@ -42,6 +42,21 @@ test('all pages remain in the vertical scroll track, navigation is lazy, and pri
   }finally{f.dom.window.close();}
 });
 test('expanded view can be closed with Escape',()=>{const f=fixture();try{const b=f.w.document.querySelector('[aria-pressed]');b.click();assert.equal(b.getAttribute('aria-pressed'),'true');f.w.document.dispatchEvent(new f.w.KeyboardEvent('keydown',{key:'Escape'}));assert.equal(b.getAttribute('aria-pressed'),'false');}finally{f.dom.window.close();}});
+test('zoom preserves the same document position on a later page',async()=>{
+  const f=fixture();try{
+    await load(f);const d=f.w.document,c=d.getElementById('tikkun-scroll'),sheet=d.querySelector('.sheet');
+    Object.defineProperties(c,{clientWidth:{value:856},clientHeight:{value:556}});
+    Object.defineProperties(sheet,{offsetWidth:{value:800},scrollWidth:{value:800},offsetHeight:{value:4000},scrollHeight:{value:4000}});
+    for(const page of d.querySelectorAll('.amud'))Object.defineProperty(page,'offsetHeight',{value:956});
+    c.getBoundingClientRect=()=>({top:100,bottom:656});
+    sheet.getBoundingClientRect=()=>{const scale=Number((sheet.style.transform.match(/scale\(([^)]+)\)/)||[])[1]||1);return{top:100-c.scrollTop,width:800*scale};};
+    sheet.style.transform='scale(1)';c.scrollTop=2000;
+    const zoom=d.querySelector('[aria-label="Preview zoom"]');zoom.value='page';zoom.dispatchEvent(new f.w.Event('change'));
+    await new Promise(r=>setTimeout(r,40));assert.equal(sheet.style.transform,'scale(0.5)');assert.equal(c.scrollTop,1000);
+    zoom.value='actual';zoom.dispatchEvent(new f.w.Event('change'));
+    await new Promise(r=>setTimeout(r,40));assert.equal(c.scrollTop,2000);
+  }finally{f.dom.window.close();}
+});
 test('print needs a loaded ready layout and uses persisted geometry, not current selector',async()=>{const f=fixture();try{await f.SS.export.printLayout();assert.equal(f.prints(),0);await load(f);await f.SS.export.printLayout();assert.equal(f.prints(),1);const note=f.w.document.getElementById('print-note').textContent;assert.match(note,/130/);assert.doesNotMatch(note,/999/);assert.equal(f.w.document.querySelectorAll('.amud').length,2);}finally{f.dom.window.close();}});
 test('study preview export restrictions also apply to the PDF print action',async()=>{const f=fixture();try{await load(f,{summary:{study_preview:true,total_lines:84}});for(const b of f.w.document.querySelectorAll('[data-format]'))assert.equal(b.disabled,true);assert.match(f.w.document.querySelector('.watermark').textContent,/NOT WRITING-READY/);f.SS.export.printLayout();assert.equal(f.prints(),0);assert.equal(f.requests(),0);}finally{f.dom.window.close();}});
 test('print CSS includes all pages and removes screen scaling',()=>{const css=source('styles.css');assert.match(css,/\.amud, \.amud\.screen-page-hidden \{ display: block !important/);assert.match(css,/transform: none !important/);assert.match(css,/page-break-after: always/);assert.match(css,/\.print-study-label \{ display: block/);});

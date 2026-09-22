@@ -2,7 +2,8 @@
 // Serve static files from a directory (the frontend's public/ tree), with path
 // traversal protection and a small MIME map.
 
-import { readFile } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
+import { createReadStream } from 'node:fs';
 import { extname, join, normalize, sep } from 'node:path';
 
 const MIME = {
@@ -37,6 +38,16 @@ export async function serveStatic(req, res, publicDir) {
   }
   let data;
   try {
+    if (extname(filePath).toLowerCase() === '.zip') {
+      const info = await stat(filePath);
+      if (!info.isFile()) throw new Error('Not a file');
+      res.writeHead(200, { 'Content-Type': 'application/zip', 'Content-Length': info.size,
+        'Content-Disposition': 'attachment; filename="Sofer-Studio-Windows-x64.zip"' });
+      if (req.method === 'HEAD') { res.end(); return; }
+      const stream = createReadStream(filePath);
+      stream.on('error', () => res.destroy()); res.on('close', () => stream.destroy());
+      stream.pipe(res); return;
+    }
     data = await readFile(filePath);
   } catch {
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });

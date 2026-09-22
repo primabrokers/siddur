@@ -176,6 +176,7 @@ ALTER TABLE profiles ADD COLUMN unit_basis TEXT;
 ALTER TABLE profiles ADD COLUMN layout_mode TEXT;`,
   },
   { version: 8, sql: `ALTER TABLE profiles ADD COLUMN letter_height_units REAL;` },
+  { version: 9, sql: `CREATE TABLE geometry_options (geometry_id TEXT PRIMARY KEY REFERENCES geometries(id), options TEXT NOT NULL);` },
 ];
 
 export function applyMigrations(db) {

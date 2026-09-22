@@ -10,7 +10,7 @@ export function measuredLetterWidth(word, letter, profile) {
   if (override) return Number(override.mm);
   const base = totalWidth(letter.base, profile);
   return letter.stam_letter_mark?.type === 'large' ? base * 1.5 :
-    letter.stam_letter_mark?.type === 'small' ? base * 0.5 : base;
+    letter.stam_letter_mark?.type === 'small' ? base * (profile.small_letter_scale ?? 0.5) : base;
 }
 
 export function percentageCap(base, percent, budget) {
@@ -34,6 +34,7 @@ export function letterCap(word, letter, profile, budget) {
 
 export function effectiveProfile(profile, geometry) {
   const result = structuredClone(profile);
+  result.small_letter_scale = 2 / 3;
   if (result.letter_height_units != null) {
     const unit = result.units_per_row != null ? Number(geometry.line_width_mm) / Number(result.units_per_row) : Number(result.unit_mm);
     result.letter_height_mm = Number(result.letter_height_units) * unit;
