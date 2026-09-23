@@ -44,7 +44,7 @@ with tempfile.TemporaryDirectory(prefix='sofer-offline-build-') as temp:
         for name in ['node.exe','LICENSE']:
             (runtime/name).write_bytes(archive.read('node-v22.23.2-win-x64/'+name))
     manifest={str(p.relative_to(base)).replace('\\','/'):hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(base.rglob('*')) if p.is_file()}
-    (base/'manifest.json').write_text(json.dumps({'release':'feedback-v17','node':'22.23.2','sqlite':'11.10.0','files':manifest},indent=2))
+    (base/'manifest.json').write_text(json.dumps({'release':'feedback-v18','node':'22.23.2','sqlite':'11.10.0','files':manifest},indent=2))
     args.output.parent.mkdir(parents=True,exist_ok=True)
     with zipfile.ZipFile(args.output,'w',zipfile.ZIP_DEFLATED,compresslevel=6) as archive:
         for path in sorted(base.rglob('*')):

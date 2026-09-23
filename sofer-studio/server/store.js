@@ -210,7 +210,7 @@ function insertLayoutLines(db, id, lines) {
         l.status || 'pending', nowIso()
       );
       db.prepare('UPDATE layout_lines SET layout_flags=? WHERE layout_id=? AND line_id=?').run(
-        json({petucha_end:!!l.petucha_end,sefer_end:!!l.sefer_end,fixed_pattern:!!l.fixed_pattern,book_boundary_blank:!!l.book_boundary_blank,reference_page:l.reference_page||null,column_width_mm:l.column_width_mm||null,song_layout:l.song_layout||null,tefillin_section:l.tefillin_section||null}),id,l.line_id
+        json({petucha_end:!!l.petucha_end,sefer_end:!!l.sefer_end,fixed_pattern:!!l.fixed_pattern,blank_line:!!l.blank_line,manual_line_end:!!l.manual_line_end,book_boundary_blank:!!l.book_boundary_blank,reference_page:l.reference_page||null,column_width_mm:l.column_width_mm||null,song_layout:l.song_layout||null,tefillin_section:l.tefillin_section||null}),id,l.line_id
       );
     }
 }
@@ -265,6 +265,7 @@ export function getLayoutLines(db, layoutId, page) {
         has_setuma: hasSetuma, setuma_at_edge: setumaAtEdge,
         fixed_pattern: !!(flags && flags.fixed_pattern) || items.some((i) => i.type === 'segment_gap'),
         book_boundary_blank: !!(flags && flags.book_boundary_blank),
+        blank_line: !!flags?.blank_line, manual_line_end: !!flags?.manual_line_end,
         petucha_end: !!(flags && flags.petucha_end), sefer_end: !!(flags && flags.sefer_end),
         spacing_metadata_complete: flags != null,
         reference_page: flags && flags.reference_page || null,
@@ -379,7 +380,7 @@ export function createLockedLayout(db, meta, lines, summary) {
         l.status || 'pending', nowIso()
       );
       db.prepare('UPDATE layout_lines SET layout_flags=? WHERE layout_id=? AND line_id=?').run(
-        json({petucha_end:!!l.petucha_end,sefer_end:!!l.sefer_end,fixed_pattern:!!l.fixed_pattern,reference_page:l.reference_page||null,column_width_mm:l.column_width_mm||null,song_layout:l.song_layout||null,tefillin_section:l.tefillin_section||null}),id,l.line_id);
+        json({petucha_end:!!l.petucha_end,sefer_end:!!l.sefer_end,fixed_pattern:!!l.fixed_pattern,blank_line:!!l.blank_line,manual_line_end:!!l.manual_line_end,reference_page:l.reference_page||null,column_width_mm:l.column_width_mm||null,song_layout:l.song_layout||null,tefillin_section:l.tefillin_section||null}),id,l.line_id);
     }
   });
   tx(lines);

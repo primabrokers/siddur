@@ -6,6 +6,7 @@
 import { createHash } from 'node:crypto';
 import { copyColumnOptions, songSettings } from './column-options.js';
 import { composeSongLine } from './song-layout.js';
+import { fitManualSongPages } from './manual-song-pages.js';
 import { computeTefillin } from './tefillin.js';
 import { totalWidth, interLetterGap, interWordGap, wordWidth, minColumnWidth, measurementUnitMm } from './width.js';
 import { lettersOf, letterKeyOf } from './profile.js';
@@ -27,6 +28,7 @@ export function computeLineKey(line) {
     ...(line.column_width_mm ? { column_width_mm: line.column_width_mm } : {}),
     ...(line.song_layout ? { song_layout: line.song_layout, stretch: line.stretch_decisions } : {}),
     ...(line.tefillin_section ? { tefillin_section: line.tefillin_section } : {}),
+    ...(line.manual_line_end ? { manual_line_end: true } : {}),
   });
   return createHash('sha256').update(payload, 'utf8').digest('hex');
 }
@@ -309,6 +311,7 @@ export function fitLines(source, profile, geometry, opts = {}) {
       ? composeSongLine(current, profile, geometry, geometry.song_layouts?.manual || 'hayam')
       : makeLine(current, currentWidth, lineW, profile, flags);
     if (currentSong) line.fixed_pattern = true;
+    if (flags.songEnd) line.manual_line_end = true;
     if (flags.blankLine) line.blank_line = true;
     lines.push(line);
     current = [];
@@ -398,7 +401,7 @@ export function fitLines(source, profile, geometry, opts = {}) {
   }
   pushLine({ force: current.length > 0 });
 
-  return { lines, totalLetters: verseLetters.reduce((s, vl) => s + vl.letters.length, 0) };
+  return { lines: [...fitManualSongPages(lines, profile, geometry)].flat(), totalLetters: verseLetters.reduce((s, vl) => s + vl.letters.length, 0) };
 }
 
 export function makeLine(items, width, lineW, profile, flags = {}) {
@@ -1099,6 +1102,7 @@ export async function computeLayoutAsync(source, profile, geometry, opts = {}) {
       ? composeSongLine(current, profile, geometry, geometry.song_layouts?.manual || 'hayam')
       : makeLine(current, currentWidth, lineW, profile, flags);
     if (currentSong || current.some(item => item.type === 'segment_gap')) line.fixed_pattern = true;
+    if (flags.songEnd) line.manual_line_end = true;
     lines.push(line);
     current = []; currentWidth = 0; prevWasWord = false; currentSong = false;
   };
@@ -1178,7 +1182,12 @@ export async function computeLayoutAsync(source, profile, geometry, opts = {}) {
     }
   }
   pushLine({ force: current.length > 0 });
-  return finalizeLayout(lines, verseLetters.reduce((s, vl) => s + vl.letters.length, 0), geometry, profile, g, blockers, source.excerpt, opts.study_preview);
+  const paged = [];
+  for (const page of fitManualSongPages(lines, profile, geometry)) {
+    paged.push(...page);
+    await yieldControl();
+  }
+  return finalizeLayout(paged, verseLetters.reduce((s, vl) => s + vl.letters.length, 0), geometry, profile, g, blockers, source.excerpt, opts.study_preview);
 }
 
 function int(v, d) {

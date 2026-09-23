@@ -1,0 +1,9 @@
+FROM prima-sofer-studio:feedback-v17-final
+USER root
+COPY sofer-studio/public /app/sofer-studio/public
+COPY sofer-studio/engine /app/sofer-studio/engine
+COPY sofer-studio/server /app/sofer-studio/server
+COPY sofer-studio/db /app/sofer-studio/db
+COPY sofer-studio/tests /app/sofer-studio/tests
+COPY sofer-studio/offline /app/sofer-studio/offline
+USER 1000:1000

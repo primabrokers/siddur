@@ -424,6 +424,12 @@ table.data tr.sev-warn td { background: rgba(199,154,63,.08); }
 .amudim-row { display: flex; flex-direction: column; gap: 24px; align-items: stretch; }
 .page-placeholder { width: calc(var(--line-width) + 112px); }
 .page-footer { margin-top: 14px; text-align: center; font: 11px/1.5 var(--font-ui); color: var(--muted); }
+.page-footer { width: calc(var(--line-width) + 112px); overflow-wrap: anywhere; }
+.page-source { font-weight: 600; }
+.tefillin-page .page-footer { width: var(--line-width); margin: 2mm 0; }
+.reverse-lines .lines { display: flex; flex-direction: column-reverse; }
+.reverse-lines .line { flex: 0 0 auto; }
+.reverse-lines .line-move button { transform: rotate(180deg); }
 .line-move { display: inline-flex; flex: 0 0 48px; align-self: center; padding-right: 6px; }
 .line-move .btn { padding: 2px 4px; font-size: 12px; }
 @media print { .line-move { visibility: hidden; } }
@@ -542,7 +548,7 @@ table.data tr.sev-warn td { background: rgba(199,154,63,.08); }
 .setuma-gap, .segment-gap { display: inline-block; white-space: pre; }
 .setuma-gap { min-width: 2ch; position: relative; }
 .segment-gap { min-width: 1ch; }
-.nun-hafucha { display: inline-block; text-align: center; font-family: "Times New Roman", serif; }
+.nun-hafucha { display: inline-block; }
 .reference-start { display: flex; gap: .75rem; flex-wrap: wrap; align-items: center; padding: .75rem 1rem; border-bottom: 1px solid var(--line); }
 .reference-start p { flex-basis: 100%; margin: 0; font-size: .82rem; }
 .parasha-anchor { display: inline-block; position: relative; width: 0; height: 0; vertical-align: baseline; }

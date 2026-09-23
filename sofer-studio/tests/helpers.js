@@ -34,6 +34,9 @@ export function request(server, method, path, { headers = {}, body, host } = {})
     const hdrs = { ...headers };
     if (host) hdrs.Host = host;
     const req = http.request({ host: url.hostname, port: url.port, path, method, headers: hdrs }, (res) => {
+      // Hebrew code points may straddle HTTP chunks; decode the stream rather
+      // than coercing each Buffer separately into replacement characters.
+      res.setEncoding('utf8');
       let data = '';
       res.on('data', (c) => { data += c; });
       res.on('end', () => {

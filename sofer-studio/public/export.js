@@ -42,6 +42,10 @@
 
     row.appendChild(bPrint);
     root.appendChild(row);
+    var reverse = util.el('input', { type: 'checkbox', id: 'export-reverse-lines', checked: !!(SS.tikkun && SS.tikkun.isReversed()) });
+    root.appendChild(util.el('label', { class: 'toggle' }, [reverse, util.el('span', { text: 'Reverse lines — line 1 at the bottom of each page' })]));
+    reverse.addEventListener('change', function () { SS.tikkun.setReverseLines(reverse.checked); });
+    bus.on('preview:reverse-lines', function (on) { reverse.checked = on; });
     var paper=util.el('select',{id:'export-tefillin-paper'},[util.el('option',{value:'A4',text:'A4 landscape'}),util.el('option',{value:'A3',text:'A3 landscape'})]);
     root.appendChild(util.el('label',{id:'export-tefillin',class:'field',hidden:true},[util.el('span',{text:'All four Tefillin pages on one sheet'}),paper]));
     root.appendChild(util.el('div',{class:'offline-download'},[

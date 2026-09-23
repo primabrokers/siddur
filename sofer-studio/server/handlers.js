@@ -46,6 +46,7 @@ export function publicLine(l, profile) {
     status: l.status || 'pending', has_setuma: !!l.has_setuma, petucha_end: !!l.petucha_end,
     setuma_at_edge: !!l.setuma_at_edge, setuma_stretch_enabled: !!profile?.stretch_policy,
     sefer_end: !!l.sefer_end, fixed_pattern: !!l.fixed_pattern,
+    blank_line: !!l.blank_line, manual_line_end: !!l.manual_line_end,
     spacing_metadata_complete: !!l.spacing_metadata_complete,
     reference_page: l.reference_page || null,
     column_width_mm: l.column_width_mm || null, song_layout: l.song_layout || null, tefillin_section: l.tefillin_section || null,
@@ -375,6 +376,7 @@ export async function handleComputeLayout(ctx) {
 
   sendJson(ctx.res, 200, {
     layout_id: layoutId,
+    source_id: body.source_id, source_name: source.name,
     status: 'draft',
     lines: computed.lines.map((l) => publicLine(l, profile)),
     amud_annotations: computed.amud_annotations,
@@ -507,7 +509,8 @@ export function handleGetLayout(ctx) {
   const rawLines = l.lines;
   const lines = rawLines.map((ln) => publicLine(ln, profile));
   const amudAnnots = annotateFromLines(rawLines);
-  const out = { ...l, lines, amud_annotations: amudAnnots, total_lines: totalLines };
+  const sourceName = ctx.db.prepare('SELECT name FROM sources WHERE id = ?').get(l.source_id)?.name || '';
+  const out = { ...l, source_name: sourceName, lines, amud_annotations: amudAnnots, total_lines: totalLines };
   // F-27: expose the snapshot geometry so a loaded layout's preview never falls
   // back to the live geometry selector (which would reflow a locked layout).
   if (l.snapshot && l.snapshot.geometry) out.geometry = l.snapshot.geometry;

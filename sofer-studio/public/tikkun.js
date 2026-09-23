@@ -25,6 +25,7 @@
   var fitPending = false, renderedLayout = null, renderedCount = 0;
   var buildPage = null, pageGroups = [], printReady = false, preparingPrint = false;
   var scrollPending = false;
+  var reverseLines = false, reverseToggle;
 
   // The seven letters that traditionally receive taggin (visual only).
   var TAGGIN = { '\u05e9': 1, '\u05e2': 1, '\u05d8': 1, '\u05e0': 1, '\u05d6': 1, '\u05d2': 1, '\u05e5': 1 };
@@ -75,6 +76,9 @@
     var help = util.el('details', { class: 'preview-help' }, [util.el('summary', { text: 'Reading the preview' }), util.el('p', { text: 'Scroll down through every page. The note to the right of each line shows its missing units before stretching: ש״ת = complete, ח״א = 1 unit, ח״ב = 2 units. Section and book-end spaces stay open. Downloads include all pages.' })]);
     [prevButton, pageSelect, nextButton, fitSelect, scaleLabel, expandButton, printButton].forEach(function (e) { toolbar.appendChild(e); });
     toolbar.appendChild(sectionLabel);
+    reverseToggle = util.el('input', { type: 'checkbox', id: 'preview-reverse-lines' });
+    toolbar.appendChild(util.el('label', { class: 'toggle', title: 'Line 1 at the bottom; keep every line on its original page.' }, [reverseToggle, util.el('span', { text: 'Reverse lines' })]));
+    reverseToggle.addEventListener('change', function () { setReverseLines(reverseToggle.checked); });
     sectionToggle.addEventListener('change', function () {
       container.classList.toggle('hide-section-guides', !sectionToggle.checked);
     });
@@ -95,6 +99,14 @@
     document.body.classList.toggle('document-focus', !!on);
     expandButton.textContent = on ? 'Exit focus' : 'Focus mode';
     expandButton.setAttribute('aria-pressed', String(!!on));
+    scheduleFit();
+  }
+
+  function setReverseLines(on) {
+    reverseLines = !!on;
+    if (reverseToggle) reverseToggle.checked = reverseLines;
+    if (currentSheet) currentSheet.classList.toggle('reverse-lines', reverseLines);
+    bus.emit('preview:reverse-lines', reverseLines);
     scheduleFit();
   }
 
@@ -180,7 +192,8 @@
     var t=renderedLayout&&renderedLayout.summary&&renderedLayout.summary.tefillin;
     if(!t)return;
     var geometry=layoutGeometry(renderedLayout),available=(paper==='A3'?420:297)-20,height=(paper==='A3'?297:210)-20;
-    var widths=t.widths_mm,gap=10,rowHeight=geometry.lines_per_amud*geometry.baseline_pitch_mm+12;
+    var footerHeight = Math.max.apply(null, pageEls.map(function (el) { var footer = el.querySelector('.page-footer'); return footer ? footer.offsetHeight * 25.4 / 96 + 4 : 0; }));
+    var widths=t.widths_mm,gap=10,rowHeight=geometry.lines_per_amud*geometry.baseline_pitch_mm+Math.max(12,footerHeight);
     var one=widths.reduce(function(a,b){return a+b;},0)+gap*3<=available&&rowHeight<=height;
     var cols=one?widths:[Math.max(widths[0],widths[2]),Math.max(widths[1],widths[3])];
     if(!one&&(cols[0]+cols[1]+gap>available||rowHeight*2+gap>height))throw new Error('These four page measurements do not fit '+paper+'. Choose A3 or adjust the page widths / line height. Text will not be shrunk.');
@@ -345,7 +358,7 @@
       if (g.num === -1) g.num = gi + 1;
     });
 
-    var sheet = util.el('div', { class: 'sheet' });
+    var sheet = util.el('div', { class: 'sheet' + (reverseLines ? ' reverse-lines' : '') });
     sheet.setAttribute('lang', 'he');
     sheet.setAttribute('dir', 'rtl');
     sheet.style.setProperty('--tf-scale', '1');
@@ -412,6 +425,7 @@
 
   function buildAmud(g, gi, layout, isYeriaEdge, placeholder) {
     var amud = util.el('div', { class: 'amud' + (isYeriaEdge ? ' onde' : '') });
+    if (layout.summary && layout.summary.tefillin) amud.classList.add('tefillin-page');
     amud.dataset.amud = String(g.num);
 
     var linesWrap = util.el('div', { class: 'lines' });
@@ -420,7 +434,9 @@
     var pitch = (geom && geom.baseline_pitch_mm) || 10;
     var profile = layout.snapshot && layout.snapshot.profile;
     if (profile && profile.letter_height_mm) linesWrap.style.fontSize = (Number(profile.letter_height_mm) * 1.3) + 'mm';
-    if (geom && geom.line_width_mm) linesWrap.style.setProperty('--line-width', Math.max.apply(null,g.lines.map(function(l){return l.column_width_mm||geom.line_width_mm;})) + 'mm');
+    var pageWidth = Math.max.apply(null, g.lines.map(function (l) { return l.column_width_mm || (geom && geom.line_width_mm) || 125; }));
+    linesWrap.style.setProperty('--line-width', pageWidth + 'mm');
+    amud.style.setProperty('--line-width', pageWidth + 'mm');
     linesWrap.style.minHeight = ((geom && geom.lines_per_amud) || g.lines.length) * pitch + 'mm';
 
     if (placeholder) {
@@ -434,7 +450,12 @@
     });
 
     amud.appendChild(linesWrap);
-    amud.appendChild(util.el('div', { class: 'page-footer', dir: 'ltr', text: (gi + 1) + ' of ' + pageGroups.length }));
+    var source = (state.sources || []).find(function (s) { return s.id === layout.source_id; });
+    var sourceName = layout.source_name || (source && source.name) || 'Untitled source';
+    amud.appendChild(util.el('div', { class: 'page-footer', dir: 'ltr' }, [
+      util.el('div', { class: 'page-source', dir: 'auto', text: sourceName }),
+      util.el('div', { text: 'Line width: ' + util.fmt(pageWidth, 2) + ' mm · Line height: ' + util.fmt(pitch, 2) + ' mm · ' + (gi + 1) + ' of ' + pageGroups.length })
+    ]));
     return amud;
   }
 
@@ -482,7 +503,8 @@
 
     // hover -> sargel tick (physical mm = (index)*pitch from column top)
     el.addEventListener('mouseenter', function () {
-      bus.emit('sargel:tick', (li) * pitch);
+      var rows = Number((layoutGeometry(renderedLayout) || {}).lines_per_amud) || totalInAmud;
+      bus.emit('sargel:tick', (reverseLines ? rows - 1 - li : li) * pitch);
     });
     el.addEventListener('mouseleave', function () {
       bus.emit('sargel:tick', null);
@@ -498,7 +520,7 @@
     var controls = util.el('span', { class: 'line-move', dir: 'ltr' });
     var overflow = Math.max(0, -Number(line.base_leftover_mm || 0));
     if (overflow) controls.style.marginRight = (overflow + 3) + 'mm';
-    [['up', '↑', 'Bring the first word from the next line up'], ['down', '↓', 'Push the last word down to the next line']].forEach(function(spec) {
+    [['up', '↑', 'Bring the first word from the next line'], ['down', '↓', 'Move the last word to the next line']].forEach(function(spec) {
       var button = util.el('button', { type: 'button', class: 'btn btn-ghost btn-sm', text: spec[1], title: spec[2], 'aria-label': spec[2], 'data-move-word': spec[0] });
       button.disabled = !API || !API.moveWord || !line.line_id || renderedLayout.status === 'locked' || line.fixed_pattern || (line.status && line.status !== 'pending');
       if (renderedLayout.status === 'locked') button.title = 'Locked layout: compute a new draft before changing line breaks';
@@ -553,7 +575,7 @@
       var amount = '';
       while (whole >= 400) { amount += 'ת'; whole -= 400; }
       amount += whole > 0 ? util.gimatriaLetters(whole) : '';
-      var parsha = line.petucha_end || line.has_setuma || line.setuma_at_edge || line.sefer_end || line.fixed_pattern;
+      var parsha = line.blank_line || line.petucha_end || line.has_setuma || line.setuma_at_edge || line.sefer_end || line.fixed_pattern;
       text = parsha && units >= 0 ? '' : Math.round(absolute) === 0 ? 'ש״ת' : (units < 0 ? 'י״' : 'ח״') + amount;
       title = units === 0 ? 'שורה תמה — complete before stretching' :
         util.fmt(absolute, 2) + ' units ' + (units < 0 ? 'overfull' : 'missing') + ' before stretching';
@@ -588,7 +610,7 @@
         box.title = 'word width ' + util.mm(measuredWidth);
       }
       if(wordIndex===words.length-1&&renderedLayout&&renderedLayout.status!=='locked'&&suggestsDrop(line,renderedLayout.lines[renderedLayout.lines.indexOf(line)+1])){
-        box.classList.add('suggested-drop');box.title='Suggested: use the down arrow to move this word to the next line and reduce uneven stretching.';
+        box.classList.add('suggested-drop');box.title='Suggested: move this word to the next line to reduce uneven stretching.';
       }
       if (Number.isFinite(letterGap)) box.style.gap = letterGap + 'mm';
       var isShem = !!word.isShem;
@@ -690,8 +712,11 @@
         } else if (it.type === 'setuma_gap' || it.type === 'segment_gap') {
           parent.appendChild(gapEl(it, index));
         } else if(it.type === 'nun_hafucha') {
-          var nun=util.el('span',{class:'nun-hafucha',text:'׆',title:'Inverted nun from reference'});
-          nun.style.width=it.width_mm+'mm';parent.appendChild(nun);
+          // Use the same measured STaM nun as the ! command. U+05C6 in a
+          // fallback Times font was a tiny punctuation mark, not the letter.
+          var nun=util.el('span',{class:'nun-hafucha lk marker-backward_nun',title:'Backward nun from reference','aria-label':'Backward nun'});
+          nun.appendChild(util.el('span',{class:'ink-glyph',text:'נ'}));
+          nun.style.width=it.width_mm+'mm';nun.dataset.widthMm=String(it.width_mm);parent.appendChild(nun);
         }
       });
     } else if (words.length) {
@@ -700,7 +725,7 @@
         if (i > 0) appendWordGap();
         parent.appendChild(wordBox(w));
       });
-    } else {
+    } else if (text || (!line.blank_line && !line.spacing_metadata_complete && !line.fixed_pattern)) {
       // Legacy fallback with NO backend metadata: raw text + honest label (F-12).
       parent.appendChild(document.createTextNode(text));
       parent.appendChild(util.el('span', { class: 't--2 faint legacy-note', text: ' (no backend metadata)' }));
@@ -823,6 +848,8 @@
     flashToken: flashToken,
     fitScale: fitScale,
     setExpanded: setExpanded,
+    setReverseLines: setReverseLines,
+    isReversed: function () { return reverseLines; },
     glyphFit: glyphFit,
     layoutGeometry: layoutGeometry,
     isReady: function () { return pageEls.length > 0 && renderedCount === pageEls.length; },

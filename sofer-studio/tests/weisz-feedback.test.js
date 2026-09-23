@@ -113,7 +113,7 @@ test('preview rounds only the Hebrew shortage, hides intentional gaps, shows Ara
     assert.deepEqual([...f.d.querySelectorAll('.lnum')].map(x => x.textContent), ['1', '2', '3', '4', '5']);
     assert.deepEqual([...f.d.querySelectorAll('.side')].map(x => x.textContent), ['ח״ב', 'ח״ג', 'י״ג', '', 'י״ד']);
     assert.equal(f.d.querySelector('.side').dataset.missingUnits, '2.4');
-    assert.equal(f.d.querySelector('.sheet-head'), null); assert.equal(f.d.querySelector('.page-footer').textContent, '1 of 1');
+    assert.equal(f.d.querySelector('.sheet-head'), null); assert.match(f.d.querySelector('.page-footer').textContent, /1 of 1$/);
     assert.equal(f.d.querySelectorAll('[data-move-word]').length, 10);
   } finally { f.dom.window.close(); }
 });
