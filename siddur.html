@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Siddur — Vecker</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5.0">
+<meta name="theme-color" content="#1C2440">
+<meta name="color-scheme" content="light">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Vecker">
+<meta name="format-detection" content="telephone=no">
+<!-- Not deferred: the inline script below calls loadIndex() during parsing,
+     before deferred scripts run, and it needs CONFIG and Store to exist. -->
+<script src="js/config.js"></script>
+<script src="js/store.js"></script>
+<script src="js/texts.js"></script>
+<script src="js/platform.js" defer></script>
+
+<style>
+  :root{
+    --night:#1C2440; --ivory:#FBF8F1; --card:#FFFFFF;
+    --ink:#25293B; --ink-2:#6A6E80; --ink-3:#9A9DAC;
+    --gold:#B8811B; --gold-bg:#F5E7C8; --gold-ink:#6E4D0D;
+    --line:#E8E2D4; --line-2:#D9D2C0;
+    --serif:'Frank Ruhl Libre','David Libre',Georgia,'Times New Roman',serif;
+    --sans:'Heebo',-apple-system,'Segoe UI',Roboto,Arial,sans-serif;
+  }
+  *{box-sizing:border-box; margin:0;}
+  body{background:#EDE9DF; font-family:var(--sans); color:var(--ink); display:flex; justify-content:center; padding:24px 12px; min-height:100vh;}
+  .app{width:430px; max-width:100%;}
+  header{display:flex; align-items:center; gap:10px; padding:4px 4px 14px;}
+  header h1{font-family:var(--serif); font-size:24px; color:var(--night); flex:1;}
+  /* Route back to the app. Without this an installed PWA has no browser chrome
+     and no way out of this page. */
+  header .home{border:1px solid var(--line-2); background:var(--card); color:var(--night);
+               width:34px; height:34px; border-radius:10px; font-size:17px; flex:none;
+               display:grid; place-items:center; text-decoration:none;}
+  .status{font-size:11.5px; color:var(--ink-2);}
+  .status .dot{display:inline-block; width:8px; height:8px; border-radius:50%; background:#9A9DAC; margin-right:5px; vertical-align:0;}
+  .status.ok .dot{background:#3E8E5A;} .status.err .dot{background:#A63D2F;}
+  /* warn: the text is on screen, but it could not be saved for offline use. */
+  .status.warn .dot{background:#B8811B;}
+  .seg{display:flex; flex-wrap:wrap; gap:4px; background:#EFE9DA; border:1px solid var(--line-2); border-radius:12px; padding:3px; margin-bottom:8px;}
+  .segbtn{flex:1 1 auto; min-width:88px; border:none; background:transparent; border-radius:9px; padding:8px 4px; font-size:12.5px; font-weight:600; color:var(--ink-2); cursor:pointer; font-family:var(--sans);}
+  .segbtn.on{background:var(--card); color:var(--night); box-shadow:0 1px 2px rgba(40,36,20,.1);}
+  .segbtn:disabled{opacity:.45; cursor:default;}
+  .segbtn:focus-visible{outline:2px solid var(--gold); outline-offset:1px;}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:16px; margin-bottom:14px;}
+  .card h2{font-size:12.5px; font-weight:700; color:var(--ink-2); text-transform:uppercase; letter-spacing:.06em; margin-bottom:8px;}
+  .notice{background:#F6F1E4; border:1px solid #E7DFC9; border-radius:12px; padding:12px 14px; font-size:12.5px; color:var(--gold-ink); line-height:1.6; margin-bottom:14px;}
+  .toc-group{margin-bottom:4px;}
+  .toc-group summary{font-size:13.5px; font-weight:700; color:var(--night); padding:9px 2px; cursor:pointer; list-style:none; display:flex; justify-content:space-between;}
+  .toc-group summary::after{content:'›'; color:var(--ink-3); transform:rotate(90deg);}
+  .toc-group[open] summary::after{transform:rotate(-90deg);}
+  .tocrow{display:flex; justify-content:space-between; align-items:center; gap:8px; padding:9px 4px 9px 12px; border-top:1px solid var(--line); font-size:13.5px; cursor:pointer; border-radius:8px;}
+  .tocrow:hover{background:#FAF6EC;}
+  .tocrow .he{font-family:var(--serif); color:var(--ink-2); font-size:13px; direction:rtl;}
+  .reader-head{display:flex; align-items:center; gap:8px; margin-bottom:2px;}
+  .reader-head button{border:1px solid var(--line-2); background:var(--card); color:var(--night); width:32px; height:32px; border-radius:9px; font-size:15px; cursor:pointer; flex:none;}
+  .reader-head .rt{flex:1; min-width:0;}
+  .reader-head .rt .t{font-family:var(--serif); font-size:17px; font-weight:600; color:var(--night); line-height:1.3;}
+  .reader-head .rt .p{font-size:10.5px; color:var(--ink-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .cov{font-size:10.5px; font-weight:700; padding:3px 8px; border-radius:999px; flex:none;}
+  .cov.full{background:#DFEEDF; color:#2E6B45;} .cov.part{background:var(--gold-bg); color:var(--gold-ink);} .cov.none{background:#EFE9DA; color:var(--ink-2);}
+  .ph{padding:10px 0; border-top:1px solid var(--line);}
+  .ph:first-of-type{border-top:none; margin-top:8px;}
+  .ph .he{font-family:var(--serif); font-size:20px; line-height:1.85; direction:rtl; text-align:right;}
+  .ph .en{font-size:12.5px; line-height:1.65; color:var(--ink-2); margin-top:4px;}
+  .ph .noen{font-size:10.5px; color:var(--ink-3); margin-top:3px; font-style:italic;}
+  .m-heb .ph .en,.m-heb .ph .noen{display:none;}
+  .m-heb .ph .he{font-size:22px; line-height:2;}
+  .m-side .ph{display:grid; grid-template-columns:1.15fr 1fr; gap:12px; align-items:start;}
+  .m-side .ph .he{font-size:16.5px; line-height:1.7;}
+  .m-side .ph .en,.m-side .ph .noen{margin-top:0;}
+  .attr{font-size:10.5px; color:var(--ink-3); line-height:1.7; margin-top:12px; padding-top:10px; border-top:1px dashed var(--line-2);}
+  .loading{text-align:center; color:var(--ink-2); font-size:13px; padding:26px 0;}
+  .spin{display:inline-block; width:16px; height:16px; border:2px solid var(--line-2); border-top-color:var(--gold); border-radius:50%; animation:sp .8s linear infinite; vertical-align:-3px; margin-right:8px;}
+  @keyframes sp{to{transform:rotate(360deg);}}
+  @media (prefers-reduced-motion:reduce){.spin{animation:none;}}
+  .err{background:#F5DFDB; border:1px solid #E5C4BD; color:#7A2A1F; border-radius:12px; padding:12px 14px; font-size:12.5px; line-height:1.6;}
+
+  html.app-standalone body, html.app-native body{ padding:14px 12px calc(14px + env(safe-area-inset-bottom)); }
+  html.app-standalone header, html.app-native header{ padding-top:calc(6px + env(safe-area-inset-top)); }
+  html.app-standalone .app, html.app-native .app{ width:100%; max-width:560px; }
+  @media (max-width:420px){
+    .m-side .ph{grid-template-columns:1fr; gap:4px;}
+    .ph .he{font-size:19px;}
+  }
+  .tocrow{min-height:44px;} .segbtn{min-height:40px;}
+  .hide{display:none;}
+  a{color:var(--gold-ink);}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <a class="home" href="index.html" aria-label="Back to Vecker">‹</a>
+    <h1>Siddur</h1>
+    <div class="status" id="status"><span class="dot"></span><span id="status-t">connecting to Sefaria…</span></div>
+  </header>
+
+  <div class="seg" role="tablist" aria-label="Nusach">
+    <button class="segbtn on" data-nus="ash">Ashkenaz</button>
+    <button class="segbtn" data-nus="sef">Sefard</button>
+    <button class="segbtn" data-nus="edot">Edot Hamizrach</button>
+  </div>
+  <div class="seg" role="tablist" aria-label="Display mode">
+    <button class="segbtn on" data-mode="inter">With English</button>
+    <button class="segbtn" data-mode="heb">Hebrew only</button>
+    <button class="segbtn" data-mode="side">Side by side</button>
+  </div>
+  <div class="seg" role="group" aria-label="Edition">
+    <button class="segbtn" id="lin-toggle" aria-pressed="false"
+            title="Translation broken up phrase by phrase against the Hebrew">Linear edition</button>
+  </div>
+
+  <div class="notice" id="sandbox-note">This build loads everything live from the Sefaria API. If nothing loads, you're likely viewing it inside a sandboxed preview that blocks network requests — download the file and open it directly in your browser.</div>
+
+  <div class="card hide" id="reader">
+    <div class="reader-head">
+      <button id="back" aria-label="Back to contents">‹</button>
+      <div class="rt"><div class="t" id="r-title"></div><div class="p" id="r-path"></div></div>
+      <span class="cov" id="r-cov"></span>
+    </div>
+    <div id="r-body"></div>
+    <div style="display:flex; gap:8px; margin-top:14px;">
+      <button class="segbtn" id="prevSec" style="border:1px solid var(--line-2);">‹ Previous</button>
+      <button class="segbtn" id="nextSec" style="border:1px solid var(--line-2);">Next ›</button>
+    </div>
+    <div class="attr" id="r-attr"></div>
+  </div>
+
+  <div class="card" id="toc-card">
+    <h2 id="toc-title">Contents</h2>
+    <div id="toc"><div class="loading"><span class="spin"></span>Loading index from Sefaria…</div></div>
+  </div>
+
+  <div class="attr" style="padding:0 6px;">Texts and translations served by the <a href="https://www.sefaria.org/developers" target="_blank" rel="noopener">Sefaria API</a>. Each section shows its version and license; untranslated passages display in Hebrew and pick up English automatically as Sefaria's coverage grows. Read sections are cached for offline rereading where the browser allows.</div>
+</div>
+
+<script>
+'use strict';
+const API=CONFIG.SEFARIA_URL;
+/* Sefaria publishes *linear* editions, where the English is broken up phrase by
+   phrase against the Hebrew rather than set as a paragraph underneath. That is a
+   property of an edition, not a nusach, so it is a toggle rather than a fourth
+   button — a linear Ashkenaz is still Ashkenaz.
+   The linear titles follow sefaria.org/Weekday_Siddur_Sefard_Linear and could
+   not be checked against the live API from here, so a linear index that fails to
+   load falls back to the standard edition and says so, rather than leaving the
+   reader on an error for a nusach that works perfectly well. */
+const NUSACH={
+  ash:{title:'Siddur Ashkenaz',        linear:'Weekday Siddur Ashkenaz Linear'},
+  sef:{title:'Siddur Sefard',          linear:'Weekday Siddur Sefard Linear'},
+  edot:{title:'Siddur Edot HaMizrach'}   // no linear edition known
+};
+let linear=false, linearMissing=false;
+let nus='ash', mode='inter', leaves=[], curIdx=-1;
+const mem={};
+// Cached texts live in IndexedDB via js/store.js. The former localStorage
+// store()/load() pair is gone deliberately rather than wrapped: its writes
+// were synchronous and swallowed quota errors, so any call site missed during
+// the move should fail loudly instead of silently not caching.
+
+/* A text that is on screen but unsaved still works right now and breaks only
+   later, offline. Say so at the point of failure rather than leaving the user
+   to discover it on Shabbos. */
+function cacheWriteFailed(err){
+  setStatus('warn','online only — couldn’t save for offline');
+  console.warn('Text cache write failed; this section will need a connection again.', err);
+}
+function setStatus(cls,txt){const s=document.getElementById('status');s.className='status '+cls;document.getElementById('status-t').textContent=txt;}
+async function api(path){
+  const r=await fetch(API+path,{headers:{'Accept':'application/json'}});
+  if(!r.ok)throw new Error('HTTP '+r.status);
+  return r.json();
+}
+/* Footnotes are removed, not flattened. Sefaria embeds them inline as a
+   <sup class="footnote-marker"> plus an <i class="footnote">; taking textContent
+   of the lot splices the note into the middle of the text. */
+function strip(s){const d=document.createElement('div');d.innerHTML=String(s);
+  d.querySelectorAll('.footnote-marker,.footnote').forEach(n=>n.remove());
+  return (d.textContent||'').replace(/\s+/g,' ').trim();}
+
+// ---- Index / TOC ----
+function walk(node,path,out){
+  const title=node.title||'';
+  const p=title?[...path,title]:path;
+  if(node.nodes&&node.nodes.length){node.nodes.forEach(n=>walk(n,p,out));}
+  else out.push({ref:p.join(', '),title:title||p[p.length-1]||'—',he:node.heTitle||'',path:p});
+}
+async function loadIndex(){
+  const cfg=NUSACH[nus];
+  const wantLinear=linear&&!!cfg.linear;
+  const t=wantLinear?cfg.linear:cfg.title;
+  document.getElementById('toc-title').textContent=t+' — contents';
+  const toc=document.getElementById('toc');
+  toc.innerHTML='<div class="loading"><span class="spin"></span>Loading index from Sefaria…</div>';
+  showToc();
+  try{
+    const key='idx:'+t;
+    let idx=mem[key]||await Store.get(key);
+    if(!idx){
+      idx=await api('/v2/index/'+encodeURIComponent(t.replace(/ /g,'_')));
+      mem[key]=idx;
+      // Not awaited inside the try: a cache write that fails must not be
+      // mistaken for an index that failed to load.
+      Store.set(key,idx).catch(cacheWriteFailed);
+    }
+    leaves=[];
+    walk(idx.schema,[],leaves);
+    if(linearMissing){
+      linearMissing=false;
+      setStatus('warn','no linear edition for this nusach — showing standard');
+    }else{
+      setStatus('ok', (wantLinear ? 'linear · ' : '') + leaves.length + ' sections');
+    }
+    renderToc();
+    document.getElementById('sandbox-note').classList.add('hide');
+  }catch(e){
+    /* A linear index that will not load is a missing edition, not a broken app:
+       drop back to the standard one for this nusach and say why. */
+    if(wantLinear){
+      /* Flagged rather than announced here: the retry below succeeds and would
+         overwrite the message, leaving the toggle looking like it did nothing. */
+      linear=false; linearMissing=true; paintLinear();
+      return loadIndex();
+    }
+    setStatus('err','offline / blocked');
+    toc.innerHTML='<div class="err"><b>Couldn\u2019t reach the Sefaria API.</b><br>If this is inside a sandboxed preview, download the file and open it in your browser. If you\u2019re offline, previously read sections remain available once loaded at least once.</div>';
+  }
+}
+function renderToc(){
+  const groups={};
+  leaves.forEach((l,i)=>{const g=l.path[1]||'Other';(groups[g]=groups[g]||[]).push({...l,i});});
+  const order=Object.keys(groups).sort((a,b)=>{
+    const pri=n=>/weekday/i.test(n)?0:/(berachot|blessings|birkat)/i.test(n)?1:2;
+    return pri(a)-pri(b);
+  });
+  const toc=document.getElementById('toc'); toc.innerHTML='';
+  order.forEach((g,gi)=>{
+    const det=document.createElement('details'); det.className='toc-group'; if(gi===0)det.open=true;
+    const sum=document.createElement('summary'); sum.textContent=g+' ('+groups[g].length+')'; det.appendChild(sum);
+    groups[g].forEach(l=>{
+      const row=document.createElement('div'); row.className='tocrow'; row.tabIndex=0;
+      const label=l.path.slice(2).join(' › ')||l.title;
+      row.innerHTML='<span></span><span class="he"></span>';
+      row.firstChild.textContent=label; row.lastChild.textContent=l.he;
+      const open=()=>openSection(l.i);
+      row.addEventListener('click',open);
+      row.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}});
+      det.appendChild(row);
+    });
+    toc.appendChild(det);
+  });
+}
+
+// ---- Reader ----
+function pairs(he,en,out){
+  if(Array.isArray(he)){for(let i=0;i<he.length;i++)pairs(he[i],Array.isArray(en)?en[i]:undefined,out);}
+  else if(he!=null&&String(he).trim()){out.push({he:strip(he),en:(en!=null&&!Array.isArray(en))?strip(en):''});}
+  return out;
+}
+// Supabase shared cache (publishable key — safe client-side; RLS allows read-only)
+const SUPA_URL=CONFIG.SUPABASE_URL, SUPA_KEY=CONFIG.SUPABASE_KEY;
+async function fetchSection(ref){
+  try{
+    const r=await fetch(SUPA_URL+'/rest/v1/luach_siddur_texts?ref=eq.'+encodeURIComponent(ref)+'&select=payload',
+      {headers:{apikey:SUPA_KEY,Authorization:'Bearer '+SUPA_KEY}});
+    if(r.ok){const rows=await r.json();if(rows.length&&rows[0].payload)return rows[0].payload;}
+  }catch(e){}
+  return api('/texts/'+encodeURIComponent(ref).replace(/%2C/g,',').replace(/%20/g,'_')+'?context=0&commentary=0&pad=0');
+}
+async function openSection(i){
+  curIdx=i; const l=leaves[i];
+  const body=document.getElementById('r-body');
+  document.getElementById('r-title').textContent=l.title;
+  document.getElementById('r-path').textContent=l.path.join(' › ');
+  document.getElementById('r-cov').textContent='…'; document.getElementById('r-cov').className='cov none';
+  document.getElementById('r-attr').textContent='';
+  body.innerHTML='<div class="loading"><span class="spin"></span>Loading from Sefaria…</div>';
+  showReader();
+  const key='txt:'+l.ref;
+  try{
+    let data=mem[key]||await Store.get(key);
+    if(!data){
+      data=await fetchSection(l.ref);
+      mem[key]=data;
+      setStatus('ok','connected');
+      // Same reasoning as the index: the section is in hand and about to
+      // render, so a failed write is a warning, not a load failure.
+      Store.set(key,data).catch(cacheWriteFailed);
+    }
+    /* A blocked translation is dropped before pairing, so the Hebrew renders
+       alone rather than beside something the app will not show. */
+    /* Fails closed. If Versions is somehow unavailable the English is withheld
+       rather than shown unchecked — for a rule like this, an absent guard must
+       not read as permission. */
+    const vcheck=window.Versions?Versions.englishAllowed(data)
+      :{ok:false,reason:'Translation could not be checked, so it is not shown.'};
+    const ps=pairs(data.he, vcheck.ok?data.text:null, []);
+    body.innerHTML='';
+    if(!ps.length){body.innerHTML='<div class="loading">No text in this section — it may be a container. Try its sub-sections in the contents.</div>';}
+    let tr=0;
+    ps.forEach(p=>{
+      if(p.en&&p.en.trim())tr++;
+      const div=document.createElement('div'); div.className='ph';
+      const he=document.createElement('div'); he.className='he'; he.textContent=p.he;
+      div.appendChild(he);
+      if(p.en&&p.en.trim()){const en=document.createElement('div');en.className='en';en.textContent=p.en;div.appendChild(en);}
+      else{const no=document.createElement('div');no.className='noen';no.textContent='translation not yet available';div.appendChild(no);}
+      body.appendChild(div);
+    });
+    const cov=document.getElementById('r-cov');
+    if(ps.length){
+      const pct=Math.round(100*tr/ps.length);
+      cov.textContent='EN '+tr+'/'+ps.length;
+      cov.className='cov '+(pct===100?'full':pct>0?'part':'none');
+    }else cov.textContent='—';
+    const bits=[];
+    if(data.heVersionTitle)bits.push('Hebrew: '+data.heVersionTitle+(data.heLicense?' ('+data.heLicense+')':''));
+    if(data.versionTitle)bits.push('English: '+data.versionTitle+(data.license?' ('+data.license+')':''));
+    /* When a translation is refused the reader must be told, or the missing
+       English reads as a loading failure. */
+    document.getElementById('r-attr').textContent=
+      (vcheck.ok?'':vcheck.reason+' ')+(bits.length?bits.join(' · ')+' · ':'')+'via Sefaria';
+  }catch(e){
+    setStatus('err','offline / blocked');
+    const cached=await Store.get(key).catch(()=>null);
+    body.innerHTML='<div class="err"><b>Couldn\u2019t load this section.</b><br>'+(cached?'':'It hasn\u2019t been cached yet, so it needs a connection once. ')+'Check your network, or open the file outside the sandboxed preview.</div>';
+  }
+  document.getElementById('prevSec').disabled=curIdx<=0;
+  document.getElementById('nextSec').disabled=curIdx>=leaves.length-1;
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function showReader(){document.getElementById('reader').classList.remove('hide');document.getElementById('toc-card').classList.add('hide');applyMode();}
+function showToc(){document.getElementById('reader').classList.add('hide');document.getElementById('toc-card').classList.remove('hide');}
+function applyMode(){const r=document.getElementById('reader');r.className='card'+(mode==='heb'?' m-heb':mode==='side'?' m-side':'');}
+
+// ---- Controls ----
+document.querySelectorAll('.segbtn[data-nus]').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.segbtn[data-nus]').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); nus=b.dataset.nus; paintLinear(); loadIndex();
+}));
+document.querySelectorAll('.segbtn[data-mode]').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.segbtn[data-mode]').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); mode=b.dataset.mode;
+  if(!document.getElementById('reader').classList.contains('hide'))applyMode();
+}));
+function paintLinear(){
+  const b=document.getElementById('lin-toggle');
+  if(!b)return;
+  const available=!!NUSACH[nus].linear;
+  b.disabled=!available;
+  b.classList.toggle('on',linear&&available);
+  b.setAttribute('aria-pressed',String(linear&&available));
+  b.textContent=available?'Linear edition':'No linear edition for this nusach';
+}
+document.getElementById('lin-toggle').addEventListener('click',()=>{
+  if(!NUSACH[nus].linear)return;
+  linear=!linear; paintLinear(); loadIndex();
+});
+
+document.getElementById('back').addEventListener('click',showToc);
+document.getElementById('prevSec').addEventListener('click',()=>{if(curIdx>0)openSection(curIdx-1);});
+document.getElementById('nextSec').addEventListener('click',()=>{if(curIdx<leaves.length-1)openSection(curIdx+1);});
+/* Migration completes before the first read: a user who cached sections under
+   the old localStorage scheme and is now offline must still find them. persist()
+   is advisory and fire-and-forget — it asks the browser not to evict texts that
+   are only useful precisely when there is no network to refetch them. */
+/* ?find=<title> opens the first section whose title or path matches, so the
+   app can link straight to Birkas Hamazon rather than dropping the user at the
+   contents and hoping. Matched on the live index rather than a hard-coded ref,
+   because Sefaria's exact ref strings differ between nusachos. */
+function openByName(q){
+  if(!q||!leaves.length)return false;
+  const norm=t=>String(t||'').toLowerCase().replace(/[^a-z0-9]+/g,'');
+  const n=norm(q);
+  let i=leaves.findIndex(l=>norm(l.title)===n);
+  if(i<0)i=leaves.findIndex(l=>norm(l.title).includes(n));
+  if(i<0)i=leaves.findIndex(l=>norm(l.path.join('')).includes(n));
+  if(i<0)return false;
+  openSection(i);
+  return true;
+}
+
+Store.migrate()
+  .catch(err=>console.warn('Text cache migration skipped.',err))
+  .then(()=>{ Store.persist().catch(()=>{}); return loadIndex(); })
+  .then(()=>{
+    paintLinear();
+    const q=new URLSearchParams(location.search).get('find');
+    if(q&&!openByName(q)){
+      setStatus('err','not found');
+      document.getElementById('sandbox-note').classList.remove('hide');
+      document.getElementById('sandbox-note').textContent =
+        'Couldn\u2019t find \u201c'+q+'\u201d in this nusach\u2019s index. It may be named '+
+        'differently here \u2014 the contents below are the full siddur.';
+    }
+  });
+</script>
+</body>
+</html>
