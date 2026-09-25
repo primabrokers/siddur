@@ -38,12 +38,12 @@ test('song halves anchor both outer edges and retain document units; three parts
  const outer=new Set([three.words[0],three.words.at(-1)].flatMap(w=>w.letters.map(l=>l.id)));
  assert(three.stretch_decisions.every(d=>!outer.has(d.letter_occurrence_id)));
  close(two.words[0].width_mm,normal.words[0].width_mm);
- const haazinu=computeLayout(processSource({text:'אבmגדe'}),p,normalizeGeometry({line_width_mm:125,song_layouts:{manual:'haazinu',haazinu:{total_mm:170,right_mm:45,left_mm:55}}}));
+ const haazinu=computeLayout(processSource({text:'אבmגדe'}),p,normalizeGeometry({line_width_mm:125,lines_per_amud:1,song_layouts:{manual:'haazinu',haazinu:{total_mm:170,right_mm:45,left_mm:55}}}));
  assert.equal(haazinu.lines[0].column_width_mm,170);close(haazinu.lines[0].song_layout.segments[1].start_mm,115);
 });
 
 test('overfull song sections extend into the middle in the requested directions without dropping text or stretching holy letters',()=>{
- const p=profile(),g=normalizeGeometry({song_layouts:{hayam:{total_mm:60,right_mm:10,left_mm:10}}});
+ const p=profile(),g=normalizeGeometry({lines_per_amud:1,song_layouts:{hayam:{total_mm:60,right_mm:10,left_mm:10}}});
  const two=computeLayout(processSource({text:'א'.repeat(8)+'m'+'ב'.repeat(8)+'e'}),p,g).lines[0];
  close(two.song_layout.segments[0].start_mm,0);close(two.song_layout.segments[1].start_mm,44);
  assert.equal(two.letter_occurrence_ids.length,16);assert.equal(two.leftover_mm,0);
@@ -95,7 +95,7 @@ test('new small letters use two thirds while an old saved snapshot still renders
 
 test('preview shows paragraph deficit, positions song fragments, and suggests a drop without changing or submitting text',async()=>{
  const f=ui();try{
-  const p=profile(),g=normalizeGeometry({line_width_mm:40}),source=processSource({text:'אבmגדe'});
+  const p=profile(),g=normalizeGeometry({line_width_mm:40,lines_per_amud:1}),source=processSource({text:'אבmגדe'});
   const song=publicLine(computeLayout(source,p,g).lines[0],effectiveProfile(p,g));
   const parsha={amud:1,line_index:2,text:'אב',words:[],petucha_end:true,base_leftover_mm:5,leftover_mm:5};
   const layout={id:'test',geometry:g,snapshot:{profile:effectiveProfile(p,g)},summary:{},lines:[song,parsha]};

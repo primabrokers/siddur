@@ -1,0 +1,68 @@
+services:
+  saved-v19:
+    image: prima-sofer-studio:feedback-v19-final
+    container_name: prima-sofer-studio-v19
+    restart: unless-stopped
+    init: true
+    user: "1000:1000"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 96
+    mem_limit: 2048m
+    cpus: 2
+    command: [node, --max-old-space-size=1024, gateway.mjs]
+    environment:
+      SOFER_DB: /data/sofer.db
+      SOFER_PORT: "4252"
+      SOFER_PUBLIC_HOST: sofer.primainsurance.tech
+    volumes:
+      - /opt/sofer-studio/data:/data
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=134217728,uid=1000,gid=1000,mode=1777
+    networks:
+      gateway:
+        aliases: [sofer-studio-app-v19]
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:4252/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    logging:
+      driver: json-file
+      options: {max-size: 1m, max-file: "2"}
+  demo-v19:
+    ports: ["127.0.0.1:19099:8080"]
+    image: prima-sofer-studio:feedback-v19-final
+    container_name: prima-sofer-demo-v19
+    restart: unless-stopped
+    init: true
+    user: "1000:1000"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 96
+    mem_limit: 3072m
+    cpus: 2
+    command: [node, /app/demo/gateway.mjs]
+    environment:
+      SOFER_DEMO_COOKIE: __Host-sofer_demo_v19
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=16777216,uid=1000,gid=1000,mode=1777
+    networks:
+      gateway:
+        aliases: [sofer-studio-demo-v19]
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:8080/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    logging:
+      driver: json-file
+      options: {max-size: 1m, max-file: "2"}
+networks:
+  gateway:
+    external: true
+    name: agent-stack_default

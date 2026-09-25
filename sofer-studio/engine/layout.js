@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto';
 import { copyColumnOptions, songSettings } from './column-options.js';
 import { composeSongLine } from './song-layout.js';
 import { fitManualSongPages } from './manual-song-pages.js';
+import { fillSongPages } from './song-page-scale.js';
 import { computeTefillin } from './tefillin.js';
 import { totalWidth, interLetterGap, interWordGap, wordWidth, minColumnWidth, measurementUnitMm } from './width.js';
 import { lettersOf, letterKeyOf } from './profile.js';
@@ -27,6 +28,7 @@ export function computeLineKey(line) {
     ids: Array.isArray(line.letter_occurrence_ids) ? line.letter_occurrence_ids : [],
     ...(line.column_width_mm ? { column_width_mm: line.column_width_mm } : {}),
     ...(line.song_layout ? { song_layout: line.song_layout, stretch: line.stretch_decisions } : {}),
+    ...(line.song_page ? { song_page: line.song_page } : {}),
     ...(line.tefillin_section ? { tefillin_section: line.tefillin_section } : {}),
     ...(line.manual_line_end ? { manual_line_end: true } : {}),
   });
@@ -1033,6 +1035,7 @@ export function computeLayout(source, profile, geometry, opts = {}) {
 }
 
 function finalizeLayout(lines, totalLetters, geometry, profile, g, blockers = [], excerpt = false, studyPreview = false) {
+  fillSongPages(lines, profile, geometry);
   const grouped = groupAndAnnotate(lines, geometry, profile);
   const total_amudim = grouped.amudim.length;
   const yerias = computeYerios(total_amudim, geometry, profile);

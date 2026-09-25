@@ -210,7 +210,7 @@ function insertLayoutLines(db, id, lines) {
         l.status || 'pending', nowIso()
       );
       db.prepare('UPDATE layout_lines SET layout_flags=? WHERE layout_id=? AND line_id=?').run(
-        json({petucha_end:!!l.petucha_end,sefer_end:!!l.sefer_end,fixed_pattern:!!l.fixed_pattern,blank_line:!!l.blank_line,manual_line_end:!!l.manual_line_end,book_boundary_blank:!!l.book_boundary_blank,reference_page:l.reference_page||null,column_width_mm:l.column_width_mm||null,song_layout:l.song_layout||null,tefillin_section:l.tefillin_section||null}),id,l.line_id
+        json({petucha_end:!!l.petucha_end,sefer_end:!!l.sefer_end,fixed_pattern:!!l.fixed_pattern,blank_line:!!l.blank_line,manual_line_end:!!l.manual_line_end,book_boundary_blank:!!l.book_boundary_blank,reference_page:l.reference_page||null,column_width_mm:l.column_width_mm||null,song_layout:l.song_layout||null,song_page:l.song_page||null,tefillin_section:l.tefillin_section||null}),id,l.line_id
       );
     }
 }
@@ -269,7 +269,7 @@ export function getLayoutLines(db, layoutId, page) {
         petucha_end: !!(flags && flags.petucha_end), sefer_end: !!(flags && flags.sefer_end),
         spacing_metadata_complete: flags != null,
         reference_page: flags && flags.reference_page || null,
-        column_width_mm: flags?.column_width_mm || null, song_layout: flags?.song_layout || null, tefillin_section: flags?.tefillin_section || null,
+        column_width_mm: flags?.column_width_mm || null, song_layout: flags?.song_layout || null, song_page: flags?.song_page || null, tefillin_section: flags?.tefillin_section || null,
         line_in_amud: flags && flags.reference_page ? (r.line_index-1)%42+1 : null,
       };
     });
@@ -380,7 +380,7 @@ export function createLockedLayout(db, meta, lines, summary) {
         l.status || 'pending', nowIso()
       );
       db.prepare('UPDATE layout_lines SET layout_flags=? WHERE layout_id=? AND line_id=?').run(
-        json({petucha_end:!!l.petucha_end,sefer_end:!!l.sefer_end,fixed_pattern:!!l.fixed_pattern,blank_line:!!l.blank_line,manual_line_end:!!l.manual_line_end,reference_page:l.reference_page||null,column_width_mm:l.column_width_mm||null,song_layout:l.song_layout||null,tefillin_section:l.tefillin_section||null}),id,l.line_id);
+        json({petucha_end:!!l.petucha_end,sefer_end:!!l.sefer_end,fixed_pattern:!!l.fixed_pattern,blank_line:!!l.blank_line,manual_line_end:!!l.manual_line_end,reference_page:l.reference_page||null,column_width_mm:l.column_width_mm||null,song_layout:l.song_layout||null,song_page:l.song_page||null,tefillin_section:l.tefillin_section||null}),id,l.line_id);
     }
   });
   tx(lines);

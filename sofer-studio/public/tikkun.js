@@ -431,13 +431,15 @@
     var linesWrap = util.el('div', { class: 'lines' });
 
     var geom = layoutGeometry(layout);
-    var pitch = (geom && geom.baseline_pitch_mm) || 10;
+    var songPage = g.lines[0] && g.lines[0].song_page;
+    var pitch = (songPage && songPage.baseline_pitch_mm) || (geom && geom.baseline_pitch_mm) || 10;
     var profile = layout.snapshot && layout.snapshot.profile;
-    if (profile && profile.letter_height_mm) linesWrap.style.fontSize = (Number(profile.letter_height_mm) * 1.3) + 'mm';
+    var letterHeight = (songPage && songPage.letter_height_mm) || (profile && profile.letter_height_mm);
+    if (letterHeight) linesWrap.style.fontSize = (Number(letterHeight) * 1.3) + 'mm';
     var pageWidth = Math.max.apply(null, g.lines.map(function (l) { return l.column_width_mm || (geom && geom.line_width_mm) || 125; }));
     linesWrap.style.setProperty('--line-width', pageWidth + 'mm');
     amud.style.setProperty('--line-width', pageWidth + 'mm');
-    linesWrap.style.minHeight = ((geom && geom.lines_per_amud) || g.lines.length) * pitch + 'mm';
+    linesWrap.style.minHeight = ((songPage && songPage.lines) || (geom && geom.lines_per_amud) || g.lines.length) * pitch + 'mm';
 
     if (placeholder) {
       // Keep the page's full geometry in the scroll track without its glyph DOM.
@@ -503,7 +505,7 @@
 
     // hover -> sargel tick (physical mm = (index)*pitch from column top)
     el.addEventListener('mouseenter', function () {
-      var rows = Number((layoutGeometry(renderedLayout) || {}).lines_per_amud) || totalInAmud;
+      var rows = (line.song_page && line.song_page.lines) || Number((layoutGeometry(renderedLayout) || {}).lines_per_amud) || totalInAmud;
       bus.emit('sargel:tick', (reverseLines ? rows - 1 - li : li) * pitch);
     });
     el.addEventListener('mouseleave', function () {

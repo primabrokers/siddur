@@ -18,7 +18,7 @@ test('geometry options migration and new computations preserve existing records 
   const before=rows(),snapshot=await call('GET','/api/layouts/'+old.layout_id);
   s.db.exec('DROP TABLE geometry_options; DELETE FROM schema_migrations WHERE version=9');
   assert.equal(applyMigrations(s.db),SCHEMA_VERSION);assert.deepEqual(rows(),before);
-  const geometry=await call('POST','/api/geometries',{name:'Songs',song_layouts:{hayam:{total_mm:180,right_mm:60,left_mm:60},haazinu:{total_mm:170,right_mm:50,left_mm:55},manual:'hayam'}});
+  const geometry=await call('POST','/api/geometries',{name:'Songs',lines_per_amud:2,song_layouts:{hayam:{total_mm:180,right_mm:60,left_mm:60},haazinu:{total_mm:170,right_mm:50,left_mm:55},manual:'hayam'}});
   const loaded=(await call('GET','/api/geometries')).find(x=>x.id===geometry.id);assert.deepEqual(loaded.song_layouts,geometry.song_layouts);
   const source=await call('POST','/api/sources/import',{text:'אב גדmהו זחe אmאב גדmבe',format:'stam'});
   const song=await call('POST','/api/layout/compute',{profile_id:p.id,geometry_id:geometry.id,source_id:source.id});
@@ -29,7 +29,7 @@ test('geometry options migration and new computations preserve existing records 
   const lineId=saved.lines[0].line_id;
   await call('POST','/api/layouts/'+saved.id+'/progress',{line_id:lineId,status:'written',lock:true});
   await call('POST','/api/layouts/'+saved.id+'/lock',{});
-  const movedGeometry=await call('POST','/api/geometries',{name:'Changed song columns',song_layouts:{hayam:{total_mm:180,right_mm:70,left_mm:50}}});
+  const movedGeometry=await call('POST','/api/geometries',{name:'Changed song columns',lines_per_amud:2,song_layouts:{hayam:{total_mm:180,right_mm:70,left_mm:50}}});
   const candidate=await call('POST','/api/layouts/'+saved.id+'/candidate',{profile_id:p.id,geometry_id:movedGeometry.id});
   assert(candidate.diff.some(d=>d.type==='measurement_changed'&&d.deltas.some(x=>x.field.startsWith('song_part_'))));
   const adopted=await call('POST','/api/layouts/'+saved.id+'/adopt-candidate',{candidate_id:candidate.candidate_id,verified_unchanged_lines:[lineId]});

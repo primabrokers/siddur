@@ -5,6 +5,7 @@
 import { countHebrewLetters } from './text.js';
 import { totalWidth, interWordGap, interLetterGap } from './width.js';
 import { applyStretch, petuchaGapMm } from './layout.js';
+import { songPageProfile } from './song-page-scale.js';
 
 const TOL = 1e-6;
 
@@ -46,6 +47,7 @@ export function validateSpacingBounds(profile, geometry) {
 }
 
 export function validateLine(line, profile, geometry) {
+  profile = songPageProfile(profile, line.song_page?.scale);
   const errors = [];
   const warnings = [];
   const lineW = Number(line.column_width_mm || geometry.line_width_mm);

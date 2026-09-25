@@ -22,11 +22,13 @@ import {fitMarginPlan,applyFitCopy} from './fit-margin.js';
 import {effectiveProfile} from '../engine/stretch-policy.js';
 import { moveWord } from '../engine/line-edit.js';
 import { loadTefillinSource } from './tefillin-source.js';
+import { songPageProfile } from '../engine/song-page-scale.js';
 
 // Strip internal engine fields for API lines. When a profile is supplied the
 // server-authoritative stretch candidates (cap_mm/letter/word_final/line_end) are
 // attached so the UI never derives caps from a different convention (F-10).
 export function publicLine(l, profile) {
+  profile = songPageProfile(profile, l.song_page?.scale);
   const words = l.words || [];
   const shem_tokens = words.filter((w) => w.isShem).map((w) => ({
     token: w.text,
@@ -49,6 +51,7 @@ export function publicLine(l, profile) {
     blank_line: !!l.blank_line, manual_line_end: !!l.manual_line_end,
     spacing_metadata_complete: !!l.spacing_metadata_complete,
     reference_page: l.reference_page || null,
+    song_page: l.song_page || null,
     column_width_mm: l.column_width_mm || null, song_layout: l.song_layout || null, tefillin_section: l.tefillin_section || null,
     words: words.map((w) => ({
       text: w.text, consonant: w.consonant, isShem: !!w.isShem, uncertain: !!w.uncertain,
@@ -718,6 +721,7 @@ function measurementDeltas(o, n) {
   cmp('leftover_mm', o.leftover_mm, n.leftover_mm);
   cmp('base_leftover_mm', o.base_leftover_mm, n.base_leftover_mm);
   cmp('column_width_mm', o.column_width_mm, n.column_width_mm);
+  for (const field of ['scale', 'baseline_pitch_mm', 'letter_height_mm']) cmp('song_page_' + field, o.song_page?.[field], n.song_page?.[field]);
   cmp('tefillin_section', o.tefillin_section, n.tefillin_section);
   const os=o.song_layout?.segments||[], ns=n.song_layout?.segments||[];
   for(let i=0;i<Math.max(os.length,ns.length);i++){
@@ -786,6 +790,7 @@ export function handleDiff(ctx) {
 // the SERVER re-checks against the parent — never on the client's word alone.
 function lineUnchanged(parentLine, candLine) {
   if (!parentLine || !candLine) return false;
+  if (JSON.stringify(parentLine.song_page || null) !== JSON.stringify(candLine.song_page || null)) return false;
   if (parentLine.column_width_mm !== candLine.column_width_mm || parentLine.tefillin_section !== candLine.tefillin_section) return false;
   if (JSON.stringify(parentLine.song_layout || null) !== JSON.stringify(candLine.song_layout || null)) return false;
   if ((parentLine.song_layout || candLine.song_layout) && JSON.stringify(parentLine.stretch_decisions || []) !== JSON.stringify(candLine.stretch_decisions || [])) return false;
