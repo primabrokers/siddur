@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <!--
+      Standalone harness for the WhatsApp pane (10 §2 Tier 2) — a development
+      page, never shipped and never linked from the app.
+
+      The Comms shell (features/comms) that normally renders this pane through
+      `registerCommsChannel` is being built in parallel; this file mounts the
+      pane on its own so it can be developed, screenshotted and reviewed without
+      waiting for the rail. Nothing in `src/` knows this page exists, and the
+      registration in `main.tsx` is untouched — when the shell lands, the pane
+      appears there with no change here.
+
+        node e2e/wa-fixture-server.mjs --port 5298
+        VITE_SUPABASE_URL=http://127.0.0.1:5298 VITE_SUPABASE_ANON_KEY=fixture \
+          npx vite --port 5198 --strictPort --host
+        open http://localhost:5198/e2e/wa-harness.html
+    -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700&display=swap"
+    />
+    <title>WhatsApp pane — harness</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/e2e/wa-harness.tsx"></script>
+  </body>
+</html>

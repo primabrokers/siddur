@@ -1,0 +1,98 @@
+import { useState } from 'react'
+import { Pill, Tabs } from '../../components'
+import { useAuth } from '../auth/AuthProvider'
+import { useTeamMember } from '../auth/useTeamMember'
+import { CalendarFeedLine } from '../journeys'
+import { PageHeader } from '../shell/PageHeader'
+import { WhatsAppSettingsCard } from '../whatsapp'
+import { AiTab } from './AiTab'
+import { AutomationTab } from './AutomationTab'
+import { EmailTab } from './EmailTab'
+import { LookupsTab } from './LookupsTab'
+import { OrganisationTab } from './OrganisationTab'
+import { TeamTab } from './TeamTab'
+
+type SettingsTab = 'lookups' | 'automation' | 'team' | 'organisation' | 'ai' | 'email' | 'whatsapp'
+
+const TABS: Array<{ id: SettingsTab; label: string }> = [
+  { id: 'lookups', label: 'Lookups' },
+  { id: 'automation', label: 'Automation rules' },
+  { id: 'team', label: 'Team' },
+  { id: 'organisation', label: 'Organisation' },
+  { id: 'ai', label: 'AI' },
+  { id: 'email', label: 'Email' },
+  { id: 'whatsapp', label: 'WhatsApp' },
+]
+
+/**
+ * Settings (06 §4) — the few things that genuinely are global. Everything a
+ * fundraiser tunes about *one relationship* stays inline on that relationship
+ * (I-6); what lands here is the shared vocabulary (lookups), the engine's
+ * parameters (automation rules), who may do what (team), the organisation's
+ * own identity, and the AI switches.
+ *
+ * **Admin-gated, and honestly so.** A non-admin sees the same information
+ * read-only: the write policies live in Postgres (11 §1), so hiding the screen
+ * would only hide the truth, not enforce it. The controls are disabled and the
+ * banner says why.
+ */
+export function SettingsView() {
+  const { user } = useAuth()
+  const { data: member, isPending } = useTeamMember()
+  const [tab, setTab] = useState<SettingsTab>('lookups')
+
+  const isAdmin = member?.role === 'admin'
+  const readOnly = !isAdmin
+
+  return (
+    <>
+      <PageHeader
+        title="Settings"
+        subtitle={
+          isPending
+            ? 'Loading your profile…'
+            : member
+              ? `${member.full_name} · ${member.role}`
+              : (user?.email ?? 'Not signed in')
+        }
+        actions={isAdmin ? <Pill tone="accent">Admin</Pill> : <Pill>Read only</Pill>}
+      />
+
+      {readOnly ? (
+        <p className="mb-3 rounded-input bg-[#FCF0E3] px-3 py-2 text-[12.5px] text-flag-today-ink">
+          You can see how the system is configured, but only an admin can change it. The database enforces
+          this, not this screen (11 §1).
+        </p>
+      ) : null}
+
+      <Tabs
+        items={TABS}
+        active={tab}
+        onChange={setTab}
+        aria-label="Settings sections"
+        className="mb-4"
+      />
+
+      {tab === 'lookups' ? <LookupsTab readOnly={readOnly} /> : null}
+      {tab === 'automation' ? <AutomationTab readOnly={readOnly} /> : null}
+      {/* The calendar feed (10 §4) is personal, not configuration: it sits above
+          the roster and is never read-only, because it is the viewer's own. */}
+      {tab === 'team' ? (
+        <>
+          <CalendarFeedLine memberId={member?.id ?? null} />
+          <TeamTab readOnly={readOnly} selfId={member?.id ?? null} />
+        </>
+      ) : null}
+      {tab === 'organisation' ? <OrganisationTab readOnly={readOnly} /> : null}
+      {tab === 'ai' ? <AiTab readOnly={readOnly} /> : null}
+      {/* 10 §3 — the inbox's two secrets, probed rather than stored: the card
+          can say whether sending and receiving are set up without ever being
+          able to read either value. */}
+      {tab === 'email' ? <EmailTab readOnly={readOnly} /> : null}
+      {/* 10 §2 Tier 2 — the connection, the Meta app config, and the rules that
+          cost money if ignored. The card can only probe: a Supabase secret is
+          never readable from the browser. */}
+      {tab === 'whatsapp' ? <WhatsAppSettingsCard readOnly={readOnly} /> : null}
+    </>
+  )
+}

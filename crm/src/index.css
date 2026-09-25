@@ -1,0 +1,129 @@
+@import 'tailwindcss';
+
+/* ---------------------------------------------------------------------------
+   Design tokens — spec 03 §2 + crm/CLAUDE.md token table + the wireframes.
+   Tailwind v4 reads @theme and emits both the CSS variables and the utilities
+   (bg-accent, text-muted, border-border, rounded-card, …).
+   --------------------------------------------------------------------------- */
+@theme {
+  /* Surfaces & text */
+  --color-ink: #1f2933;
+  --color-muted: #6b7686;
+  --color-faint: #9aa3ad;
+  --color-border: #e3e6ea;
+  --color-row: #eef1f4;
+  --color-ground: #f6f7f9;
+  --color-surface: #ffffff;
+
+  /* Brand */
+  --color-accent: #0e6e6b;
+  --color-accent-dark: #0a5451;
+  --color-accent-soft: #e3f0ee;
+
+  /* Money & positive */
+  --color-gold: #a97f24;
+  --color-good: #2e7d46;
+  --color-good-bg: #edf7f1;
+
+  /* Flag language — 03 §2. Yellow (no next action) sorts worse than grey (I-3). */
+  --color-flag-overdue: #d64545;
+  --color-flag-today: #e8871e;
+  --color-flag-none: #d9a800;
+  --color-flag-waiting: #3e7cb1;
+  --color-flag-future: #9aa3ad;
+
+  /* Section-label / heading tints taken straight from the wireframes */
+  --color-flag-none-ink: #b08a00;
+  --color-flag-today-ink: #b4650f;
+  --color-flag-waiting-bg: #e8f0f7;
+  --color-nav: #4b5563;
+  --color-chip-border: #c9d2ce;
+  --color-sheet-border: #d8dce1;
+
+  /* Radii — cards 10, inputs 8, pills 999 */
+  --radius-card: 10px;
+  --radius-card-lg: 12px;
+  --radius-input: 8px;
+  --radius-pill: 999px;
+  --radius-sheet: 20px;
+
+  /* Type */
+  --font-sans: 'Albert Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: var(--color-ground);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* The wireframes never show a focus ring style; use the accent consistently. */
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+
+  button {
+    font: inherit;
+    color: inherit;
+  }
+
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Bottom-sheet / modal entrance. Respects reduced motion. */
+@keyframes dc-sheet-up {
+  from {
+    transform: translateY(12px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes dc-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.dc-sheet-enter {
+  animation: dc-sheet-up 160ms ease-out;
+}
+
+.dc-fade-enter {
+  animation: dc-fade-in 120ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dc-sheet-enter,
+  .dc-fade-enter {
+    animation: none;
+  }
+}
+
+/* Safe-area padding for the mobile tab bar (matches the 22px bottom pad in
+   MobileToday.dc.html, growing on notched devices). */
+.pb-safe {
+  padding-bottom: calc(22px + env(safe-area-inset-bottom, 0px));
+}
