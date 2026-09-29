@@ -5,7 +5,7 @@ function reportLine(line, decisions, geometry) {
   const occurrences = new Map();
   for(const [wordIndex,word] of (line.words||[]).entries()) for(const letter of word.letters||[]) occurrences.set(letter.id,{word:word.text,word_index:wordIndex+1,letter:letter.base});
   return decisions.filter(d=>d.stretch_mm>0).map(d=>({
-    page:line.amud,line:((line.line_index-1)%geometry.lines_per_amud)+1,line_index:line.line_index,line_id:line.line_id,
+    page:line.amud,line:line.line_in_amud || ((line.line_index-1)%geometry.lines_per_amud)+1,line_index:line.line_index,line_id:line.line_id,
     ...(occurrences.get(d.kind === 'hyphen' ? d.letter_occurrence_id.slice(7) : d.letter_occurrence_id) || {
       word: d.kind === 'setuma_gap' ? 'Setumah gap' : d.kind === 'petucha_gap' ? 'Petuchah gap' : 'Word space',
       letter: '', word_index: null,

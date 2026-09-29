@@ -39,11 +39,12 @@ export function parseStamInput(raw) {
       else hyphens.push({ offset: Array.from(letters).length });
       continue;
     }
-    if (ch === '+' || ch === '\u2013' || ch === '\u2212' || ch === '.') {
-      pendingMarks.push(ch === '+' ? 'large' : ch === '.' ? 'dotted' : 'small'); continue;
+    if (ch === '+' || ch === '\u2013' || ch === '\u2212' || ch === 'd' || ch === '.') {
+      // d is the dot command; retain . as a legacy import alias.
+      pendingMarks.push(ch === '+' ? 'large' : ch === 'd' || ch === '.' ? 'dotted' : 'small'); continue;
     }
     if (ch === '!') { pendingMarks.push('backward_nun'); appendLetter('נ'); continue; }
-    if ('psl123me'.includes(ch)) { flush(); markers.push({ type: ch, after_word: words.length }); continue; }
+    if ('pslt123me'.includes(ch)) { flush(); markers.push({ type: ch, after_word: words.length }); continue; }
     if (/\s/u.test(ch)) { flush(); continue; }
     throw new Error(`Unsupported STAM character U+${ch.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')}`);
   }
@@ -57,14 +58,19 @@ export function stamSourceText(parsed) {
     const list = after.get(marker.after_word) || []; list.push(marker); after.set(marker.after_word, list);
   }
   const out = [];
-  for (let index = 0; index < parsed.words.length; index++) {
-    out.push(parsed.words[index].text);
-    for (const marker of after.get(index + 1) || []) {
+  const addMarkers = index => {
+    for (const marker of after.get(index) || []) {
       if (marker.type === 'p') out.push('{פ}');
       else if (marker.type === 's') out.push('{ס}');
       else if (marker.type === 'l') out.push('{blank-line}');
+      else if (marker.type === 't') out.push('{page-start}');
       else if ('123me'.includes(marker.type)) out.push(`{song-${marker.type}}`);
     }
+  };
+  addMarkers(0);
+  for (let index = 0; index < parsed.words.length; index++) {
+    out.push(parsed.words[index].text);
+    addMarkers(index + 1);
   }
   return out.join(' ');
 }

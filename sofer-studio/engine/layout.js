@@ -8,6 +8,7 @@ import { copyColumnOptions, songSettings } from './column-options.js';
 import { composeSongLine } from './song-layout.js';
 import { fitManualSongPages } from './manual-song-pages.js';
 import { fillSongPages } from './song-page-scale.js';
+import { pageRanges } from './pagination.js';
 import { computeTefillin } from './tefillin.js';
 import { totalWidth, interLetterGap, interWordGap, wordWidth, minColumnWidth, measurementUnitMm } from './width.js';
 import { lettersOf, letterKeyOf } from './profile.js';
@@ -31,6 +32,7 @@ export function computeLineKey(line) {
     ...(line.song_page ? { song_page: line.song_page } : {}),
     ...(line.tefillin_section ? { tefillin_section: line.tefillin_section } : {}),
     ...(line.manual_line_end ? { manual_line_end: true } : {}),
+    ...(line.page_start ? { page_start: true } : {}),
   });
   return createHash('sha256').update(payload, 'utf8').digest('hex');
 }
@@ -306,6 +308,7 @@ export function fitLines(source, profile, geometry, opts = {}) {
   let currentWidth = 0;
   let prevWasWord = false;
   let currentSong = false;
+  let pageStart = false;
 
   const pushLine = (flags = {}) => {
     if (current.length === 0 && !flags.force) return;
@@ -315,6 +318,7 @@ export function fitLines(source, profile, geometry, opts = {}) {
     if (currentSong) line.fixed_pattern = true;
     if (flags.songEnd) line.manual_line_end = true;
     if (flags.blankLine) line.blank_line = true;
+    if (pageStart) { line.page_start = true; pageStart = false; }
     lines.push(line);
     current = [];
     currentWidth = 0;
@@ -342,17 +346,17 @@ export function fitLines(source, profile, geometry, opts = {}) {
       i -= 1;
       pushLine();
       const fixed = renderPattern(passage, profile, geometry, collected, overrideMap);
-      for (const fl of fixed) lines.push(fl);
+      for (const fl of fixed) { if (pageStart) { fl.page_start = true; pageStart = false; } lines.push(fl); }
       current = []; currentWidth = 0; prevWasWord = false;
       continue;
     }
 
     if (u.type === 'word') {
-      // m/e defines the row explicitly, including its first segment. Never
-      // wrap the first segment before encountering its middle-break marker.
+      // Only an m introduces a fixed song segment. e ends an ordinary row
+      // after normal wrapping; it must never collect an unlimited prose line.
       if (!currentSong) {
         const marker = nextMarkers[i];
-        if (marker?.type === 'song_end' || (marker?.type === 'song_break' && marker.break_kind === 'm')) currentSong = true;
+        if (marker?.type === 'song_break' && marker.break_kind === 'm') currentSong = true;
       }
       const w = measureWord(u, profile, overrideMap);
       const reserve = current.some(item => item.type === 'segment_gap') ? 0 : paragraphReserve(units, i, profile, geometry, overrideMap);
@@ -396,6 +400,8 @@ export function fitLines(source, profile, geometry, opts = {}) {
     } else if (u.type === 'song_end') {
       currentSong = true;
       pushLine({ songEnd: true });
+    } else if (u.type === 'page_break') {
+      pushLine(); pageStart = true;
     } else if (u.type === 'blank_line') {
       pushLine();
       pushLine({ force: true, blankLine: true });
@@ -448,18 +454,15 @@ export function makeLine(items, width, lineW, profile, flags = {}) {
 // ---- Amud grouping & vavei ha'amudim --------------------------------------
 
 export function groupAndAnnotate(lines, geometry, profile) {
-  const per = Math.max(1, int(geometry.lines_per_amud, 42));
   const amudim = [];
-  for (let i = 0; i < lines.length; i += per) {
-    const chunk = lines.slice(i, i + per);
-    amudim.push(chunk);
-  }
+  for (const [start, end] of pageRanges(lines, geometry)) amudim.push(lines.slice(start, end));
   const needVav = (profile.vavei_haamudim !== false);
   const annotations = [];
+  let lineIndex = 0;
   amudim.forEach((chunk, aIdx) => {
     const amud = aIdx + 1;
     chunk.forEach((line, li) => {
-      line.line_index = aIdx * per + li + 1;
+      line.line_index = ++lineIndex;
       line.amud = amud;
       line.line_in_amud = li + 1;
       line.line_id = 'amud-' + amud + '-line-' + (li + 1);
@@ -1096,6 +1099,7 @@ export async function computeLayoutAsync(source, profile, geometry, opts = {}) {
   }
   const lines = [];
   let currentSong = false;
+  let pageStart = false;
   let current = [];
   let currentWidth = 0;
   let prevWasWord = false;
@@ -1106,6 +1110,7 @@ export async function computeLayoutAsync(source, profile, geometry, opts = {}) {
       : makeLine(current, currentWidth, lineW, profile, flags);
     if (currentSong || current.some(item => item.type === 'segment_gap')) line.fixed_pattern = true;
     if (flags.songEnd) line.manual_line_end = true;
+    if (pageStart) { line.page_start = true; pageStart = false; }
     lines.push(line);
     current = []; currentWidth = 0; prevWasWord = false; currentSong = false;
   };
@@ -1130,13 +1135,15 @@ export async function computeLayoutAsync(source, profile, geometry, opts = {}) {
       }
       i -= 1;
       pushLine();
-      for (const fl of renderPattern(passage, profile, geometry, collected, overrideMap)) lines.push(fl);
+      for (const fl of renderPattern(passage, profile, geometry, collected, overrideMap)) {
+        if (pageStart) { fl.page_start = true; pageStart = false; } lines.push(fl);
+      }
       current = []; currentWidth = 0; prevWasWord = false;
       continue;
     }
     if (u.type === 'word') {
       const marker = nextMarkers[i];
-      if (marker?.type === 'song_end' || (marker?.type === 'song_break' && marker.break_kind === 'm')) currentSong = true;
+      if (marker?.type === 'song_break' && marker.break_kind === 'm') currentSong = true;
       const w = measureWord(u, profile, overrideMap);
       const reserve = current.some(item => item.type === 'segment_gap') ? 0 : paragraphReserve(units, i, profile, geometry, overrideMap);
       const joinsSetuma = profile.stretch_policy?.version === 2 && current.at(-1)?.type === 'setuma_gap';
@@ -1177,10 +1184,13 @@ export async function computeLayoutAsync(source, profile, geometry, opts = {}) {
     } else if (u.type === 'song_end') {
       currentSong = true;
       pushLine({ songEnd: true });
+    } else if (u.type === 'page_break') {
+      pushLine(); pageStart = true;
     } else if (u.type === 'blank_line') {
       pushLine();
       const blank = makeLine([], 0, lineW, profile, { force: true });
       blank.blank_line = true;
+      if (pageStart) { blank.page_start = true; pageStart = false; }
       lines.push(blank);
     }
   }

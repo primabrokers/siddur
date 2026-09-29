@@ -524,7 +524,7 @@
     if (overflow) controls.style.marginRight = (overflow + 3) + 'mm';
     [['up', '↑', 'Bring the first word from the next line'], ['down', '↓', 'Move the last word to the next line']].forEach(function(spec) {
       var button = util.el('button', { type: 'button', class: 'btn btn-ghost btn-sm', text: spec[1], title: spec[2], 'aria-label': spec[2], 'data-move-word': spec[0] });
-      button.disabled = !API || !API.moveWord || !line.line_id || renderedLayout.status === 'locked' || line.fixed_pattern || (line.status && line.status !== 'pending');
+      button.disabled = !!renderedLayout.lines[renderedLayout.lines.indexOf(line)+1]?.page_start || !API || !API.moveWord || !line.line_id || renderedLayout.status === 'locked' || line.fixed_pattern || (line.status && line.status !== 'pending');
       if (renderedLayout.status === 'locked') button.title = 'Locked layout: compute a new draft before changing line breaks';
       button.addEventListener('click', async function(event) {
         event.stopPropagation();
@@ -546,6 +546,7 @@
   }
 
   function suggestsDrop(line, next) {
+    if (next && next.page_start) return false;
     var blocked=function(l){return !l||l.fixed_pattern||l.petucha_end||l.sefer_end||l.has_setuma||l.setuma_at_edge||(l.status&&l.status!=='pending');};
     if(blocked(line)||blocked(next)||line.tefillin_section!==next.tefillin_section||!line.words||line.words.length<2||!next.words||!next.words.length) return false;
     var before=Number(line.base_leftover_mm),after=Number(next.base_leftover_mm),word=Number(line.words[line.words.length-1].width_mm);

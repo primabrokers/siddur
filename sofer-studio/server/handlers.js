@@ -49,6 +49,7 @@ export function publicLine(l, profile) {
     setuma_at_edge: !!l.setuma_at_edge, setuma_stretch_enabled: !!profile?.stretch_policy,
     sefer_end: !!l.sefer_end, fixed_pattern: !!l.fixed_pattern,
     blank_line: !!l.blank_line, manual_line_end: !!l.manual_line_end,
+    page_start: !!l.page_start,
     spacing_metadata_complete: !!l.spacing_metadata_complete,
     reference_page: l.reference_page || null,
     song_page: l.song_page || null,
@@ -721,6 +722,7 @@ function measurementDeltas(o, n) {
   cmp('leftover_mm', o.leftover_mm, n.leftover_mm);
   cmp('base_leftover_mm', o.base_leftover_mm, n.base_leftover_mm);
   cmp('column_width_mm', o.column_width_mm, n.column_width_mm);
+  cmp('page_start', o.page_start, n.page_start);
   for (const field of ['scale', 'baseline_pitch_mm', 'letter_height_mm']) cmp('song_page_' + field, o.song_page?.[field], n.song_page?.[field]);
   cmp('tefillin_section', o.tefillin_section, n.tefillin_section);
   const os=o.song_layout?.segments||[], ns=n.song_layout?.segments||[];
@@ -790,6 +792,7 @@ export function handleDiff(ctx) {
 // the SERVER re-checks against the parent — never on the client's word alone.
 function lineUnchanged(parentLine, candLine) {
   if (!parentLine || !candLine) return false;
+  if (!!parentLine.page_start !== !!candLine.page_start) return false;
   if (JSON.stringify(parentLine.song_page || null) !== JSON.stringify(candLine.song_page || null)) return false;
   if (parentLine.column_width_mm !== candLine.column_width_mm || parentLine.tefillin_section !== candLine.tefillin_section) return false;
   if (JSON.stringify(parentLine.song_layout || null) !== JSON.stringify(candLine.song_layout || null)) return false;

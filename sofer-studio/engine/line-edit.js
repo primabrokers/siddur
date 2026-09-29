@@ -10,6 +10,7 @@ export function moveWord(layout, { line_id, direction, line_key, next_line_key }
   const lines = layout.lines, index = lines.findIndex(line => line.line_id === line_id);
   if (index < 0) throw new Error('Line not found');
   const current = lines[index], following = lines[index + 1];
+  if (following?.page_start) throw new Error('Words cannot be moved across an explicit page start');
   if (!line_key || line_key !== current.line_key || (following?.line_key || null) !== (next_line_key || null)) throw new Error('The line changed. Reload the layout before moving another word.');
   for (const line of [current, following].filter(Boolean)) {
     if (line.status && line.status !== 'pending') throw new Error('Written or checked lines cannot change line breaks');
@@ -41,6 +42,7 @@ export function moveWord(layout, { line_id, direction, line_key, next_line_key }
     const line = makeLine(items, width, original?.column_width_mm || geometry.line_width_mm, profile, { endedBy: original?.petucha_end ? 'petucha' : original?.sefer_end ? 'sefer' : null });
     line.sefer_end = !!original?.sefer_end;
     line.column_width_mm = original?.column_width_mm || null; line.tefillin_section = original?.tefillin_section || null;
+    if (original?.page_start) line.page_start = true;
     line.spacing_metadata_complete = true;
     line.line_key = computeLineKey(line);
     if (line.base_leftover_mm >= 0) {
@@ -51,8 +53,8 @@ export function moveWord(layout, { line_id, direction, line_key, next_line_key }
   };
   const changed = [rebuild(current, a), rebuild(following, b)];
   const output = lines.slice(); output.splice(index, following ? 2 : 1, ...changed);
-  groupAndAnnotate(output, geometry, geometry.tefillin ? { ...profile, vavei_haamudim: false } : profile);
-  const totalAmudim = Math.ceil(output.length / geometry.lines_per_amud);
+  const grouped = groupAndAnnotate(output, geometry, geometry.tefillin ? { ...profile, vavei_haamudim: false } : profile);
+  const totalAmudim = grouped.amudim.length;
   const yerios = computeYerios(totalAmudim, geometry, profile);
   const summary = { ...layout.summary, total_lines: output.length, total_amudim: totalAmudim,
     total_yerios: geometry.tefillin ? 1 : yerios.total_yerios, klaf_length_m: geometry.tefillin ? layout.summary.klaf_length_m : yerios.klaf_length_m,

@@ -1,4 +1,5 @@
 import { composeSongLine } from './song-layout.js';
+import { pageRanges } from './pagination.js';
 
 // A page-local measurement profile. Keep the saved document calibration intact;
 // enlarged letters and spaces consume more of its original physical units.
@@ -23,8 +24,8 @@ export function songPageProfile(profile, scale = 1) {
 // their original size. Page membership, word order and physical width stay fixed.
 export function fillSongPages(lines, profile, geometry) {
   const perPage = Math.max(1, Number(geometry.lines_per_amud) || 42);
-  for (let start = 0; start < lines.length; start += perPage) {
-    const page = lines.slice(start, start + perPage);
+  for (const [start, end] of pageRanges(lines, geometry)) {
+    const page = lines.slice(start, end);
     if (page.length >= perPage || geometry.tefillin) continue;
     const song = page.find(line => line.song_layout);
     if (!song || !page.every(line => line.song_layout ||

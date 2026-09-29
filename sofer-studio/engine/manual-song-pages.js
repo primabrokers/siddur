@@ -4,14 +4,14 @@ import { interWordGap } from './width.js';
 // An e ends a complete, justified row. Freeze its word membership only AFTER
 // stretching, so the ordinary fixed-passage guard cannot skip justification.
 function explicitRow(line, width, profile) {
-  if (line.blank_line) return { ...makeLine([], 0, width, profile), blank_line: true };
+  if (line.blank_line) return { ...line, ...makeLine([], 0, width, profile), blank_line: true };
   if (!line.manual_line_end || line.song_layout) return line;
   const result = makeLine(line.items, line.width_mm, width, profile);
   const plan = autoSuggestLine(result, profile);
   if (plan.suggestions.length) applyStretch(result, plan.suggestions, profile);
   result.manual_line_end = true;
   result.fixed_pattern = true;
-  return result;
+  return { ...line, ...result };
 }
 
 // Reuse measured words/occurrence IDs: widening a song page must increase its
@@ -27,10 +27,12 @@ export function* fitManualSongPages(lines, profile, geometry) {
   }
   const stream = [];
   for (const line of lines) {
-    if (line.blank_line || line.fixed_pattern) stream.push({ type: 'row', line });
+    if (line.page_start) stream.push({ type: 'page_break' });
+    if (line.blank_line || (line.fixed_pattern && !line.manual_line_end) || line.song_layout) stream.push({ type: 'row', line });
     else {
       stream.push(...line.items);
       if (line.petucha_end || line.sefer_end) stream.push({ type: line.petucha_end ? 'petucha' : 'sefer' });
+      if (line.manual_line_end) stream.push({ type: 'line_end' });
     }
   }
   const perPage = Math.max(1, Number(geometry.lines_per_amud) || 42);
@@ -48,15 +50,22 @@ export function* fitManualSongPages(lines, profile, geometry) {
   }
   function pageFrom(start, width) {
     const page = [];
-    let cursor = start, items = [], used = 0;
+    let cursor = start, items = [], used = 0, pageStart = false;
     function flush(flags = {}) {
       if (!items.length) return;
-      page.push(makeLine(items, used, width, profile, flags));
+      let line = makeLine(items, used, width, profile, flags);
+      if (flags.lineEnd) line = explicitRow({ ...line, manual_line_end: true }, width, profile);
+      page.push(line);
       items = []; used = 0;
     }
     while (cursor < stream.length && page.length < perPage) {
       const item = stream[cursor];
-      if (item.type === 'row') {
+      if (item.type === 'page_break') {
+        if (items.length || page.length) { flush(); break; }
+        pageStart = true; cursor++;
+      } else if (item.type === 'line_end') {
+        flush({ lineEnd: true }); cursor++;
+      } else if (item.type === 'row') {
         flush();
         if (page.length === perPage) break;
         page.push(explicitRow(item.line, width, profile));
@@ -78,6 +87,7 @@ export function* fitManualSongPages(lines, profile, geometry) {
       }
     }
     flush();
+    if (pageStart && page.length) page[0].page_start = true;
     return { page, cursor };
   }
   let cursor = 0;
@@ -90,6 +100,6 @@ export function* fitManualSongPages(lines, profile, geometry) {
     }
     if (candidate.cursor <= cursor) throw new Error('Song page fitting did not advance');
     cursor = candidate.cursor;
-    yield candidate.page;
+    if (candidate.page.length) yield candidate.page;
   }
 }
