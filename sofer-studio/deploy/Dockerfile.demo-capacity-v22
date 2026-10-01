@@ -1,0 +1,7 @@
+# Preserve the exact tested v21 application, assets and offline download.
+FROM prima-sofer-studio:feedback-v21-final
+USER root
+COPY sofer-studio/deploy/demo /app/demo
+COPY sofer-studio/deploy/demo /app/sofer-studio/deploy/demo
+COPY sofer-studio/tests/demo-gateway.test.js /app/sofer-studio/tests/demo-gateway.test.js
+USER 1000:1000
