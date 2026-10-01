@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { parseStamInput } from '../engine/stam-input.js';
 import { processSource } from '../engine/source.js';
 import { defaultProfile, normalizeProfile } from '../engine/profile.js';
-import { normalizeGeometry, computeLayout, computeLayoutAsync, stretchCandidatesOf } from '../engine/layout.js';
+import { normalizeGeometry, computeLayout, computeLayoutAsync, stretchCandidatesOf, autoSuggestLine, applyStretch } from '../engine/layout.js';
 import { effectiveProfile } from '../engine/stretch-policy.js';
 import { sourceControls, customGapWidth } from '../engine/document-options.js';
 import { publicLine } from '../server/handlers.js';
@@ -131,4 +131,13 @@ test('new imports use r and z; a hyphen is a width marker and + is rejected', ()
   assert.equal(parsed.words[1].letterMarks[0].type, 'small');
   assert.equal(parsed.words[2].letterMarks[0].type, 'large');
   assert.throws(() => parseStamInput('(note)'), /not followed/);
+});
+
+test('rr is exclusive even with a legacy profile and manual stretch requests', () => {
+  const legacy = { ...effectiveProfile(p, geom()), stretch_policy: null };
+  const result = computeLayout(processSource({ text: 'rrא אב' }), legacy, geom()), line = result.lines[0];
+  const plan = autoSuggestLine(line, legacy); assert(plan.suggestions.length);
+  applyStretch(line, plan.suggestions, legacy);
+  assert(line.stretch_decisions.every(d => d.letter_occurrence_id === line.words[0].letters[0].id));
+  assert.throws(() => applyStretch(line, [{ letter_occurrence_id: line.words[1].letters[0].id, stretch_mm: .1 }], legacy), /rejected/);
 });

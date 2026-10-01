@@ -678,8 +678,8 @@ function computeLeftover(line, profile) {
 export function applyStretch(line, decisions, profile) {
   if (line.song_layout) throw new Error("Song segments are stretched separately; recompute the layout after editing their settings");
   if (line.fixed_pattern) throw new Error('fixed passage stretch is frozen');
-  if (profile.stretch_policy) {
-    if ((line.petucha_end && profile.stretch_policy.version !== 2) || line.sefer_end || line.setuma_at_edge) throw new Error('intentional line-end spacing is frozen');
+  if (profile.stretch_policy || line.words.some(word => word.letters.some(letter => hasLetterMark(letter, 'exclusive_stretch')))) {
+    if ((line.petucha_end && profile.stretch_policy?.version !== 2) || line.sefer_end || line.setuma_at_edge) throw new Error('intentional line-end spacing is frozen');
     const previous = (line.stretch_decisions || []).reduce((n, d) => n + Number(d.stretch_mm || 0), 0);
     const originalGap = Number(line.base_leftover_mm ?? (Number(line.leftover_mm || 0) + previous));
     if (!Number.isFinite(originalGap) || originalGap < 0) throw new Error('overfull or unmeasured line cannot be stretched');
