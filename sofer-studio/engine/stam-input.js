@@ -20,35 +20,48 @@ export function parseStamInput(raw) {
     const letterIndex = Array.from(letters).length;
     letters += letter;
     if (holy) holyLetterIndexes.push(letterIndex);
-    for (const type of pendingMarks) letterMarks.push({ letter_index: letterIndex, type });
+    for (const mark of pendingMarks) letterMarks.push({ letter_index: letterIndex, ...(typeof mark === 'string' ? { type: mark } : mark) });
     pendingMarks = [];
   };
   const input = Array.from(String(raw || '').replace(/^\ufeff/u, ''));
   for (let index = 0; index < input.length; index++) {
     const ch = input[index];
+    if (ch === '(') {
+      let note = '', depth = 1;
+      while (++index < input.length && depth) {
+        if (input[index] === '(') depth++;
+        if (input[index] === ')') depth--;
+        if (depth) note += input[index];
+      }
+      if (depth) throw new Error('Close the margin note with a parenthesis');
+      index--;
+      if (!note.trim() || note.length > 2000) throw new Error('Margin notes need 1 to 2000 characters');
+      pendingMarks.push({ type: 'margin_note', note: note.trim() }); continue;
+    }
+    if ('rznfb'.includes(ch)) {
+      if (ch === 'r' && input[index + 1] === 'r') { pendingMarks.push('exclusive_stretch'); index++; }
+      pendingMarks.push({ r: 'large', z: 'small', n: 'backward', f: 'four_tagin', b: 'broken' }[ch]); continue;
+    }
     if (/[\u05d0-\u05ea]/u.test(ch)) { appendLetter(ch); continue; }
     if (/[A-Z]/.test(ch)) {
       const mapped = STAM_KEYBOARD[ch];
       if (!mapped || !/[\u05d0-\u05ea]/u.test(mapped)) throw new Error(`Unsupported capital key ${ch}`);
       appendLetter(mapped, true); continue;
     }
-    if (ch === '-') {
-      // A single prefix is the owner's small-letter command. Keep standalone,
-      // trailing and repeated hyphen width markers compatible with saved input.
-      if (input[index - 1] !== '-' && /[\u05d0-\u05eaA-Z]/u.test(input[index + 1] || '')) pendingMarks.push('small');
-      else hyphens.push({ offset: Array.from(letters).length });
-      continue;
+    if (ch === '-' || ch === '\u2013' || ch === '\u2212') {
+      hyphens.push({ offset: Array.from(letters).length }); continue;
     }
-    if (ch === '+' || ch === '\u2013' || ch === '\u2212' || ch === 'd' || ch === '.') {
-      // d is the dot command; retain . as a legacy import alias.
-      pendingMarks.push(ch === '+' ? 'large' : ch === 'd' || ch === '.' ? 'dotted' : 'small'); continue;
+    if (ch === 'd' || ch === '.') {
+      // The full stop is the current dot command; d remains import-compatible.
+      pendingMarks.push('dotted'); continue;
     }
     if (ch === '!') { pendingMarks.push('backward_nun'); appendLetter('נ'); continue; }
-    if ('pslt123me'.includes(ch)) { flush(); markers.push({ type: ch, after_word: words.length }); continue; }
+    if ('psltg123me'.includes(ch)) { flush(); markers.push({ type: ch, after_word: words.length }); continue; }
     if (/\s/u.test(ch)) { flush(); continue; }
     throw new Error(`Unsupported STAM character U+${ch.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')}`);
   }
   flush();
+  if (pendingMarks.length) throw new Error('STAM modifier is not followed by a Hebrew letter');
   return { words, markers };
 }
 
@@ -64,6 +77,7 @@ export function stamSourceText(parsed) {
       else if (marker.type === 's') out.push('{ס}');
       else if (marker.type === 'l') out.push('{blank-line}');
       else if (marker.type === 't') out.push('{page-start}');
+      else if (marker.type === 'g') out.push('{custom-gap}');
       else if ('123me'.includes(marker.type)) out.push(`{song-${marker.type}}`);
     }
   };

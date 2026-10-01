@@ -14,7 +14,7 @@ import { startTestServer, getToken, jsonHeaders, request } from './helpers.js';
 const close = (a, b) => assert(Math.abs(a - b) < 1e-6, `${a} != ${b}`);
 const profile = () => normalizeProfile({ ...defaultProfile(), units_per_row: 125 });
 const geometry = n => normalizeGeometry({ line_width_mm: 125, lines_per_amud: n, baseline_pitch_mm: 7.5, small_letter_reference: 'א' });
-const song = Array.from({ length: 11 }, (_, i) => i === 0 ? 'אב גדe' : i % 2 ? 'Cאב גדmאב גדe' : 'אm+ב -גm!נe').join(' ');
+const song = Array.from({ length: 11 }, (_, i) => i === 0 ? 'אב גדe' : i % 2 ? 'Cאב גדmאב גדe' : 'אmrב zגm!נe').join(' ');
 const ids = result => result.lines.flatMap(line => line.letter_occurrence_ids);
 const asset = name => readFileSync(new URL('../public/' + name, import.meta.url), 'utf8');
 

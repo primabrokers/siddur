@@ -26,6 +26,8 @@
     ['bottom_margin_mm', 'Bottom margin', 0.1],
     ['inter_column_gap_mm', 'Column gap', 0.1],
     ['outer_margin_mm', 'Outer margin', 0.1],
+    ['initial_margin_mm', 'Initial document margin (blank = outer)', 0.1],
+    ['final_margin_mm', 'Final document margin (blank = outer)', 0.1],
     ['line_width_mm', 'Line (column) width', 0.1]
   ];
 
@@ -37,6 +39,7 @@
     buildStatic();
     bindEvents();
     loadDraftFromActive();
+    SS.documentSettings?.init(API, root, function(){return draft;});
 
     bus.on('geometryId:changed', loadDraftFromActive);
     bus.on('selection:changed', function () { renderDerived(); });
@@ -84,6 +87,8 @@
       max_inter_word_gap_mm: (g.max_inter_word_gap_mm != null) ? toNum(g.max_inter_word_gap_mm, null) : null,
       max_inter_word_gap_factor: (g.max_inter_word_gap_factor != null) ? toNum(g.max_inter_word_gap_factor, null) : null,
       small_letter_reference: g.small_letter_reference || 'י',
+      initial_margin_mm: g.initial_margin_mm ?? null, final_margin_mm: g.final_margin_mm ?? null,
+      document_flow: g.document_flow ? JSON.parse(JSON.stringify(g.document_flow)) : null,
       song_layouts: g.song_layouts ? JSON.parse(JSON.stringify(g.song_layouts)) : null,
       tefillin: g.tefillin ? JSON.parse(JSON.stringify(g.tefillin)) : null,
       vavei_haamudim: g.vavei_haamudim !== false
@@ -168,12 +173,6 @@
     grid.appendChild(pfy);
     root.appendChild(grid);
 
-    var spGrid = util.el('div', { class: 'geom-grid' });
-    spGrid.appendChild(util.el('label', { class: 'toggle' },
-      [util.el('input', { type: 'checkbox', id: 'geom-vavei_haamudim' }),
-       util.el('span', { text: "Vavei ha'amudim (column-initial vavs)" })]));
-    root.appendChild(spGrid);
-
     var songs=util.el('details',{class:'song-settings'},[util.el('summary',{text:'Song column settings'})]);
     songs.appendChild(util.el('p',{class:'profile-help',text:'Letters keep the same physical size as the rest of the document. Wider song columns contain more units.'}));
     ['hayam','haazinu'].forEach(function(kind){
@@ -186,9 +185,7 @@
       });
       songs.appendChild(grid);
     });
-    var manual=util.el('select',{id:'song-manual'},[util.el('option',{value:'hayam',text:'Hayam'}),util.el('option',{value:'haazinu',text:'Haazinu'})]);
-    manual.addEventListener('change',function(){ensureSongs();draft.song_layouts.manual=manual.value;});
-    songs.appendChild(util.el('label',{class:'field'},[util.el('span',{text:'Imported m / e song rows use'}),manual]));
+    songs.appendChild(util.el('p',{class:'profile-help',text:'Imported songs are recognised automatically: all two-part rows use Haazinu; mixed two- and three-part rows use Hayam.'}));
     root.appendChild(songs);
 
     // min-width guard (live)
@@ -284,7 +281,7 @@
         if (path === 'max_inter_word_gap_factor') {
           draft[path] = (el.value === '' || Number.isNaN(v)) ? null : Math.min(0.99, Math.max(0.01, v));
         } else if (el.value === '') {
-          draft[path] = (path === 'setuma_gap_mm' || path === 'max_inter_word_gap_mm') ? null : v;
+          draft[path] = (['setuma_gap_mm','max_inter_word_gap_mm','initial_margin_mm','final_margin_mm'].includes(path)) ? null : v;
         } else {
           draft[path] = (path === 'amudim_per_yeria') ? Math.max(1, Math.round(v)) : v;
         }
@@ -292,10 +289,6 @@
         renderTotals();
         bus.emit('geometry:draft-changed');
       });
-    });
-    util.byId('geom-vavei_haamudim').addEventListener('change', function () {
-      draft.vavei_haamudim = util.byId('geom-vavei_haamudim').checked;
-      renderDerived();
     });
     util.byId('geom-name').addEventListener('input', function () { draft.name = util.byId('geom-name').value; });
     util.byId('geom-pfy').addEventListener('change', function () { draft.partial_final_yeria = util.byId('geom-pfy').value; renderTotals(); });
@@ -313,7 +306,7 @@
     util.byId('geom-name').value = draft.name || '';
     FIELDS.forEach(function (f) {
       var el = util.qs('[data-field="' + f[0] + '"]', root);
-      if (el) el.value = draft[f[0]];
+      if (el) el.value = draft[f[0]] ?? '';
     });
     util.byId('geom-pfy').value = draft.partial_final_yeria;
     var custom = util.qs('[data-field="max_letters_per_line"]', root);
@@ -327,12 +320,12 @@
     if(draft.tefillin){draft.tefillin.widths_mm.forEach(function(width,i){util.byId('tefillin-width-'+i).value=width==null?'':width;});util.byId('tefillin-paper').value=draft.tefillin.paper||'A4';}
     ensureSongs();
     ['hayam','haazinu'].forEach(function(kind){['total_mm','right_mm','left_mm'].forEach(function(key){util.byId('song-'+kind+'-'+key).value=draft.song_layouts[kind][key];});});
-    util.byId('song-manual').value=draft.song_layouts.manual;
+    SS.documentSettings?.render();
     ['setuma_gap_mm', 'min_inter_letter_gap_mm', 'min_inter_word_gap_mm', 'max_inter_word_gap_mm', 'max_inter_word_gap_factor'].forEach(function (p) {
       var el = util.qs('[data-field="' + p + '"]', root);
       if (el) el.value = (draft[p] != null && !Number.isNaN(draft[p])) ? draft[p] : '';
     });
-    util.byId('geom-vavei_haamudim').checked = !!draft.vavei_haamudim;
+
     updateLinesSegUI();
     util.byId('geom-lines-custom-input').value = String(draft.lines_per_amud);
     renderDerived();
@@ -348,6 +341,7 @@
     if (!prof) return null;
     var units = (prof.letter_widths && prof.letter_widths[letter]);
     if (typeof units !== 'number' || !isFinite(units) || units <= 0) return null;
+    if (prof.unit_basis === 'line_units' && prof.units_per_row > 0) return units * draft.line_width_mm / prof.units_per_row + Number(prof.stroke_mm || 0) * Number(prof.stroke_factors?.[letter] ?? 1);
     var unitMm = (prof.unit_mm != null && isFinite(Number(prof.unit_mm))) ? Number(prof.unit_mm) : 0.5;
     var ref = prof.reference_height_mm || 3.0;
     var stroke = (prof.stroke_mm || 0) * Number(prof.stroke_factors && prof.stroke_factors[letter] != null ? prof.stroke_factors[letter] : 1);
@@ -408,26 +402,16 @@
 
     var overlap = (P < H);
 
-    // guard
-    var mw = minColumnWidth();
-    var lw = draft.line_width_mm;
-    if (mw === null) {
-      // Never claim a pass from missing calibration data.
-      guardEl.className = 'guard warn';
-      util.clear(guardEl);
-      guardEl.appendChild(util.el('span', {
-        text: prof ? 'Incomplete calibration — cannot verify the three-word column minimum (missing letter widths).' : 'No calibration profile loaded — the three-word column minimum cannot be verified.'
-      }));
-    } else {
-      var pass = lw >= mw;
-      guardEl.className = 'guard ' + (pass ? 'pass' : 'fail');
-      util.clear(guardEl);
-      guardEl.appendChild(util.el('span', { text: '3 × ' }));
-      var phrase = util.el('span', { class: 'gphrase', lang: 'he', text: THREE_WORD });
-      guardEl.appendChild(phrase);
-      guardEl.appendChild(util.el('span', { text: ' = ' + util.mm(mw) + ' \u2264 ' + util.mm(lw) + ' ' + (pass ? '\u2713' : '\u2717 (' + util.mm(mw - lw) + ' short)') }));
-      guardEl.appendChild(util.el('br'));
-      guardEl.appendChild(util.el('span', { class: 't--1 faint', text: pass ? 'Column width meets the three-word minimum.' : 'Below the three-word column minimum — widen the column or reduce letter height.' }));
+    var mw = minColumnWidth(), lw = draft.line_width_mm;
+    guardEl.className = 'guard'; util.clear(guardEl);
+    if (mw === null) guardEl.textContent = 'Load a complete calibration to compare the ideal three-word widths.';
+    else {
+      var joined = wordWidth(THREE_WORD + THREE_WORD + THREE_WORD);
+      [[joined, 'without spaces'], [mw, 'with two word spaces']].forEach(function (pair) {
+        var delta = lw - pair[0];
+        guardEl.appendChild(util.el('p', {text:'Ideal 3 × ' + THREE_WORD + ' ' + pair[1] + ': ' + util.mm(pair[0]) + ' — column is ' + util.mm(Math.abs(delta)) + (delta < 0 ? ' smaller.' : delta > 0 ? ' larger.' : ' equal.')}));
+      });
+      guardEl.appendChild(util.el('span',{class:'profile-help',text:'These are ideal reference widths, not minimum requirements.'}));
     }
 
     // derived list
@@ -509,6 +493,7 @@
       vavei_haamudim: !!draft.vavei_haamudim
     };
     body.song_layouts=draft.song_layouts;
+    body.document_flow=draft.document_flow; body.initial_margin_mm=draft.initial_margin_mm; body.final_margin_mm=draft.final_margin_mm;
     if(draft.tefillin) body.tefillin=draft.tefillin;
     try {
       var saved = await API.createGeometry(body);
@@ -528,5 +513,16 @@
     } catch (e) { /* ignore */ }
   }
 
-  SS.geometry = { init: init, selectTefillin: selectTefillin, starter: defaultDraft, getDraft:function(){return draft;} };
+  async function forCompute() {
+    var active = activeGeometry();
+    var clean = function(g) { var c = normalizeGeometry(g); delete c.id; delete c._isDefault; return JSON.stringify(c); };
+    if (active && clean(active) === clean(draft)) return active;
+    var body = JSON.parse(JSON.stringify(draft)); delete body.id; delete body._isDefault;
+    if (!body.name?.trim()) throw new Error('Give the geometry a name.');
+    var saved = await API.createGeometry(body); await refreshGeometries();
+    state.active.geometryId = saved.id; draft = normalizeGeometry(saved); renderFromDraft();
+    bus.emit('geometryId:changed'); return saved;
+  }
+
+  SS.geometry = { forCompute: forCompute, init: init, selectTefillin: selectTefillin, starter: defaultDraft, getDraft:function(){return draft;} };
 })();

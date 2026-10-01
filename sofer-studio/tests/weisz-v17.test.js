@@ -43,7 +43,7 @@ test('song halves anchor both outer edges and retain document units; three parts
 });
 
 test('overfull song sections extend into the middle in the requested directions without dropping text or stretching holy letters',()=>{
- const p=profile(),g=normalizeGeometry({lines_per_amud:1,song_layouts:{hayam:{total_mm:60,right_mm:10,left_mm:10}}});
+ const p=profile(),g=normalizeGeometry({lines_per_amud:1,song_layouts:{hayam:{total_mm:60,right_mm:10,left_mm:10},haazinu:{total_mm:60,right_mm:10,left_mm:10}}});
  const two=computeLayout(processSource({text:'א'.repeat(8)+'m'+'ב'.repeat(8)+'e'}),p,g).lines[0];
  close(two.song_layout.segments[0].start_mm,0);close(two.song_layout.segments[1].start_mm,44);
  assert.equal(two.letter_occurrence_ids.length,16);assert.equal(two.leftover_mm,0);
@@ -86,7 +86,7 @@ test('Tefillin keeps all 1594 letters in four distinct passages, with exactly fo
 });
 
 test('new small letters use two thirds while an old saved snapshot still renders its original half-width',()=>{
- const p=profile(),g=normalizeGeometry({line_width_mm:125}),line=computeLayout(processSource({text:'-א א'}),p,g).lines[0];
+ const p=profile(),g=normalizeGeometry({line_width_mm:125}),line=computeLayout(processSource({text:'zא א'}),p,g).lines[0];
  close(line.words[0].width_mm,line.words[1].width_mm*2/3);
  close(publicLine(line,effectiveProfile(p,g)).words[0].letters[0].width_mm,4/3);
  close(publicLine(line,p).words[0].letters[0].width_mm,1);
@@ -100,7 +100,7 @@ test('preview shows paragraph deficit, positions song fragments, and suggests a 
   const parsha={amud:1,line_index:2,text:'אב',words:[],petucha_end:true,base_leftover_mm:5,leftover_mm:5};
   const layout={id:'test',geometry:g,snapshot:{profile:effectiveProfile(p,g)},summary:{},lines:[song,parsha]};
   const copy=JSON.stringify(layout);f.SS.state.layout=layout;f.SS.tikkun.render(layout);await tick();
-  const parts=f.d.querySelectorAll('.song-segment');assert.equal(parts.length,2);assert.equal(parts[0].style.right,'0mm');assert.equal(parts[1].style.right,'120mm');
+  const parts=f.d.querySelectorAll('.song-segment');assert.equal(parts.length,2);assert.equal(parts[0].style.right,'0mm');assert.equal(parts[1].style.right,'113.333mm');
   const note=f.d.querySelectorAll('.side')[1];assert.match(note.textContent,/י״/);assert.equal(Number(note.dataset.missingUnits),-15);assert(note.classList.contains('is-overfull'));
   assert.equal(JSON.stringify(layout),copy);
   const a={words:[{width_mm:10},{width_mm:5}],base_leftover_mm:1,inter_word_gap_mm:1},b={words:[{width_mm:5}],base_leftover_mm:20,inter_word_gap_mm:1};

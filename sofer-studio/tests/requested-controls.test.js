@@ -42,7 +42,7 @@ test('shortfall is the immutable original gap in row units, with line numbers fu
     f.SS.tikkun.render({id:'shortfall',geometry:{line_width_mm:125,lines_per_amud:42,baseline_pitch_mm:7.5},snapshot:{profile:{units_per_row:62.5}},lines});
     assert.deepEqual([...f.d.querySelectorAll('.side')].map(el=>el.textContent),['ש״ת','ח״א','ח״ב','ח״ג','ח״ג','י״א']);
     assert.deepEqual([...f.d.querySelectorAll('.lnum')].map(el=>el.textContent),['1','2','3','4','5','6']);
-    assert.deepEqual([...f.d.querySelector('.line').children].map(el=>el.className),['lnum','side','ltext','line-move']);
+    assert.deepEqual([...f.d.querySelector('.line').children].map(el=>el.className),['line-move','lnum','side','ltext']);
     assert.equal(f.d.querySelector('.sirtut-grid'),null);
     assert.equal(lines[1].base_leftover_mm,2);assert.equal(lines[1].leftover_mm,0);
   }finally{f.dom.window.close();}

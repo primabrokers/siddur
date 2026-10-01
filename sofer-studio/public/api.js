@@ -119,6 +119,7 @@
   api.computeLayout = function (body) { return request('POST', '/layout/compute', body); };
   api.listLayouts = function () { return request('GET', '/layouts'); };
   api.deleteLayout = function (id) { return request('DELETE', '/layouts/' + encodeURIComponent(id)); };
+  api.pageWidth = function (id, body) { return request('POST', '/layouts/' + encodeURIComponent(id) + '/page-width', body); };
   api.moveWord = function (id, body) { return request('POST', '/layouts/' + encodeURIComponent(id) + '/move-word', body); };
   api.getLayout = function (id, opts) {
     var q = '';

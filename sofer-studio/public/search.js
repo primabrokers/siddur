@@ -110,13 +110,13 @@
     var tradInput = util.el('input', { type: 'text', placeholder: 'Tradition (optional)', 'data-i': 'tradition' });
     var fmtSel = util.el('select', { 'data-i': 'format' },
       [util.el('option', { value: 'txt', text: 'Text / STAM — detect English markers automatically' }),
-       util.el('option', { value: 'stam', text: 'STAM keyboard text (capitals, p / s / l / t, m / e, d, + / -)' }),
+       util.el('option', { value: 'stam', text: 'STAM keyboard text (capitals, p / s / l / t, m / e, g, r / z, n / f / b)' }),
        util.el('option', { value: 'json', text: 'JSON' }),
        util.el('option', { value: 'sefaria', text: 'Sefaria' })]);
     imp.appendChild(util.el('div', { class: 'import-row' }, [nameInput, tradInput]));
     imp.appendChild(fmtSel);
 
-    var paste = util.el('textarea', { 'data-i': 'text', placeholder: 'Paste Hebrew or STAM text. Capitals mark holy letters (H = י, V = ה); p = pesucha, s = setuma, l = blank line, t = new page, d = dotted letter.', rows: 4 });
+    var paste = util.el('textarea', { 'data-i': 'text', placeholder: 'Paste Hebrew or STAM text. Capitals mark holy letters (H = י, V = ה); p = pesucha, s = setuma, l = blank line, t = new page, . = dotted letter.', rows: 4 });
     imp.appendChild(paste);
 
     var btnRow = util.el('div', { class: 'btn-row' });
@@ -131,7 +131,7 @@
 
     var aside = util.el('details', { class: 'import-hint' },
       [util.el('summary', { text: 'Import notes' }),
-       util.el('p', { class: 't--2 faint', text: 'The original is preserved. Capitals use the Hebrew keyboard and mark only those letters as holy (שמות קודש), with a white strike. Lowercase p = pesucha, s = setuma, l = blank line, t = start a new page, even attached to a word. Put d immediately before a letter to add a dot. Put + immediately before a letter for 1.5× width and height, or - for two-thirds width and height; both align at the top. e ends the current line after normal wrapping at the column width. For a song row, m makes a middle break and e ends the row: use one m for two sections or two for three. The program never decides holiness from a word’s spelling. Unsupported STAM characters are reported, not silently removed.' })]);
+       util.el('p', { class: 't--2 faint', text: 'The original is preserved. Capitals use the Hebrew keyboard and mark only those letters as holy (שמות קודש), with a white strike. Lowercase p = pesucha, s = setuma, l = blank line, t = start a new page, even attached to a word. Put . before a letter for a dot; r for a large letter, z for a small letter, rr for a large letter that alone may stretch on its line, n to mirror the next letter, f for four tagin, b for a broken letter. Combine commands, e.g. frב. Put (note words) before a letter for a right-margin note and ° marker. Use g for an individually configurable gap. Small roofs align at their tops; large roofs align at their bottoms. e ends the current line after normal wrapping at the column width. For a song row, m makes a middle break and e ends the row: use one m for two sections or two for three. The program never decides holiness from a word’s spelling. Unsupported STAM characters are reported, not silently removed.' })]);
     imp.appendChild(aside);
     root.appendChild(imp);
 

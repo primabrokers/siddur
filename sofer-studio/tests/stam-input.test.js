@@ -14,10 +14,10 @@ test('capital keys become exact human-marked Hebrew letters', () => {
 });
 
 test('STAM control syntax becomes metadata and never visible Latin text', () => {
-  const parsed = parseStamInput('אpבsגlד1ה2ו3+א–ב.ג!');
+  const parsed = parseStamInput('אpבsגlד1ה2ו3rאzב.ג!');
   assert.deepEqual(parsed.markers.map((m) => m.type), ['p', 's', 'l', '1', '2', '3']);
   assert.deepEqual(parsed.words.at(-1).letterMarks.map((m) => m.type), ['large', 'small', 'dotted', 'backward_nun']);
-  const doc = processSource({ format: 'stam', text: 'HוV p א s ב l ג1 ד2 ה3 +א –ב .ג !' });
+  const doc = processSource({ format: 'stam', text: 'HוV p א s ב l ג1 ד2 ה3 rא zב .ג !' });
   const { units } = buildWordUnits(doc);
   assert(units.some((u) => u.type === 'petucha'));
   assert(units.some((u) => u.type === 'setuma'));
@@ -29,7 +29,7 @@ test('STAM control syntax becomes metadata and never visible Latin text', () => 
 
 test('large and small controls change both measured and public preview widths', () => {
   const profile = normalizeProfile({ reference_height_mm: 3, letter_height_mm: 3, stroke_mm: 0, unit_mm: .5, non_stretchable: [] });
-  const doc = processSource({ format: 'stam', text: '+א –א' });
+  const doc = processSource({ format: 'stam', text: 'rא zא' });
   const result = computeLayout(doc, profile, normalizeGeometry({ line_width_mm: 80, lines_per_amud: 42 }));
   const [large, small] = result.lines[0].words;
   const base = totalWidth('א', profile);

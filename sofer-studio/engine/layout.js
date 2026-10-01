@@ -9,6 +9,9 @@ import { composeSongLine } from './song-layout.js';
 import { fitManualSongPages } from './manual-song-pages.js';
 import { fillSongPages } from './song-page-scale.js';
 import { pageRanges } from './pagination.js';
+import { hasLetterMark, letterSizeScale } from './letter-marks.js';
+import { documentSettings, customGapWidth, inferredSongKinds } from './document-options.js';
+import { reflowDocument } from './document-flow.js';
 import { computeTefillin } from './tefillin.js';
 import { totalWidth, interLetterGap, interWordGap, wordWidth, minColumnWidth, measurementUnitMm } from './width.js';
 import { lettersOf, letterKeyOf } from './profile.js';
@@ -62,6 +65,7 @@ export function deriveGeometry(geometry, profile) {
 
   return {
     lines_per_amud,
+    ...copyColumnOptions(g),
     baseline_pitch_mm: pitch,
     letter_height_mm: H,
     top_margin_mm: top,
@@ -85,7 +89,7 @@ export function fullYeriaWidth(k, g, profile) {
 }
 
 // Yeria/klaf totals. amudim_per_yeria is a configurable positive integer.
-export function computeYerios(totalAmudim, geometry, profile) {
+export function computeYerios(totalAmudim, geometry, profile, pageWidths = null) {
   const k = Math.max(1, int(geometry.amudim_per_yeria, 2));
   const total_yerios = Math.ceil(totalAmudim / k);
   const partial = totalAmudim % k;
@@ -102,6 +106,16 @@ export function computeYerios(totalAmudim, geometry, profile) {
       w = fullYeriaWidth(k, geometry, profile);
     }
     widths.push(w);
+  }
+  if (pageWidths || geometry.initial_margin_mm != null || geometry.final_margin_mm != null) {
+    widths = widths.map((width, i) => {
+      const count = i === total_yerios - 1 && isPartial && convention === 'exact' ? partial : k;
+      let total = 2 * geometry.outer_margin_mm + (count - 1) * geometry.inter_column_gap_mm;
+      for (let j = 0; j < count; j++) total += pageWidths?.[i * k + j] || geometry.line_width_mm;
+      if (i === 0) total += (geometry.initial_margin_mm ?? geometry.outer_margin_mm) - geometry.outer_margin_mm;
+      if (i === total_yerios - 1) total += (geometry.final_margin_mm ?? geometry.outer_margin_mm) - geometry.outer_margin_mm;
+      return total;
+    });
   }
   const klaf_length_m = widths.reduce((s, w) => s + w, 0) / 1000;
   return { amudim_per_yeria: k, total_amudim: totalAmudim, total_yerios, partial_final_columns: isPartial ? partial : 0, convention, yeria_widths_mm: widths, klaf_length_m };
@@ -127,8 +141,8 @@ export function petuchaGapMm(profile) {
 function paragraphReserve(units, index, profile, geometry, overrides) {
   if (profile.stretch_policy?.version !== 2) return 0;
   let reserve = 0, i = index;
-  while (units[i + 1]?.type === 'setuma') {
-    reserve += setumaGapMm(profile, geometry);
+  while (['setuma', 'custom_gap'].includes(units[i + 1]?.type)) {
+    reserve += units[i + 1].type === 'custom_gap' ? units[i + 1].width_mm : setumaGapMm(profile, geometry);
     if (units[i + 2]?.type !== 'word') return reserve;
     reserve += measureWord(units[i + 2], profile, overrides);
     i += 2;
@@ -142,7 +156,7 @@ export function buildWordUnits(source) {
   const units = [];
   const verseLetters = []; // [{ ref, letters: [{id,base,grapheme}] }] for override resolution
   let letterIdx = 0;
-  let wordIdx = 0;
+  let wordIdx = 0, pageMarker = 0, gapMarker = 0;
   let prevBook = null;
   for (const verse of source.verses) {
     if (verse.book !== prevBook && prevBook !== null) {
@@ -154,7 +168,9 @@ export function buildWordUnits(source) {
     for (const t of verse.tokens) {
       if (t.marker) {
         // Inline marker: preserves the gap boundary BETWEEN words (not verse end).
-        units.push({ type: t.marker, break_kind: t.break_kind || null, verse: verse.ref });
+        units.push({ type: t.marker, break_kind: t.break_kind || null, verse: verse.ref,
+          ...(t.marker === 'page_break' ? { marker_id: 't-' + pageMarker++ } : {}),
+          ...(t.marker === 'custom_gap' ? { marker_id: 'g-' + gapMarker++ } : {}) });
         continue;
       }
       const graphemes = lettersOf(t.text);
@@ -165,11 +181,18 @@ export function buildWordUnits(source) {
           ? { ...mark, count: Number(previous.count) + Number(mark.count) } : { ...mark });
       }
       const holy = new Set((t.holy_letter_indexes || []).map(Number));
-      const letterMarks = new Map((t.stam_letter_marks || []).map((mark) => [Number(mark.letter_index), mark]));
+      const letterMarks = new Map();
+      for (const mark of t.stam_letter_marks || []) {
+        const at = Number(mark.letter_index); letterMarks.set(at, [...(letterMarks.get(at) || []), mark]);
+      }
       const letters = graphemes.map((g, letterInWord) => {
         const occ = { id: 'occ-' + letterIdx, base: letterKeyOf(g), grapheme: g, holy: holy.has(letterInWord) };
         if (marks.has(letterInWord)) occ.stam_width_mark = { ...marks.get(letterInWord) };
-        if (letterMarks.has(letterInWord)) occ.stam_letter_mark = { ...letterMarks.get(letterInWord) };
+        if (letterMarks.has(letterInWord)) {
+          const marks = letterMarks.get(letterInWord).map(mark => ({ ...mark }));
+          occ.stam_letter_mark = marks.find(mark => ['large', 'small'].includes(mark.type)) || marks[0];
+          if (marks.length > 1) occ.stam_letter_marks = marks;
+        }
         letterIdx += 1;
         return occ;
       });
@@ -191,6 +214,13 @@ export function buildWordUnits(source) {
     }
   }
   return { units, verseLetters, totalLetters: letterIdx, totalWords: wordIdx };
+}
+
+function buildLayoutUnits(source, profile, geometry) {
+  const built = buildWordUnits(source), settings = documentSettings(source, geometry);
+  built.units = built.units.filter(unit => unit.type !== 'page_break' || settings.starts?.[unit.marker_id]?.enabled !== false)
+    .map(unit => unit.type === 'custom_gap' ? { ...unit, width_mm: customGapWidth(settings.gaps?.[unit.marker_id], profile) } : unit);
+  return built;
 }
 
 // Resolve occurrence-specific unusual-letter overrides once, globally, keyed by
@@ -240,8 +270,7 @@ function stamMarkerUnitMm(profile) {
 function measuredOccurrenceWidth(letter, profile, overrideByOccId) {
   const override = overrideByOccId.get(letter.id);
   let base = override != null ? Number(override.mm) : totalWidth(letter.base, profile);
-  if (letter.stam_letter_mark?.type === 'large') base *= 1.5;
-  if (letter.stam_letter_mark?.type === 'small') base *= profile.small_letter_scale ?? 0.5;
+  base *= letterSizeScale(letter, profile);
   const mark = letter.stam_width_mark;
   if (!mark) return base;
   const units = Math.max(0, Number(profile.stretch_policy?.version === 2
@@ -293,7 +322,8 @@ export function fitLines(source, profile, geometry, opts = {}) {
   const lineW = num(geometry.line_width_mm);
   const gap_word = interWordGap(profile);
   const sgap = setumaGapMm(profile, geometry);
-  const { units, verseLetters } = buildWordUnits(source);
+  const { units, verseLetters } = buildLayoutUnits(source, profile, geometry);
+  const songKinds = inferredSongKinds(units);
   const overrideMap = buildOverrideMap(source, verseLetters);
   const passageMap = opts.passageMap || null;
   const nextMarkers = new Array(units.length);
@@ -313,12 +343,12 @@ export function fitLines(source, profile, geometry, opts = {}) {
   const pushLine = (flags = {}) => {
     if (current.length === 0 && !flags.force) return;
     const line = flags.songEnd && current.some(item => item.type === 'segment_gap')
-      ? composeSongLine(current, profile, geometry, geometry.song_layouts?.manual || 'hayam')
+      ? composeSongLine(current, profile, geometry, flags.songKind || 'hayam')
       : makeLine(current, currentWidth, lineW, profile, flags);
     if (currentSong) line.fixed_pattern = true;
     if (flags.songEnd) line.manual_line_end = true;
     if (flags.blankLine) line.blank_line = true;
-    if (pageStart) { line.page_start = true; pageStart = false; }
+    if (pageStart) { line.page_start = true; line.segment_start_id = pageStart; pageStart = false; }
     lines.push(line);
     current = [];
     currentWidth = 0;
@@ -346,7 +376,7 @@ export function fitLines(source, profile, geometry, opts = {}) {
       i -= 1;
       pushLine();
       const fixed = renderPattern(passage, profile, geometry, collected, overrideMap);
-      for (const fl of fixed) { if (pageStart) { fl.page_start = true; pageStart = false; } lines.push(fl); }
+      for (const fl of fixed) { if (pageStart) { fl.page_start = true; fl.segment_start_id = pageStart; pageStart = false; } lines.push(fl); }
       current = []; currentWidth = 0; prevWasWord = false;
       continue;
     }
@@ -360,7 +390,7 @@ export function fitLines(source, profile, geometry, opts = {}) {
       }
       const w = measureWord(u, profile, overrideMap);
       const reserve = current.some(item => item.type === 'segment_gap') ? 0 : paragraphReserve(units, i, profile, geometry, overrideMap);
-      const joinsSetuma = profile.stretch_policy?.version === 2 && current.at(-1)?.type === 'setuma_gap';
+      const joinsSetuma = profile.stretch_policy?.version === 2 && ['setuma_gap', 'custom_gap'].includes(current.at(-1)?.type);
       const addGap = prevWasWord ? gap_word : 0;
       const addW = addGap + w;
       if (current.length === 0) {
@@ -389,6 +419,8 @@ export function fitLines(source, profile, geometry, opts = {}) {
         currentWidth = sgap;
       }
       prevWasWord = false;
+    } else if (u.type === 'custom_gap') {
+      current.push({ ...u, width_mm: u.width_mm }); currentWidth += u.width_mm; prevWasWord = false;
     } else if (u.type === 'petucha' || u.type === 'sefer') {
       pushLine({ endedBy: u.type, endVerse: u.verse });
     } else if (u.type === 'song_break') {
@@ -399,9 +431,9 @@ export function fitLines(source, profile, geometry, opts = {}) {
       currentWidth += width; prevWasWord = false; currentSong = true;
     } else if (u.type === 'song_end') {
       currentSong = true;
-      pushLine({ songEnd: true });
+      pushLine({ songEnd: true, songKind: songKinds.get(i) });
     } else if (u.type === 'page_break') {
-      pushLine(); pageStart = true;
+      pushLine(); pageStart = u.marker_id;
     } else if (u.type === 'blank_line') {
       pushLine();
       pushLine({ force: true, blankLine: true });
@@ -484,6 +516,11 @@ function startsWithVav(word) {
 // ---- Stretch candidates & justification ----------------------------------
 
 function primaryStretchCandidatesOf(line, profile) {
+  const exclusive = line.words.flatMap(word => word.letters.filter(letter => hasLetterMark(letter, 'exclusive_stretch')).map(letter => ({ word, letter })));
+  if (exclusive.length) return exclusive.filter(({ word, letter }) => !letter.holy && (profile.stretch_policy?.version === 2 || !word.isShem)).map(({ word, letter }) => ({
+    letter_occurrence_id: letter.id, letter: letter.base, word: word.text, kind: 'letter', priority: 1,
+    cap_mm: baseBudget(line), cap_percent: 'unlimited', base_width_mm: measuredLetterWidth(word, letter, profile),
+  }));
   // A paragraph-break line is gap-only. A finite gap cap must never cause
   // fallback stretching of letters or normal spaces on that same line.
   if (profile.stretch_policy && (line.has_setuma || line.petucha_end)) {
@@ -544,6 +581,12 @@ export function stretchCandidatesOf(line, profile) {
   }
   const originals = new Map(primary.map(c => [c.letter_occurrence_id, c.cap_mm]));
   return primaryStretchCandidatesOf(line, expanded).map(c => ({ ...c, primary_cap_mm: originals.get(c.letter_occurrence_id) || 0 }));
+}
+
+export function needsSecondaryStretch(line, profile) {
+  if (line.song_layout) return line.song_layout.segments.some(segment => segment.secondary_required);
+  if (line.blank_line || line.sefer_end || line.setuma_at_edge || (line.fixed_pattern && !line.manual_line_end)) return false;
+  return primaryStretchCandidatesOf({ ...line, fixed_pattern: false }, profile).reduce((sum, candidate) => sum + candidate.cap_mm, 0) < baseBudget(line) - .001;
 }
 
 export function autoSuggestLine(line, profile, opts = {}) {
@@ -1023,6 +1066,7 @@ function reflowMeasuredReference(referenceLines,lineW,profile) {
 // ---- Top-level compute ----------------------------------------------------
 
 export function computeLayout(source, profile, geometry, opts = {}) {
+  if (geometry.document_flow) geometry = { ...geometry, document_flow: documentSettings(source, geometry) };
   profile = effectiveProfile(profile, geometry);
   if (source.tefillin && !geometry.tefillin) throw new Error('Choose Tefillin in Column settings, enter four page widths, and save the geometry first');
   if (geometry.tefillin) return computeTefillin(source, profile, geometry);
@@ -1038,10 +1082,14 @@ export function computeLayout(source, profile, geometry, opts = {}) {
 }
 
 function finalizeLayout(lines, totalLetters, geometry, profile, g, blockers = [], excerpt = false, studyPreview = false) {
+  let flowWarnings = [];
+  if (geometry.document_flow && !geometry.tefillin && !lines.some(line => line.reference_page && profile.layout_mode !== 'reflow')) {
+    const flowed = reflowDocument(lines, profile, geometry); lines = flowed.lines; flowWarnings = flowed.warnings;
+  }
   fillSongPages(lines, profile, geometry);
   const grouped = groupAndAnnotate(lines, geometry, profile);
   const total_amudim = grouped.amudim.length;
-  const yerias = computeYerios(total_amudim, geometry, profile);
+  const yerias = computeYerios(total_amudim, geometry, profile, geometry.document_flow ? grouped.amudim.map(page => page[0].column_width_mm || geometry.line_width_mm) : null);
   return {
     lines: grouped.lines,
     amudim: grouped.amudim,
@@ -1061,6 +1109,7 @@ function finalizeLayout(lines, totalLetters, geometry, profile, g, blockers = []
       min_column_width_violation: g.minColumnWidthViolation,
       is_excerpt: !!excerpt,
       study_preview: !!studyPreview,
+      ...(flowWarnings.length ? { flow_warnings: flowWarnings } : {}),
     },
     yerias: yerias.yeria_widths_mm.map((w) => round(w)),
     pattern_blockers: blockers || [],
@@ -1071,6 +1120,7 @@ function finalizeLayout(lines, totalLetters, geometry, profile, g, blockers = []
 // workloads never block concurrent health/UI requests; progress reflects real
 // advance, not a timer animation.
 export async function computeLayoutAsync(source, profile, geometry, opts = {}) {
+  if (geometry.document_flow) geometry = { ...geometry, document_flow: documentSettings(source, geometry) };
   profile = effectiveProfile(profile, geometry);
   if (source.tefillin && !geometry.tefillin) throw new Error('Choose Tefillin in Column settings, enter four page widths, and save the geometry first');
   if (geometry.tefillin) return computeTefillin(source, profile, geometry);
@@ -1085,7 +1135,8 @@ export async function computeLayoutAsync(source, profile, geometry, opts = {}) {
   if (blockers.length && !opts.study_preview) {
     throw new Error('pattern data blocker: ' + blockers.map((b) => b.reason).join('; '));
   }
-  const { units, verseLetters } = buildWordUnits(source);
+  const { units, verseLetters } = buildLayoutUnits(source, profile, geometry);
+  const songKinds = inferredSongKinds(units);
   const overrideMap = buildOverrideMap(source, verseLetters);
   const lineW = num(geometry.line_width_mm);
   const gap_word = interWordGap(profile);
@@ -1106,11 +1157,11 @@ export async function computeLayoutAsync(source, profile, geometry, opts = {}) {
   const pushLine = (flags = {}) => {
     if (current.length === 0 && !flags.force) return;
     const line = flags.songEnd && current.some(item => item.type === 'segment_gap')
-      ? composeSongLine(current, profile, geometry, geometry.song_layouts?.manual || 'hayam')
+      ? composeSongLine(current, profile, geometry, flags.songKind || 'hayam')
       : makeLine(current, currentWidth, lineW, profile, flags);
     if (currentSong || current.some(item => item.type === 'segment_gap')) line.fixed_pattern = true;
     if (flags.songEnd) line.manual_line_end = true;
-    if (pageStart) { line.page_start = true; pageStart = false; }
+    if (pageStart) { line.page_start = true; line.segment_start_id = pageStart; pageStart = false; }
     lines.push(line);
     current = []; currentWidth = 0; prevWasWord = false; currentSong = false;
   };
@@ -1136,7 +1187,7 @@ export async function computeLayoutAsync(source, profile, geometry, opts = {}) {
       i -= 1;
       pushLine();
       for (const fl of renderPattern(passage, profile, geometry, collected, overrideMap)) {
-        if (pageStart) { fl.page_start = true; pageStart = false; } lines.push(fl);
+        if (pageStart) { fl.page_start = true; fl.segment_start_id = pageStart; pageStart = false; } lines.push(fl);
       }
       current = []; currentWidth = 0; prevWasWord = false;
       continue;
@@ -1146,7 +1197,7 @@ export async function computeLayoutAsync(source, profile, geometry, opts = {}) {
       if (marker?.type === 'song_break' && marker.break_kind === 'm') currentSong = true;
       const w = measureWord(u, profile, overrideMap);
       const reserve = current.some(item => item.type === 'segment_gap') ? 0 : paragraphReserve(units, i, profile, geometry, overrideMap);
-      const joinsSetuma = profile.stretch_policy?.version === 2 && current.at(-1)?.type === 'setuma_gap';
+      const joinsSetuma = profile.stretch_policy?.version === 2 && ['setuma_gap', 'custom_gap'].includes(current.at(-1)?.type);
       const addGap = prevWasWord ? gap_word : 0;
       if (current.length === 0) {
         current.push({ ...u, width_mm: w, override: wordOverrides(u, overrideMap, profile) });
@@ -1173,6 +1224,8 @@ export async function computeLayoutAsync(source, profile, geometry, opts = {}) {
         currentWidth = sgap;
       }
       prevWasWord = false;
+    } else if (u.type === 'custom_gap') {
+      current.push({ ...u, width_mm: u.width_mm }); currentWidth += u.width_mm; prevWasWord = false;
     } else if (u.type === 'petucha' || u.type === 'sefer') {
       pushLine({ endedBy: u.type, endVerse: u.verse });
     } else if (u.type === 'song_break') {
@@ -1183,14 +1236,14 @@ export async function computeLayoutAsync(source, profile, geometry, opts = {}) {
       currentWidth += width; prevWasWord = false; currentSong = true;
     } else if (u.type === 'song_end') {
       currentSong = true;
-      pushLine({ songEnd: true });
+      pushLine({ songEnd: true, songKind: songKinds.get(i) });
     } else if (u.type === 'page_break') {
-      pushLine(); pageStart = true;
+      pushLine(); pageStart = u.marker_id;
     } else if (u.type === 'blank_line') {
       pushLine();
       const blank = makeLine([], 0, lineW, profile, { force: true });
       blank.blank_line = true;
-      if (pageStart) { blank.page_start = true; pageStart = false; }
+      if (pageStart) { blank.page_start = true; blank.segment_start_id = pageStart; pageStart = false; }
       lines.push(blank);
     }
   }

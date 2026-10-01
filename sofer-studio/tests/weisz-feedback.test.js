@@ -26,12 +26,12 @@ function ui() {
 }
 
 test('ASCII minus and plus are single-letter size commands, retaining exact holy marks and legacy width markers', () => {
-  const parsed = parseStamInput('+א -ב -C אב--גד הו-');
+  const parsed = parseStamInput('rא zב zC אב--גד הו-');
   assert.deepEqual(parsed.words.slice(0, 3).map(w => w.letterMarks[0].type), ['large', 'small', 'small']);
   assert.deepEqual(parsed.words[2].holyLetterIndexes, [0]);
   assert.equal(parsed.words[3].hyphens.length, 2);
   assert.equal(parsed.words[4].hyphens.length, 1);
-  const doc = processSource({ text: '+א -א א' });
+  const doc = processSource({ text: 'rא zא א' });
   assert.equal(doc.format, 'stam');
   const line = computeLayout(doc, profile(), normalizeGeometry({ line_width_mm: 80 })).lines[0];
   assert.deepEqual(line.words.map(w => w.width_mm), [3, 4/3, 2]);

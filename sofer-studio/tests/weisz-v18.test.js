@@ -101,7 +101,7 @@ test('preview and download reverse only each page, keep footer metadata, and ren
     assert.equal(SS.tikkun.isReversed(), true); assert.equal(d.getElementById('preview-reverse-lines').checked, true);
     assert(d.querySelector('.sheet.reverse-lines')); assert.deepEqual(membership(), before); assert.equal(JSON.stringify(layout), copy);
     assert([...d.querySelectorAll('.page-footer')].every(footer => /Imported source.stm/.test(footer.textContent) && /Line height: 7.50 mm/.test(footer.textContent)));
-    assert.match(d.querySelectorAll('.page-footer')[1].textContent, /Line width: 180.00 mm/);
+    assert.match(d.querySelectorAll('.page-footer')[1].textContent, /Line width: 170.00 mm/);
     assert.equal(d.querySelectorAll('.legacy-note').length, 0);
     assert.equal(d.querySelectorAll('.marker-backward_nun').length, 2);
     assert.equal(d.querySelector('.nun-hafucha .ink-glyph').textContent, 'נ');

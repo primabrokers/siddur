@@ -1,4 +1,5 @@
 // Optional geometry settings. Old geometry rows and saved snapshots stay intact.
+import { documentOptionsErrors } from './document-options.js';
 export const SONG_DEFAULTS = Object.freeze({
   hayam: { total_mm: 180, right_mm: 60, left_mm: 60 },
   haazinu: { total_mm: 170, right_mm: 170 / 3, left_mm: 170 / 3 },
@@ -7,7 +8,7 @@ export function songSettings(geometry, kind = 'hayam') {
   return { ...SONG_DEFAULTS[kind], ...geometry.song_layouts?.[kind] };
 }
 export function columnOptionsErrors(input) {
-  const errors = [];
+  const errors = documentOptionsErrors(input);
   if (input.song_layouts != null) {
     const songs = input.song_layouts;
     if (!songs || typeof songs !== 'object' || Array.isArray(songs)) return ['Song settings must be an object'];
@@ -30,5 +31,8 @@ export function copyColumnOptions(input) {
   return {
     ...(input.song_layouts ? { song_layouts: structuredClone(input.song_layouts) } : {}),
     ...(input.tefillin ? { tefillin: structuredClone(input.tefillin) } : {}),
+    ...(input.document_flow ? { document_flow: structuredClone(input.document_flow) } : {}),
+    ...(input.initial_margin_mm != null ? { initial_margin_mm: input.initial_margin_mm } : {}),
+    ...(input.final_margin_mm != null ? { final_margin_mm: input.final_margin_mm } : {}),
   };
 }

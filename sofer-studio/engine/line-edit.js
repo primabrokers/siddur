@@ -30,7 +30,7 @@ export function moveWord(layout, { line_id, direction, line_key, next_line_key }
   }
   for (const items of [a, b]) {
     if (layout.snapshot.geometry.tefillin && !items.some(item => item.type === 'word')) throw new Error('Keep at least one word on each fixed Tefillin line');
-    if (items[0]?.type === 'setuma_gap' || items.at(-1)?.type === 'setuma_gap') throw new Error('Keep the setumah gap together with its adjacent words');
+    if (['setuma_gap', 'custom_gap'].includes(items[0]?.type) || ['setuma_gap', 'custom_gap'].includes(items.at(-1)?.type)) throw new Error('Keep the setumah gap together with its adjacent words');
   }
   const profile = layout.snapshot.profile, geometry = layout.snapshot.geometry;
   const rebuild = (original, items) => {
@@ -42,7 +42,8 @@ export function moveWord(layout, { line_id, direction, line_key, next_line_key }
     const line = makeLine(items, width, original?.column_width_mm || geometry.line_width_mm, profile, { endedBy: original?.petucha_end ? 'petucha' : original?.sefer_end ? 'sefer' : null });
     line.sefer_end = !!original?.sefer_end;
     line.column_width_mm = original?.column_width_mm || null; line.tefillin_section = original?.tefillin_section || null;
-    if (original?.page_start) line.page_start = true;
+    if (original?.page_start) { line.page_start = true; line.segment_start_id = original.segment_start_id; }
+    if (original?.flow_page_start) line.flow_page_start = true;
     line.spacing_metadata_complete = true;
     line.line_key = computeLineKey(line);
     if (line.base_leftover_mm >= 0) {

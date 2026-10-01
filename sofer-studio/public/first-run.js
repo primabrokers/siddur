@@ -35,7 +35,7 @@
     var ul = util.el('ul');
     [
       'Defaults are a starting point only. They should be confirmed with a rav or mumcheh before writing.',
-      'Every halachic parameter is an editable setting \u2014 margins, line counts, minimum column width, stretchable letters, setuma gap, and special-passage schemes are never hard-coded.',
+      'Every halachic parameter is an editable setting \u2014 margins, line counts, column width, stretchable letters, setuma gap, and special-passage schemes are never hard-coded.',
       'This application plans layout. It does not replace hagahah, a computer check, or the sofer\u2019s own judgment.',
       'Tikkun and totals are generated from your imported source and calibration \u2014 a screen rendering is not proof of physical nib-calibrated dimensions.'
     ].forEach(function (t) { ul.appendChild(util.el('li', { text: t })); });

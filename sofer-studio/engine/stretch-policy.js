@@ -1,6 +1,7 @@
 // Versioned, JSON-safe stretch policy. Existing snapshots without a policy keep
 // their original millimetre caps. No persisted Infinity or inferred permissions.
 import { totalWidth, interWordGap, measurementUnitMm } from './width.js';
+import { letterSizeScale } from './letter-marks.js';
 
 export const UNLIMITED = 'unlimited';
 const floorMm = n => Math.floor((Math.max(0, n) + 1e-10) * 1000) / 1000;
@@ -9,8 +10,7 @@ export function measuredLetterWidth(word, letter, profile) {
   const override = (word.override || []).find(o => o.id === letter.id);
   if (override) return Number(override.mm);
   const base = totalWidth(letter.base, profile);
-  return letter.stam_letter_mark?.type === 'large' ? base * 1.5 :
-    letter.stam_letter_mark?.type === 'small' ? base * (profile.small_letter_scale ?? 0.5) : base;
+  return base * letterSizeScale(letter, profile);
 }
 
 export function percentageCap(base, percent, budget) {

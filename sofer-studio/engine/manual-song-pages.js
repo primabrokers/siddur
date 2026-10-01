@@ -18,6 +18,7 @@ function explicitRow(line, width, profile) {
 // word capacity, never change the document's unit size or letter measurements.
 // Yield one page at a time so asynchronous full-book computes remain responsive.
 export function* fitManualSongPages(lines, profile, geometry) {
+  if (geometry.document_flow) { yield lines; return; }
   const normalWidth = Number(geometry.line_width_mm);
   if (!lines.some(line => line.song_layout)) {
     for (let start = 0; start < lines.length; start += 42) {
@@ -27,7 +28,7 @@ export function* fitManualSongPages(lines, profile, geometry) {
   }
   const stream = [];
   for (const line of lines) {
-    if (line.page_start) stream.push({ type: 'page_break' });
+    if (line.page_start) stream.push({ type: 'page_break', marker_id: line.segment_start_id });
     if (line.blank_line || (line.fixed_pattern && !line.manual_line_end) || line.song_layout) stream.push({ type: 'row', line });
     else {
       stream.push(...line.items);
@@ -40,7 +41,7 @@ export function* fitManualSongPages(lines, profile, geometry) {
   function reserve(index) {
     if (!modern) return 0;
     let width = 0;
-    while (stream[index + 1]?.type === 'setuma_gap') {
+    while (['setuma_gap', 'custom_gap'].includes(stream[index + 1]?.type)) {
       width += stream[index + 1].width_mm;
       if (stream[index + 2]?.type !== 'word') return width;
       width += stream[index + 2].width_mm;
@@ -62,7 +63,7 @@ export function* fitManualSongPages(lines, profile, geometry) {
       const item = stream[cursor];
       if (item.type === 'page_break') {
         if (items.length || page.length) { flush(); break; }
-        pageStart = true; cursor++;
+        pageStart = item.marker_id || true; cursor++;
       } else if (item.type === 'line_end') {
         flush({ lineEnd: true }); cursor++;
       } else if (item.type === 'row') {
@@ -76,7 +77,7 @@ export function* fitManualSongPages(lines, profile, geometry) {
       } else {
         const previous = items.at(-1);
         const add = item.width_mm + (previous?.type === 'word' && item.type === 'word' ? gap : 0);
-        const joined = modern && (item.type === 'setuma_gap' || previous?.type === 'setuma_gap');
+        const joined = modern && (['setuma_gap', 'custom_gap'].includes(item.type) || ['setuma_gap', 'custom_gap'].includes(previous?.type));
         if (items.length && !joined && used + add + reserve(cursor) > width + 1e-9) {
           flush();
           if (page.length === perPage) break;
@@ -87,7 +88,7 @@ export function* fitManualSongPages(lines, profile, geometry) {
       }
     }
     flush();
-    if (pageStart && page.length) page[0].page_start = true;
+    if (pageStart && page.length) { page[0].page_start = true; page[0].segment_start_id = pageStart; }
     return { page, cursor };
   }
   let cursor = 0;

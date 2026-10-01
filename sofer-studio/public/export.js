@@ -42,6 +42,11 @@
 
     row.appendChild(bPrint);
     root.appendChild(row);
+    var samplePaper=util.el('select',{id:'sample-paper'},['A4-landscape','A4-portrait','A3-landscape','A3-portrait','A2-portrait'].map(function(value){return util.el('option',{value:value,text:value.replace('-',' ')});}));
+    var sampleButton=util.el('button',{class:'btn btn-ghost',text:'Print sample at actual size',id:'print-sample'});
+    sampleButton.addEventListener('click',function(){printLayout('sample');});
+    root.appendChild(util.el('div',{class:'sample-print-controls'},[util.el('label',{class:'field'},[util.el('span',{text:'Sample paper'}),samplePaper]),sampleButton,
+      util.el('p',{class:'profile-help',text:'Print the first columns side by side with the real top, bottom and side margins and column gaps. Content beyond the paper edges is clipped. Choose 100% scale in the print dialog.'})]));
     var reverse = util.el('input', { type: 'checkbox', id: 'export-reverse-lines', checked: !!(SS.tikkun && SS.tikkun.isReversed()) });
     root.appendChild(util.el('label', { class: 'toggle' }, [reverse, util.el('span', { text: 'Reverse lines — line 1 at the bottom of each page' })]));
     reverse.addEventListener('change', function () { SS.tikkun.setReverseLines(reverse.checked); });
@@ -80,7 +85,7 @@
     if (returnView && SS.workspace) SS.workspace.open(returnView);
     returnView = null;
   }
-  async function printLayout() {
+  async function printLayout(kind) {
     if (preparingPrint) return;
     if (!state.active.layoutId || !state.layout) { SS.toast('Open or compute a layout first.', 'error'); return; }
     if (state.layout.summary && state.layout.summary.study_preview) { SS.toast('This study preview has unverified special passages. Complete their verification before export.', 'error'); return; }
@@ -92,7 +97,8 @@
     try {
       if (!await SS.tikkun.preparePrint()) { SS.toast('Layout changed. Please try printing again.', 'error'); finishPrint(); return; }
       SS.tikkun.refreshPrintNote();
-      if(SS.tikkun.prepareTefillinPaper)SS.tikkun.prepareTefillinPaper(util.byId('export-tefillin-paper').value);
+      if(kind==='sample')SS.tikkun.prepareSamplePaper(util.byId('sample-paper').value);
+      else if(SS.tikkun.prepareTefillinPaper)SS.tikkun.prepareTefillinPaper(util.byId('export-tefillin-paper').value);
       // Browser print includes every amud, not only the page on screen.
       window.print();
     } catch (e) { finishPrint(); SS.toast(e.message || String(e), 'error'); }

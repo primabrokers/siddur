@@ -11,7 +11,7 @@ import { validateLayout, validateLine, validateSpacingBounds } from '../engine/v
 import { searchVerse } from '../engine/search.js';
 import { compareProfiles } from '../engine/compare.js';
 import { validateProfileInput, validateGeometryInput, validatePatternInput } from './validation.js';
-import { wordWidth, totalWidth, interWordGap, interLetterGap } from '../engine/width.js';
+import { wordWidth, totalWidth, interWordGap, interLetterGap, measurementUnitMm } from '../engine/width.js';
 import { lettersOf, letterKeyOf } from '../engine/profile.js';
 import { countHebrewLetters } from '../engine/text.js';
 import * as store from './store.js';
@@ -20,14 +20,17 @@ import { planBookStretch, stretchReport } from './stretch-book.js';
 import { loadReferenceSource } from './reference.js';
 import {fitMarginPlan,applyFitCopy} from './fit-margin.js';
 import {effectiveProfile} from '../engine/stretch-policy.js';
-import { moveWord } from '../engine/line-edit.js';
+import { editWordCount, editPageWidth } from '../engine/document-edit.js';
 import { loadTefillinSource } from './tefillin-source.js';
 import { songPageProfile } from '../engine/song-page-scale.js';
+import { letterMarks, letterSizeScale } from '../engine/letter-marks.js';
+import { sourceControls } from '../engine/document-options.js';
 
 // Strip internal engine fields for API lines. When a profile is supplied the
 // server-authoritative stretch candidates (cap_mm/letter/word_final/line_end) are
 // attached so the UI never derives caps from a different convention (F-10).
 export function publicLine(l, profile) {
+  const documentUnitMm = profile ? measurementUnitMm(profile) : null;
   profile = songPageProfile(profile, l.song_page?.scale);
   const words = l.words || [];
   const shem_tokens = words.filter((w) => w.isShem).map((w) => ({
@@ -50,6 +53,10 @@ export function publicLine(l, profile) {
     sefer_end: !!l.sefer_end, fixed_pattern: !!l.fixed_pattern,
     blank_line: !!l.blank_line, manual_line_end: !!l.manual_line_end,
     page_start: !!l.page_start,
+    segment_start_id: l.segment_start_id || null,
+    flow_page_start: !!l.flow_page_start, page_fit: l.page_fit || null,
+    measurement_unit_mm: documentUnitMm,
+    secondary_stretch: !!profile && engine.needsSecondaryStretch(l, profile),
     spacing_metadata_complete: !!l.spacing_metadata_complete,
     reference_page: l.reference_page || null,
     song_page: l.song_page || null,
@@ -59,9 +66,9 @@ export function publicLine(l, profile) {
       shem: w.shem || null, letters: (w.letters || []).map((lt) => {
         const override = (w.override || []).find(o => o.id === lt.id);
         let width = override ? Number(override.mm) : profile ? totalWidth(lt.base, profile) : Number(lt.width_mm);
-        if (!override && lt.stam_letter_mark?.type === 'large') width *= 1.5;
-        if (!override && lt.stam_letter_mark?.type === 'small') width *= profile?.small_letter_scale ?? 0.5;
+        if (!override && profile) width *= letterSizeScale(lt, profile);
         return { id: lt.id, base: lt.base, holy: !!lt.holy, stam_letter_mark: lt.stam_letter_mark || null,
+          stam_letter_marks: letterMarks(lt),
           width_mm: width };
       }),
       width_mm: w.width_mm, override: w.override || [],
@@ -83,7 +90,7 @@ function getEngineSource(db, sourceId) {
   const s = store.getSource(db, sourceId);
   if (!s) throw new HttpError(404, 'source not found');
   return {
-    name: s.name, tradition: s.tradition, revision_hash: s.revision_hash,
+    id: s.id, name: s.name, tradition: s.tradition, revision_hash: s.revision_hash,
     excerpt: s.excerpt, partial_corpus: !!s.partial_corpus, label: s.label, source_label: s.source_label,
     verses: s.verses || [], unusual_letters: s.unusual_letters || [],
     format: s.format,
@@ -125,7 +132,7 @@ export function handleSession(ctx) {
 }
 
 export function handleHealth(ctx) {
-  sendJson(ctx.res, 200, { status: 'ok', db: true, version: '1.0.0' });
+  sendJson(ctx.res, 200, { status: 'ok', db: true, version: '21', release: 'feedback-v21' });
 }
 
 // ---- sources --------------------------------------------------------------
@@ -143,6 +150,7 @@ export function handleGetSource(ctx) {
     book_count: s.book_count, verse_count: s.verse_count, letter_count: s.letter_count,
     has_qere_ketiv: !!s.has_qere_ketiv,
     section_breaks: sectionBreakSummary(s.verses),
+    controls: sourceControls(s),
     reference: s.format==='tikkun-reference' && s.canonical ? (({lines,...provenance})=>provenance)(s.canonical.reference) : null,
     unusual_letters: (s.unusual_letters || []).map((u) => ({
       id: u.id || null, ref: u.ref, letter: u.letter, type: u.type || 'large',
@@ -488,10 +496,22 @@ export function handleMoveWord(ctx) {
   const layout = store.getLayout(ctx.db, ctx.params.id);
   if (!layout) throw new HttpError(404, 'layout not found');
   let result;
-  try { result = moveWord(layout, ctx.body || {}); }
+  try { result = editWordCount(layout, ctx.body || {}); }
   catch (error) { throw new HttpError(409, error.message); }
-  store.saveEditedLines(ctx.db, layout.id, result.changed, result.summary, result.validation);
+  try { store.saveDocumentEdit(ctx.db, layout.id, result, layout); }
+  catch (error) { throw new HttpError(409, error.message); }
   sendJson(ctx.res, 200, { ok: true, changed_lines: result.changed.map(line => publicLine(line, layout.snapshot.profile)) });
+}
+
+export function handlePageWidth(ctx) {
+  const layout = store.getLayout(ctx.db, ctx.params.id);
+  if (!layout) throw new HttpError(404, 'layout not found');
+  let result;
+  try { result = editPageWidth(layout, ctx.body || {}); }
+  catch (error) { throw new HttpError(409, error.message); }
+  try { store.saveDocumentEdit(ctx.db, layout.id, result, layout); }
+  catch (error) { throw new HttpError(409, error.message); }
+  sendJson(ctx.res, 200, { ok: true });
 }
 
 export function handleGetLayout(ctx) {

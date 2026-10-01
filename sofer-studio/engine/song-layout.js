@@ -1,4 +1,4 @@
-import { makeLine, autoSuggestLine, applyStretch } from './layout.js';
+import { makeLine, autoSuggestLine, applyStretch, needsSecondaryStretch } from './layout.js';
 import { interWordGap, measurementUnitMm } from './width.js';
 import { songSettings } from './column-options.js';
 
@@ -12,7 +12,7 @@ export function composeSongLine(items, profile, geometry, kind = 'hayam') {
     else groups.at(-1).push(item);
   }
   if (![1, 2, 3].includes(groups.length) || groups.some(g => !g.length)) throw new Error('A song row needs non-empty parts');
-  if (kind === 'haazinu' && groups.length !== 2) throw new Error('Haazinu rows need two parts and one m break');
+  if (kind === 'haazinu' && groups.length === 3) throw new Error('Haazinu rows need two parts and one m break');
   const gap = interWordGap(profile), unit = measurementUnitMm(profile);
   const middle = total - config.right_mm - config.left_mm;
   const segments = [], decisions = []; let wordIndex = 0;
@@ -32,6 +32,7 @@ export function composeSongLine(items, profile, geometry, kind = 'hayam') {
     minimumStart = Math.min(minimumStart, start); maximumEnd = Math.max(maximumEnd, start + rendered);
     segments.push({ start_mm: start, width_mm: rendered, target_mm: target, base_width_mm: width,
       word_start: wordIndex, word_count: segment.words.length, shortfall_mm: Math.max(0, target - rendered),
+      secondary_required: (!three || index === 1) && needsSecondaryStretch(segment, profile),
       stretch: !three || index === 1 });
     for (const decision of segment.stretch_decisions) {
       const id = decision.letter_occurrence_id;
@@ -42,7 +43,7 @@ export function composeSongLine(items, profile, geometry, kind = 'hayam') {
   const line = makeLine(items.map(item => item.type === 'segment_gap' ? { ...item, width_mm: 0 } : item), total, total, profile);
   line.column_width_mm = total;
   const overlap = segments.slice(1).reduce((max, segment, index) => Math.max(max, segments[index].start_mm + segments[index].width_mm - segment.start_mm), 0);
-  line.song_layout = { kind, total_mm: total, segments, overlap_mm: overlap };
+  line.song_layout = { kind, total_mm: total, right_mm: config.right_mm, left_mm: config.left_mm, segments, overlap_mm: overlap };
   line.fixed_pattern = true;
   line.stretch_decisions = decisions;
   line.base_leftover_mm = line.leftover_mm = -Math.max(-minimumStart, maximumEnd - total, overlap) || 0;

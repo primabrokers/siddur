@@ -29,20 +29,35 @@ export function fillSongPages(lines, profile, geometry) {
     if (page.length >= perPage || geometry.tefillin) continue;
     const song = page.find(line => line.song_layout);
     if (!song || !page.every(line => line.song_layout ||
-      (song.song_layout.kind === 'hayam' && line.manual_line_end && line.words.length && !line.has_setuma))) continue;
-    const scale = perPage / page.length;
+      (line.manual_line_end && line.words.length && !line.has_setuma))) continue;
+    const exceptions = { 21: 2, 28: 2.6, 42: 4 };
+    const scale = page.length === 11 && exceptions[perPage] ? exceptions[perPage] : perPage / page.length;
     const scaled = songPageProfile(profile, scale);
     const metrics = { scale, lines: page.length, baseline_pitch_mm: geometry.baseline_pitch_mm * scale,
-      letter_height_mm: profile.letter_height_mm * scale };
+      letter_height_mm: profile.letter_height_mm * scale,
+      overflow_mm: Math.max(0, (page.length * scale - perPage) * geometry.baseline_pitch_mm) };
     page.forEach((line, index) => {
       const items = line.items.map(item => ({ ...item, width_mm: item.width_mm * scale,
         ...(item.override ? { override: item.override.map(value => ({ ...value, mm: value.mm * scale })) } : {}) }));
       // Rejustify each enlarged segment inside the existing song column. Scaling
       // already-justified coordinates would incorrectly enlarge the whole page.
-      const enlarged = composeSongLine(items, scaled, geometry, line.song_layout?.kind || song.song_layout.kind);
+      const kind = line.song_layout?.kind || song.song_layout.kind;
+      const dimensions = line.song_layout || song.song_layout;
+      const enlarged = composeSongLine(items, scaled, { ...geometry, song_layouts: { ...geometry.song_layouts, [kind]: dimensions } }, kind);
       lines[start + index] = { ...line, ...enlarged, petucha_end: line.petucha_end, sefer_end: line.sefer_end,
         line_key: undefined, song_page: { ...metrics } };
     });
   }
   return lines;
+}
+
+export function unscaleSongPages(lines, profile, geometry) {
+  return lines.map(line => {
+    if (!line.song_page) return line;
+    const scale = line.song_page.scale, kind = line.song_layout.kind;
+    const items = line.items.map(item => ({ ...item, width_mm: item.width_mm / scale,
+      ...(item.override ? { override: item.override.map(value => ({ ...value, mm: value.mm / scale })) } : {}) }));
+    const normal = composeSongLine(items, profile, { ...geometry, song_layouts: { ...geometry.song_layouts, [kind]: line.song_layout } }, kind);
+    return { ...line, ...normal, song_page: null, line_key: undefined };
+  });
 }

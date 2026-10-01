@@ -495,6 +495,7 @@
     setStatus('computing layout…');
     var usePoll = !!(src.letter_count && src.letter_count > LARGE_CORPUS_LETTERS);
     try {
+      if (SS.geometry?.forCompute) geom = await SS.geometry.forCompute();
       var patternIds = (state.active.patternIds || []);
       var annotations = (state.active.annotations || {});
       var body = {

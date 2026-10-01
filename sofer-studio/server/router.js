@@ -33,6 +33,7 @@ const ROUTES = [
   { method: 'GET', pattern: '/api/layouts/:id', handler: h.handleGetLayout, limit: null },
   { method: 'DELETE', pattern: '/api/layouts/:id', handler: h.handleDeleteLayout, limit: null },
   { method: 'POST', pattern: '/api/layouts/:id/move-word', handler: h.handleMoveWord, limit: 'default' },
+  { method: 'POST', pattern: '/api/layouts/:id/page-width', handler: h.handlePageWidth, limit: 'default' },
   { method: 'POST', pattern: '/api/layouts/:id/lock', handler: h.handleLockLayout, limit: null },
   { method: 'POST', pattern: '/api/layouts/:id/progress', handler: h.handleProgress, limit: 'default' },
   { method: 'POST', pattern: '/api/layouts/:id/candidate', handler: h.handleCreateCandidate, limit: 'default' },

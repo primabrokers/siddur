@@ -131,18 +131,20 @@
     root.appendChild(crud);
     var preset = util.el('select', { id: 'cal-preset', 'aria-label': 'Profile preset' }, [
       util.el('option', { value: '', text: 'Choose a profile preset…' }),
-      util.el('option', { value: '4mm-yad', text: '4mm yad' })
+      util.el('option', { value: '4mm-yad', text: '4mm yad' }),
+      util.el('option', { value: 'classic-sefer-torah', text: 'Classic Sefer Torah' })
     ]);
     preset.addEventListener('change', async function() {
       if (!preset.value) return;
-      if (dirty && !window.confirm('Replace the unsaved profile draft with the 4mm yad preset?')) { preset.value = ''; return; }
+      var label = preset.options[preset.selectedIndex].text;
+      if (dirty && !window.confirm('Replace the unsaved profile draft with the ' + label + ' preset?')) { preset.value = ''; return; }
       try {
-        var response = await fetch('/profiles/4mm-yad.profile.json');
-        if (!response.ok) throw new Error('Cannot load the 4mm yad preset');
+        var response = await fetch('/profiles/' + preset.value + '.profile.json');
+        if (!response.ok) throw new Error('Cannot load the selected preset');
         var profile = await response.json();
         ++loadRevision; draft = normalizeProfile(profile); draft.id = null;
         state.active.profileId = null; markDirty(); renderFromDraft();
-        bus.emit('calibration:draft-changed'); SS.toast('4mm yad loaded. Save to add it to your profiles.');
+        bus.emit('calibration:draft-changed'); SS.toast(label + ' loaded. Save to add it to your profiles.');
       } catch(e) { SS.toast(e.message || String(e), 'error'); }
       preset.value = '';
     });

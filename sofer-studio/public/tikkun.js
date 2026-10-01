@@ -25,7 +25,7 @@
   var fitPending = false, renderedLayout = null, renderedCount = 0;
   var buildPage = null, pageGroups = [], printReady = false, preparingPrint = false;
   var scrollPending = false;
-  var reverseLines = false, reverseToggle;
+  var reverseLines = false, reverseToggle, reflowToggle;
 
   // The seven letters that traditionally receive taggin (visual only).
   var TAGGIN = { '\u05e9': 1, '\u05e2': 1, '\u05d8': 1, '\u05e0': 1, '\u05d6': 1, '\u05d2': 1, '\u05e5': 1 };
@@ -82,6 +82,15 @@
     sectionToggle.addEventListener('change', function () {
       container.classList.toggle('hide-section-guides', !sectionToggle.checked);
     });
+    [['letter-guides','Letter guides',false],['shortfall','ח״א marks',true],['numbers','Line numbers',true]].forEach(function(spec){
+      var checked = spec[2]; try { var saved=localStorage.getItem('sofer:preview-'+spec[0]); if(saved!=null)checked=saved==='1'; } catch(e){}
+      var input=util.el('input',{type:'checkbox',id:'preview-'+spec[0],checked:checked});
+      function apply(){container.classList.toggle('hide-'+spec[0],!input.checked); if(spec[0]==='letter-guides')container.classList.toggle('show-letter-guides',input.checked); scheduleFit();}
+      input.addEventListener('change',function(){apply();try{localStorage.setItem('sofer:preview-'+spec[0],input.checked?'1':'0');}catch(e){}}); apply();
+      toolbar.appendChild(util.el('label',{class:'toggle'},[input,util.el('span',{text:spec[1]})]));
+    });
+    reflowToggle=util.el('input',{type:'checkbox',id:'preview-reflow-words'});
+    toolbar.appendChild(util.el('label',{class:'toggle'},[reflowToggle,util.el('span',{text:'Recalculate after word edits'})]));
     toolbar.appendChild(help);
     container.parentNode.insertBefore(toolbar, container);
     prevButton.addEventListener('click', function () { selectPage(pageIndex - 1); });
@@ -183,6 +192,8 @@
   }
 
   function finishPrint() {
+    document.body.classList.remove('printing-sample');
+    util.byId('sample-print-area')?.remove(); util.byId('sample-page-style')?.remove();
     if(currentSheet)currentSheet.classList.remove('tefillin-print');
     document.body.classList.remove('printing-tefillin');
     var style=util.byId('tefillin-page-style');if(style)style.remove();
@@ -201,6 +212,27 @@
     currentSheet.classList.add('tefillin-print');document.body.classList.add('printing-tefillin');
     currentSheet.style.setProperty('--tefillin-columns',cols.map(function(w){return w+'mm';}).join(' '));
     var style=util.el('style',{id:'tefillin-page-style',text:'@page { size: '+paper+' landscape; margin: 10mm; }'});document.head.appendChild(style);
+  }
+
+  function prepareSamplePaper(paper) {
+    var papers = {'A4-landscape':[297,210],'A4-portrait':[210,297],'A3-landscape':[420,297],'A3-portrait':[297,420],'A2-portrait':[420,594]};
+    var dimensions=papers[paper]||papers['A4-landscape'], geometry=layoutGeometry(renderedLayout);
+    var area=util.el('div',{id:'sample-print-area',class:'sheet sample-sheet',dir:'rtl'});
+    area.style.width=dimensions[0]+'mm';area.style.height=dimensions[1]+'mm';
+    var row=util.el('div',{class:'amudim-row'});area.appendChild(row);
+    var used=0, perYeria=Number(geometry.amudim_per_yeria)||4;
+    for(var i=0;i<pageEls.length&&used<dimensions[0];i++){
+      var clone=pageEls[i].cloneNode(true), width=Number(pageGroups[i].lines[0].column_width_mm)||geometry.line_width_mm;
+      var right=i===0?Number(geometry.initial_margin_mm??geometry.outer_margin_mm):i%perYeria===0?2*Number(geometry.outer_margin_mm):Number(geometry.inter_column_gap_mm);
+      var left=i===pageEls.length-1?Number(geometry.final_margin_mm??geometry.outer_margin_mm):0;
+      clone.style.width=(width+right+left)+'mm';clone.style.padding=geometry.top_margin_mm+'mm '+right+'mm '+geometry.bottom_margin_mm+'mm '+left+'mm';
+      clone.style.minHeight='0';
+      clone.querySelectorAll('.line-move,.lnum,.side,.page-footer,.page-width-editor,.print-study-label').forEach(function(node){node.remove();});
+      clone.querySelector('.lines').style.width=width+'mm';
+      row.appendChild(clone);used+=width+right+left;
+    }
+    document.body.appendChild(area);document.body.classList.add('printing-sample');
+    document.head.appendChild(util.el('style',{id:'sample-page-style',text:'@page { size: '+dimensions[0]+'mm '+dimensions[1]+'mm; margin:0; }'}));
   }
 
   // Fit the entire rendered page, not just its font. Width and height both
@@ -260,16 +292,27 @@
         fit = glyphFit(natural,target,m.actualBoundingBoxLeft,m.actualBoundingBoxRight);
       }
       var vertical = ink.parentNode.classList.contains('marker-large') ? 1.5 : ink.parentNode.classList.contains('marker-small') ? Number(renderedLayout?.snapshot?.profile?.small_letter_scale ?? 0.5) : 1;
-      var offset = 0;
-      if (vertical !== 1 && ctx) {
+      var offset = 0, roofTop = 0;
+      if (ctx) {
         var glyphStyle = window.getComputedStyle(ink);
         ctx.font = glyphStyle.fontStyle+' '+glyphStyle.fontWeight+' '+glyphStyle.fontSize+' '+glyphStyle.fontFamily;
         ctx.textAlign = 'left'; ctx.direction = 'ltr';
-        var bounds = ctx.measureText(ink.textContent);
-        var size = parseFloat(glyphStyle.fontSize), height = parseFloat(glyphStyle.lineHeight) || size * 1.5;
-        var ascent = bounds.fontBoundingBoxAscent || size * 0.8, descent = bounds.fontBoundingBoxDescent || size * 0.2;
-        var inkTop = (height - ascent - descent) / 2 + ascent - (bounds.actualBoundingBoxAscent || ascent);
-        offset = (1 - vertical) * inkTop;
+        var bounds=ctx.measureText(ink.textContent), size=parseFloat(glyphStyle.fontSize), height=parseFloat(glyphStyle.lineHeight)||size*1.5;
+        var ascent=bounds.fontBoundingBoxAscent||size*.8,descent=bounds.fontBoundingBoxDescent||size*.2;
+        var baseline=(height-ascent-descent)/2+ascent;
+        // STaM Ashkenaz's common roof occupies font units 700..1050 of 2048.
+        // Align the roof itself, excluding crowns and the lamed's ascender.
+        roofTop=baseline-size*1050/2048;
+        var roofBottom=baseline-size*700/2048;
+        offset=(1-vertical)*(vertical>1?roofBottom:roofTop);
+        ink.parentNode.style.setProperty('--roof-top',(roofTop*vertical+offset)+'px');
+        ink.parentNode.style.setProperty('--roof-middle',((roofTop+size*175/2048)*vertical+offset)+'px');
+        if(ink.parentNode.classList.contains('marker-four_tagin')){
+          var crownRoof=ink.textContent==='ל'?baseline-size*1960/2048:roofTop;
+          ink.style.clipPath='inset('+Math.max(0,crownRoof)+'px -100% -100% -100%)';
+          var crown=ink.parentNode.querySelector('.four-tagin');
+          if(crown){crown.style.height=(size*360/2048*vertical)+'px';crown.style.top=(crownRoof*vertical+offset-size*360/2048*vertical)+'px';}
+        }
       }
       ink.style.transformOrigin = vertical === 1 ? 'right bottom' : 'right top';
       ink.style.transform = 'translateX('+fit.translate+'px) translateY('+offset+'px) scaleX('+fit.scale+') scaleY('+vertical+')';
@@ -338,7 +381,7 @@
     var sameLayout = renderedLayout && renderedLayout.id === layout.id;
     printReady = false; container.classList.remove('print-ready');
     renderedLayout = layout;
-    if (!sameLayout) pageIndex = 0;
+    if (!sameLayout) { pageIndex = 0; reflowToggle.checked=!!layoutGeometry(layout)?.document_flow?.reflow_word_moves; }
 
     // Group lines into amudim (columns), preserving order.
     var amudim = [];   // [{ index, lines: [] }]
@@ -439,7 +482,9 @@
     var pageWidth = Math.max.apply(null, g.lines.map(function (l) { return l.column_width_mm || (geom && geom.line_width_mm) || 125; }));
     linesWrap.style.setProperty('--line-width', pageWidth + 'mm');
     amud.style.setProperty('--line-width', pageWidth + 'mm');
-    linesWrap.style.minHeight = ((songPage && songPage.lines) || (geom && geom.lines_per_amud) || g.lines.length) * pitch + 'mm';
+    linesWrap.style.minHeight = Number(geom?.lines_per_amud || g.lines.length) * Number(geom?.baseline_pitch_mm || pitch) + 'mm';
+    if (songPage) { linesWrap.style.height=linesWrap.style.minHeight; linesWrap.style.overflow='visible'; }
+    if (g.lines.some(function(line){return line.words.some(function(word){return word.letters.some(function(letter){return (letter.stam_letter_marks||[]).some(function(mark){return mark.type==='margin_note';});});});})) amud.classList.add('has-margin-notes');
 
     if (placeholder) {
       // Keep the page's full geometry in the scroll track without its glyph DOM.
@@ -458,6 +503,18 @@
       util.el('div', { class: 'page-source', dir: 'auto', text: sourceName }),
       util.el('div', { text: 'Line width: ' + util.fmt(pageWidth, 2) + ' mm · Line height: ' + util.fmt(pitch, 2) + ' mm · ' + (gi + 1) + ' of ' + pageGroups.length })
     ]));
+    if (!placeholder) {
+      var unit=Number(g.lines[0]?.measurement_unit_mm), first=g.lines[0];
+      var widthInput=util.el('input',{type:'number',min:'.01',step:'1',value:unit>0?+(pageWidth/unit).toFixed(3):'', 'aria-label':'Units on page '+g.num});
+      widthInput.disabled=!(unit>0)||layout.status==='locked'||!!geom?.tefillin;
+      widthInput.addEventListener('change',async function(){
+        if(movingWord)return; movingWord=true; widthInput.disabled=true;
+        try { await API.pageWidth(layout.id,{amud:g.num,line_key:first.line_key,units:Number(widthInput.value)}); await refreshEditedLayout(layout); }
+        catch(error){SS.toast(error.message,'error');widthInput.value=+(pageWidth/unit).toFixed(3);}
+        finally {movingWord=false;widthInput.disabled=false;}
+      });
+      amud.appendChild(util.el('label',{class:'page-width-editor',dir:'ltr'},[util.el('span',{text:'Page width (units)'}),widthInput,util.el('span',{text:'Recalculates from this page onward'})]));
+    }
     return amud;
   }
 
@@ -475,6 +532,7 @@
 
     var gim = util.el('span', { class: 'lnum', text: String(li + 1), dir: 'ltr' });
     gim.setAttribute('lang', 'en');
+    el.appendChild(wordMoveControls(line));
     el.appendChild(gim);
     el.appendChild(shortfallNote(line));
 
@@ -497,7 +555,10 @@
     }
 
     el.appendChild(txt);
-    el.appendChild(wordMoveControls(line));
+    if(line.secondary_stretch)el.classList.add('needs-secondary-stretch');
+    var notes=[];
+    (line.words||[]).forEach(function(word){(word.letters||[]).forEach(function(letter){(letter.stam_letter_marks||[]).forEach(function(mark){if(mark.type==='margin_note')notes.push(mark.note);});});});
+    if(notes.length)el.appendChild(util.el('span',{class:'margin-notes',dir:'auto',text:notes.map(function(note){return '° '+note;}).join(' · ')}));
 
     // aria label: amud, line, verse ref
     var ref = pick(line, ['verse_ref', 'ref', 'verse'], '');
@@ -518,30 +579,28 @@
     return el;
   }
 
+  async function refreshEditedLayout(layout) {
+    if(SS.app?.reloadLayout) { await SS.app.reloadLayout(layout.id); return; }
+    var refreshed=await API.getLayout(layout.id);
+    if(state.active.layoutId===layout.id||state.layout===layout){state.layout=refreshed;bus.emit('layout:loaded',refreshed);}
+  }
   function wordMoveControls(line) {
-    var controls = util.el('span', { class: 'line-move', dir: 'ltr' });
-    var overflow = Math.max(0, -Number(line.base_leftover_mm || 0));
-    if (overflow) controls.style.marginRight = (overflow + 3) + 'mm';
-    [['up', '↑', 'Bring the first word from the next line'], ['down', '↓', 'Move the last word to the next line']].forEach(function(spec) {
-      var button = util.el('button', { type: 'button', class: 'btn btn-ghost btn-sm', text: spec[1], title: spec[2], 'aria-label': spec[2], 'data-move-word': spec[0] });
-      button.disabled = !!renderedLayout.lines[renderedLayout.lines.indexOf(line)+1]?.page_start || !API || !API.moveWord || !line.line_id || renderedLayout.status === 'locked' || line.fixed_pattern || (line.status && line.status !== 'pending');
-      if (renderedLayout.status === 'locked') button.title = 'Locked layout: compute a new draft before changing line breaks';
-      button.addEventListener('click', async function(event) {
-        event.stopPropagation();
-        if (movingWord) return;
-        movingWord = true;
-        var layout = renderedLayout, index = layout.lines.indexOf(line), next = layout.lines[index + 1];
-        try {
-          await API.moveWord(layout.id, { line_id: line.line_id, direction: spec[0], line_key: line.line_key, next_line_key: next ? next.line_key : null });
-          var refreshed = await API.getLayout(layout.id);
-          if (state.active.layoutId === layout.id || state.layout === layout) {
-            state.layout = refreshed; bus.emit('layout:loaded', refreshed);
-          }
-        } catch(error) { SS.toast(error.message || String(error), 'error'); }
-        finally { movingWord = false; }
-      });
-      controls.appendChild(button);
+    var controls=util.el('span',{class:'line-move',dir:'ltr'});
+    var disabled=!API||!line.line_id||renderedLayout.status==='locked'||line.fixed_pattern||(line.status&&line.status!=='pending');
+    async function edit(values){
+      if(movingWord)return; movingWord=true;
+      var layout=renderedLayout,index=layout.lines.indexOf(line),next=layout.lines[index+1];
+      try { await API.moveWord(layout.id,Object.assign({line_id:line.line_id,line_key:line.line_key,next_line_key:next?.line_key||null,reflow:!!reflowToggle.checked},values)); await refreshEditedLayout(layout); }
+      catch(error){SS.toast(error.message||String(error),'error');count.value=line.words.length;}
+      finally {movingWord=false;}
+    }
+    [['up','↑','Bring a word from the next line'],['down','↓','Move a word to the next line']].forEach(function(spec){
+      var button=util.el('button',{type:'button',class:'btn btn-ghost btn-sm',text:spec[1],title:spec[2],'aria-label':spec[2],'data-move-word':spec[0],disabled:disabled});
+      button.addEventListener('click',function(event){event.stopPropagation();edit({direction:spec[0]});}); controls.appendChild(button);
     });
+    var count=util.el('input',{type:'number',class:'line-word-count',min:'0',max:'1000',step:'1',value:(line.words||[]).length,'aria-label':'Word count on line '+line.line_id,disabled:disabled});
+    count.addEventListener('click',function(event){event.stopPropagation();});
+    count.addEventListener('change',function(){edit({word_count:Number(count.value)});});controls.appendChild(count);
     return controls;
   }
 
@@ -642,11 +701,16 @@
           ink.classList.add('holy-letter');
           s.title = 'Holy letter — human decision';
         }
-        if (lt && lt.stam_letter_mark) {
-          var markerType = lt.stam_letter_mark.type;
-          s.classList.add('marker-' + markerType);
-          if (markerType === 'backward_nun') ink.textContent = '\u05e0';
-        }
+        var marks = lt && (lt.stam_letter_marks || (lt.stam_letter_mark ? [lt.stam_letter_mark] : [])) || [];
+        marks.forEach(function(mark){
+          s.classList.add('marker-'+mark.type);
+          if(mark.type==='backward_nun')ink.textContent='נ';
+          if(mark.type==='margin_note')s.appendChild(util.el('span',{class:'note-anchor',text:'°',title:mark.note}));
+          if(mark.type==='four_tagin'){
+            var svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 100 40');svg.setAttribute('class','four-tagin');svg.setAttribute('aria-label','Four tagin');svg.setAttribute('preserveAspectRatio','none');
+            [14,38,62,86].forEach(function(x){var path=document.createElementNS(svg.namespaceURI,'path');path.setAttribute('d','M'+x+' 40 V12 M'+(x-6)+' 10 L'+x+' 2 L'+(x+6)+' 10 Z');path.setAttribute('fill','currentColor');path.setAttribute('stroke','currentColor');path.setAttribute('stroke-width','3');svg.appendChild(path);});s.appendChild(svg);
+          }
+        });
         if (g === '\u05dc' && wordIndex === 0 && li === 0) s.classList.add('lamed-line-start');
         if (g === '\u05dc' && wordIndex === words.length - 1 && li === graphemes.length - 1) s.classList.add('lamed-line-end');
         if (tagginOn && TAGGIN[g]) s.classList.add('taggin');
@@ -712,7 +776,7 @@
           if (index && items[index-1].type === 'word') appendWordGap();
           parent.appendChild(wordBox(words[wi] || { text: it.text || it.consonant || '', width_mm: it.width_mm, letters: [], override: [] }));
           wi++;
-        } else if (it.type === 'setuma_gap' || it.type === 'segment_gap') {
+        } else if (it.type === 'setuma_gap' || it.type === 'segment_gap' || it.type === 'custom_gap') {
           parent.appendChild(gapEl(it, index));
         } else if(it.type === 'nun_hafucha') {
           // Use the same measured STaM nun as the ! command. U+05C6 in a
@@ -860,6 +924,7 @@
     finishPrint: finishPrint,
     isPrintReady: function () { return printReady; },
     prepareTefillinPaper: prepareTefillinPaper,
+    prepareSamplePaper: prepareSamplePaper,
     suggestsDrop: suggestsDrop,
     refreshPrintNote: function () { if (renderedLayout) fillPrintNote(renderedLayout); }
   };

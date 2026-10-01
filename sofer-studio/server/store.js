@@ -5,6 +5,7 @@
 import { getId, nowIso } from '../db/db.js';
 import { normalizeProfile } from '../engine/profile.js';
 import { normalizeGeometry } from '../engine/layout.js';
+import { copyColumnOptions } from '../engine/column-options.js';
 
 function json(x) { return JSON.stringify(x == null ? null : x); }
 function parse(x) { return x ? JSON.parse(x) : null; }
@@ -132,7 +133,8 @@ export function insertGeometry(db, g) {
     n.max_inter_word_gap_factor != null ? n.max_inter_word_gap_factor : null,
     n.small_letter_reference, n.vavei_haamudim ? 1 : 0, nowIso()
   );
-  if (n.song_layouts || n.tefillin) db.prepare('INSERT INTO geometry_options (geometry_id,options) VALUES (?,?)').run(id,json({song_layouts:n.song_layouts,tefillin:n.tefillin}));
+  const options = copyColumnOptions(n);
+  if (Object.keys(options).length) db.prepare('INSERT INTO geometry_options (geometry_id,options) VALUES (?,?)').run(id,json(options));
   })();
   return { ...n, id };
 }
@@ -210,9 +212,20 @@ function insertLayoutLines(db, id, lines) {
         l.status || 'pending', nowIso()
       );
       db.prepare('UPDATE layout_lines SET layout_flags=? WHERE layout_id=? AND line_id=?').run(
-        json({petucha_end:!!l.petucha_end,sefer_end:!!l.sefer_end,fixed_pattern:!!l.fixed_pattern,blank_line:!!l.blank_line,manual_line_end:!!l.manual_line_end,page_start:!!l.page_start,line_in_amud:l.line_in_amud||null,book_boundary_blank:!!l.book_boundary_blank,reference_page:l.reference_page||null,column_width_mm:l.column_width_mm||null,song_layout:l.song_layout||null,song_page:l.song_page||null,tefillin_section:l.tefillin_section||null}),id,l.line_id
+        json({petucha_end:!!l.petucha_end,sefer_end:!!l.sefer_end,fixed_pattern:!!l.fixed_pattern,blank_line:!!l.blank_line,manual_line_end:!!l.manual_line_end,page_start:!!l.page_start,segment_start_id:l.segment_start_id||null,flow_page_start:!!l.flow_page_start,page_fit:l.page_fit||null,line_in_amud:l.line_in_amud||null,book_boundary_blank:!!l.book_boundary_blank,reference_page:l.reference_page||null,column_width_mm:l.column_width_mm||null,song_layout:l.song_layout||null,song_page:l.song_page||null,tefillin_section:l.tefillin_section||null}),id,l.line_id
       );
     }
+}
+
+export function saveDocumentEdit(db, id, result, expected) {
+  db.transaction(() => {
+    if (getLayoutRow(db, id)?.status === 'locked') throw new Error('Layout is locked');
+    const revision = lines => json(lines.map(line => [line.line_id, line.line_key, line.status, line.stretch_decisions]));
+    if (expected && revision(getLayoutLines(db, id)) !== revision(expected.lines)) throw new Error('Layout changed during recalculation. Reload it before editing.');
+    db.prepare('DELETE FROM layout_lines WHERE layout_id=?').run(id);
+    insertLayoutLines(db, id, result.lines);
+    db.prepare('UPDATE layouts SET summary=?, validation=?, geometry_snapshot=? WHERE id=?').run(json(result.summary), json(result.validation), json(result.geometry), id);
+  }).immediate();
 }
 
 export function saveEditedLines(db, id, lines, summary, validation) {
@@ -265,7 +278,7 @@ export function getLayoutLines(db, layoutId, page) {
         has_setuma: hasSetuma, setuma_at_edge: setumaAtEdge,
         fixed_pattern: !!(flags && flags.fixed_pattern) || items.some((i) => i.type === 'segment_gap'),
         book_boundary_blank: !!(flags && flags.book_boundary_blank),
-        blank_line: !!flags?.blank_line, manual_line_end: !!flags?.manual_line_end, page_start: !!flags?.page_start,
+        blank_line: !!flags?.blank_line, manual_line_end: !!flags?.manual_line_end, page_start: !!flags?.page_start, segment_start_id: flags?.segment_start_id || null, flow_page_start: !!flags?.flow_page_start, page_fit: flags?.page_fit || null,
         petucha_end: !!(flags && flags.petucha_end), sefer_end: !!(flags && flags.sefer_end),
         spacing_metadata_complete: flags != null,
         reference_page: flags && flags.reference_page || null,
@@ -380,7 +393,7 @@ export function createLockedLayout(db, meta, lines, summary) {
         l.status || 'pending', nowIso()
       );
       db.prepare('UPDATE layout_lines SET layout_flags=? WHERE layout_id=? AND line_id=?').run(
-        json({petucha_end:!!l.petucha_end,sefer_end:!!l.sefer_end,fixed_pattern:!!l.fixed_pattern,blank_line:!!l.blank_line,manual_line_end:!!l.manual_line_end,page_start:!!l.page_start,line_in_amud:l.line_in_amud||null,reference_page:l.reference_page||null,column_width_mm:l.column_width_mm||null,song_layout:l.song_layout||null,song_page:l.song_page||null,tefillin_section:l.tefillin_section||null}),id,l.line_id);
+        json({petucha_end:!!l.petucha_end,sefer_end:!!l.sefer_end,fixed_pattern:!!l.fixed_pattern,blank_line:!!l.blank_line,manual_line_end:!!l.manual_line_end,page_start:!!l.page_start,segment_start_id:l.segment_start_id||null,flow_page_start:!!l.flow_page_start,page_fit:l.page_fit||null,line_in_amud:l.line_in_amud||null,reference_page:l.reference_page||null,column_width_mm:l.column_width_mm||null,song_layout:l.song_layout||null,song_page:l.song_page||null,tefillin_section:l.tefillin_section||null}),id,l.line_id);
     }
   });
   tx(lines);

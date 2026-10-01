@@ -58,9 +58,9 @@ test('word spaces, stroke and inter-letter gaps consume additional width', () =>
 });
 
 test('large and small letter marks count their scaled widths before fitting', () => {
-  const result = flow(Array(50).fill('+א').join(' '));
+  const result = flow(Array(50).fill('rא').join(' '));
   assert.equal(count(result.lines[0]), 20); // each marked letter is 3 units.
-  const small = flow(Array(80).fill('–א').join(' '));
+  const small = flow(Array(80).fill('zא').join(' '));
   assert.equal(count(small.lines[0]), 46); // each marked letter is 4/3 units.
 });
 
