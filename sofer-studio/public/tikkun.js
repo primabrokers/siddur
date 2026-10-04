@@ -82,7 +82,7 @@
     sectionToggle.addEventListener('change', function () {
       container.classList.toggle('hide-section-guides', !sectionToggle.checked);
     });
-    [['letter-guides','Letter guides',false],['shortfall','ח״א marks',true],['numbers','Line numbers',true]].forEach(function(spec){
+    [['letter-guides','Letter guides',false],['shortfall','ח״א marks',true],['numbers','Line numbers',true],['line-controls','Move words / word count',true]].forEach(function(spec){
       var checked = spec[2]; try { var saved=localStorage.getItem('sofer:preview-'+spec[0]); if(saved!=null)checked=saved==='1'; } catch(e){}
       var input=util.el('input',{type:'checkbox',id:'preview-'+spec[0],checked:checked});
       function apply(){container.classList.toggle('hide-'+spec[0],!input.checked); if(spec[0]==='letter-guides')container.classList.toggle('show-letter-guides',input.checked); scheduleFit();}
@@ -219,9 +219,9 @@
     var dimensions=papers[paper]||papers['A4-landscape'], geometry=layoutGeometry(renderedLayout);
     var area=util.el('div',{id:'sample-print-area',class:'sheet sample-sheet',dir:'rtl'});
     area.style.width=dimensions[0]+'mm';area.style.height=dimensions[1]+'mm';
-    var row=util.el('div',{class:'amudim-row'});area.appendChild(row);
+    var sampleFrame=util.el('div',{class:'sample-frame'}), row=util.el('div',{class:'amudim-row'});sampleFrame.appendChild(row);area.appendChild(sampleFrame);
     var used=0, perYeria=Number(geometry.amudim_per_yeria)||4;
-    for(var i=0;i<pageEls.length&&used<dimensions[0];i++){
+    for(var i=0;i<pageEls.length&&used<dimensions[0]-6;i++){
       var clone=pageEls[i].cloneNode(true), width=Number(pageGroups[i].lines[0].column_width_mm)||geometry.line_width_mm;
       var right=i===0?Number(geometry.initial_margin_mm??geometry.outer_margin_mm):i%perYeria===0?2*Number(geometry.outer_margin_mm):Number(geometry.inter_column_gap_mm);
       var left=i===pageEls.length-1?Number(geometry.final_margin_mm??geometry.outer_margin_mm):0;
@@ -232,6 +232,14 @@
       row.appendChild(clone);used+=width+right+left;
     }
     document.body.appendChild(area);document.body.classList.add('printing-sample');
+    var sampleWidth = Math.min(used, dimensions[0]-6), sampleHeight = Math.min(dimensions[1]-6, Number(geometry.top_margin_mm) + Number(geometry.bottom_margin_mm) + Number(geometry.lines_per_amud) * Number(geometry.baseline_pitch_mm));
+    sampleFrame.style.width=sampleWidth+'mm';sampleFrame.style.height=sampleHeight+'mm';
+    [['top-right',0,0],['top-left',sampleWidth,0],['bottom-right',0,sampleHeight],['bottom-left',sampleWidth,sampleHeight]].forEach(function (corner) {
+      var mark = util.el('span', { class: 'sample-cut-mark', 'aria-label': 'Trim ' + corner[0] });
+      mark.style.right = (3+corner[1]) + 'mm'; mark.style.top = (3+corner[2]) + 'mm'; area.appendChild(mark);
+    });
+    var copyright = util.el('div', { class: 'sample-copyright', text: 'Copyright Yehuda Weisz — no one has rights to use this or copy without paying.' });
+    copyright.style.top = Math.max(3, sampleHeight - 2) + 'mm'; area.appendChild(copyright);
     document.head.appendChild(util.el('style',{id:'sample-page-style',text:'@page { size: '+dimensions[0]+'mm '+dimensions[1]+'mm; margin:0; }'}));
   }
 
@@ -307,6 +315,8 @@
         offset=(1-vertical)*(vertical>1?roofBottom:roofTop);
         ink.parentNode.style.setProperty('--roof-top',(roofTop*vertical+offset)+'px');
         ink.parentNode.style.setProperty('--roof-middle',((roofTop+size*175/2048)*vertical+offset)+'px');
+        ink.parentNode.dataset.inkTop = String((baseline - (ink.textContent === 'ל' ? size * 1410 / 2048 : bounds.actualBoundingBoxAscent)) * vertical + offset);
+        ink.parentNode.dataset.inkBottom = String((baseline + bounds.actualBoundingBoxDescent) * vertical + offset);
         if(ink.parentNode.classList.contains('marker-four_tagin')){
           var crownRoof=ink.textContent==='ל'?baseline-size*1960/2048:roofTop;
           ink.style.clipPath='inset('+Math.max(0,crownRoof)+'px -100% -100% -100%)';
@@ -316,6 +326,58 @@
       }
       ink.style.transformOrigin = vertical === 1 ? 'right bottom' : 'right top';
       ink.style.transform = 'translateX('+fit.translate+'px) translateY('+offset+'px) scaleX('+fit.scale+') scaleY('+vertical+')';
+    });
+    placePageNotes();
+    util.qsa('.amud .lines', container).forEach(function (page) {
+      var rows = Array.from(page.querySelectorAll('.line'));
+      rows.forEach(function (line, index) {
+        var bottom = Math.max(0, ...Array.from(line.querySelectorAll('.lk[data-ink-bottom]')).map(function (glyph) { return Number(glyph.dataset.inkBottom); }));
+        var next = rows[index + 1], tops = next && Array.from(next.querySelectorAll('.lk[data-ink-top]')).map(function (glyph) { return Number(glyph.dataset.inkTop); });
+        var top = line.offsetHeight + (tops?.length ? Math.min.apply(null, tops) : 0);
+        line.style.setProperty('--separator-top', ((bottom + top) / 2) + 'px');
+      });
+    });
+  }
+
+  function letterMarks(letter) { return letter.stam_letter_marks || (letter.stam_letter_mark ? [letter.stam_letter_mark] : []); }
+  function holyLabel(word) {
+    var letters = word.letters || [], marked = letters.filter(function (letter) { return letter.holy; }).length;
+    if (!marked || (word.consonant || letters.map(function (letter) { return letter.base; }).join('')).includes('יהוה')) return '';
+    return marked === letters.length ? 'קדש' : 'ספק';
+  }
+  // Find the nearest free vertical position. If a margin column is full, use
+  // the next column rather than overlap or print below the page.
+  function notePosition(wanted, height, pageHeight, occupied) {
+    var limit = Math.max(0, pageHeight - height), clamp = function (n) { return Math.max(0, Math.min(limit, n)); };
+    var candidates = [clamp(wanted), 0, limit];
+    occupied.forEach(function (box) { candidates.push(clamp(box.top + box.height + 3), clamp(box.top - height - 3)); });
+    return candidates.filter(function (top) { return occupied.every(function (box) { return top + height + 2 <= box.top || top >= box.top + box.height + 2; }); })
+      .sort(function (a, b) { return Math.abs(a - wanted) - Math.abs(b - wanted); })[0];
+  }
+  function placePageNotes() {
+    var measure = typeof window.CanvasRenderingContext2D === 'function' ? document.createElement('canvas').getContext('2d') : null;
+    if (measure) measure.font = '11px Arial';
+    util.qsa('.amud .lines', container).forEach(function (page) {
+      var lanes = [], maxHeight = page.clientHeight;
+      if (!maxHeight) return;
+      var scale = page.getBoundingClientRect().height / maxHeight || 1;
+      Array.from(page.querySelectorAll('.margin-note')).forEach(function (note) {
+        var line = note.closest('.line'), wanted = (line.getBoundingClientRect().top - page.getBoundingClientRect().top) / scale;
+        note.style.maxHeight = maxHeight + 'px'; note.style.top = '0px';
+        if (note.classList.contains('margin-comment')) note.style.height = Math.min(maxHeight, Math.ceil(measure ? measure.measureText(note.textContent).width + 2 : note.textContent.length * 6)) + 'px';
+        var height = Math.min(maxHeight, note.offsetHeight), lane = 0, top;
+        while (top == null) {
+          lanes[lane] ||= []; top = notePosition(wanted, height, maxHeight, lanes[lane]);
+          if (note.classList.contains('holy-name-note') && top !== Math.max(0, Math.min(maxHeight - height, wanted))) top = undefined;
+          if (top == null) lane++;
+        }
+        lanes[lane].push({ top: top, height: height, width: note.offsetWidth });
+        var right = 8;
+        for (var i = 0; i < lane; i++) right += Math.max(16, ...lanes[i].map(function (box) { return box.width; })) + 5;
+        note.style.top = (top - wanted) + 'px'; note.style.right = -(right + note.offsetWidth) + 'px';
+      });
+      var extent = lanes.reduce(function (sum, lane) { return sum + Math.max(16, ...lane.map(function (box) { return box.width; })) + 5; }, 8);
+      if (lanes.length) page.closest('.amud').style.setProperty('--notes-gutter', Math.max(34 * 96 / 25.4, extent + 8) + 'px');
     });
   }
 
@@ -484,7 +546,7 @@
     amud.style.setProperty('--line-width', pageWidth + 'mm');
     linesWrap.style.minHeight = Number(geom?.lines_per_amud || g.lines.length) * Number(geom?.baseline_pitch_mm || pitch) + 'mm';
     if (songPage) { linesWrap.style.height=linesWrap.style.minHeight; linesWrap.style.overflow='visible'; }
-    if (g.lines.some(function(line){return line.words.some(function(word){return word.letters.some(function(letter){return (letter.stam_letter_marks||[]).some(function(mark){return mark.type==='margin_note';});});});})) amud.classList.add('has-margin-notes');
+    if (g.lines.some(function(line){return (line.words||[]).some(function(word){return holyLabel(word) || (word.letters||[]).some(function(letter){return letterMarks(letter).some(function(mark){return mark.type==='margin_note';});});});})) amud.classList.add('has-margin-notes');
 
     if (placeholder) {
       // Keep the page's full geometry in the scroll track without its glyph DOM.
@@ -501,7 +563,8 @@
     var sourceName = layout.source_name || (source && source.name) || 'Untitled source';
     amud.appendChild(util.el('div', { class: 'page-footer', dir: 'ltr' }, [
       util.el('div', { class: 'page-source', dir: 'auto', text: sourceName }),
-      util.el('div', { text: 'Line width: ' + util.fmt(pageWidth, 2) + ' mm · Line height: ' + util.fmt(pitch, 2) + ' mm · ' + (gi + 1) + ' of ' + pageGroups.length })
+      util.el('div', { text: 'Line width: ' + util.fmt(pageWidth, 2) + ' mm · Line height: ' + util.fmt(pitch, 2) + ' mm · ' + (gi + 1) + ' of ' + pageGroups.length }),
+      util.el('div', { class: 'page-copyright', text: 'Copyright Yehuda Weisz — no one has rights to use this or copy without paying.' })
     ]));
     if (!placeholder) {
       var unit=Number(g.lines[0]?.measurement_unit_mm), first=g.lines[0];
@@ -529,6 +592,7 @@
     el.setAttribute('role', 'listitem');
     el.style.height = pitch + 'mm';
     el.style.minHeight = '0'; el.style.padding = '0';
+    el.style.setProperty('--row-pitch', pitch + 'mm');
 
     var gim = util.el('span', { class: 'lnum', text: String(li + 1), dir: 'ltr' });
     gim.setAttribute('lang', 'en');
@@ -556,9 +620,13 @@
 
     el.appendChild(txt);
     if(line.secondary_stretch)el.classList.add('needs-secondary-stretch');
-    var notes=[];
-    (line.words||[]).forEach(function(word){(word.letters||[]).forEach(function(letter){(letter.stam_letter_marks||[]).forEach(function(mark){if(mark.type==='margin_note')notes.push(mark.note);});});});
-    if(notes.length)el.appendChild(util.el('span',{class:'margin-notes',dir:'auto',text:notes.map(function(note){return '° '+note;}).join(' · ')}));
+    (line.words||[]).forEach(function(word){
+      var label = holyLabel(word);
+      if (label) el.appendChild(util.el('span', { class: 'margin-note holy-name-note', dir: 'rtl', text: '° ' + label }));
+      (word.letters||[]).forEach(function(letter){letterMarks(letter).forEach(function(mark){
+        if(mark.type==='margin_note') el.appendChild(util.el('span',{class:'margin-note margin-comment',dir:'auto',text:'° '+mark.note}));
+      });});
+    });
 
     // aria label: amud, line, verse ref
     var ref = pick(line, ['verse_ref', 'ref', 'verse'], '');
@@ -702,6 +770,7 @@
           s.title = 'Holy letter — human decision';
         }
         var marks = lt && (lt.stam_letter_marks || (lt.stam_letter_mark ? [lt.stam_letter_mark] : [])) || [];
+        if (li === 0 && holyLabel(word)) s.appendChild(util.el('span', { class: 'note-anchor holy-note-anchor', text: '°', title: holyLabel(word) }));
         marks.forEach(function(mark){
           s.classList.add('marker-'+mark.type);
           if(mark.type==='backward_nun')ink.textContent='נ';
@@ -918,6 +987,8 @@
     setReverseLines: setReverseLines,
     isReversed: function () { return reverseLines; },
     glyphFit: glyphFit,
+    holyLabel: holyLabel,
+    notePosition: notePosition,
     layoutGeometry: layoutGeometry,
     isReady: function () { return pageEls.length > 0 && renderedCount === pageEls.length; },
     preparePrint: preparePrint,

@@ -20,13 +20,14 @@ const layout = (text, geometry = geom()) => {
   return { ...computed, status: 'draft', snapshot: { profile: effectiveProfile(p, geometry), geometry } };
 };
 
-test('compound markers and notes remain metadata, rr never stretches a human-marked holy letter', () => {
+test('compound markers and notes remain metadata, a zero holy cap also protects rr letters', () => {
   const result = compute('frב zא nל bת (roof note)מ .ו rrד אב rrC');
   const line = result.lines[0], view = publicLine(line, effectiveProfile(p, geom()));
   assert.equal(view.words.map(word => word.consonant).join(' '), 'ב א ל ת מ ו ד אב ב');
   assert.deepEqual(view.words[0].letters[0].stam_letter_marks.map(m => m.type), ['four_tagin', 'large']);
   assert.equal(view.words[4].letters[0].stam_letter_marks[0].note, 'roof note');
-  const allowed = stretchCandidatesOf(line, effectiveProfile(p, geom()));
+  const protectedProfile = effectiveProfile(p, geom()); protectedProfile.stretch_policy.holy_name_percent = 0;
+  const allowed = stretchCandidatesOf(line, protectedProfile);
   assert(allowed.length > 0); assert(allowed.every(c => c.letter === 'ד'));
   assert.equal(ids(result.lines).length, 10);
 });

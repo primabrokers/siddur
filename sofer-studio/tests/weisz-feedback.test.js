@@ -14,7 +14,7 @@ function profile() {
   return normalizeProfile({ ...defaultProfile(), units_per_row: null, letter_height_units: null,
     reference_height_mm: 3, letter_height_mm: 3, unit_mm: 1,
     stretch_policy: { ...defaultProfile().stretch_policy,
-      caps_percent: { 'ב': 50 }, word_space_percent: 0,
+      caps_percent: { 'ב': 50 }, word_space_percent: 0, holy_name_percent: 0,
       secondary: { caps_percent: { 'ב': 200 }, priorities: { 'ב': 1 } } } });
 }
 function ui() {
@@ -113,7 +113,7 @@ test('preview rounds only the Hebrew shortage, hides intentional gaps, shows Ara
     assert.deepEqual([...f.d.querySelectorAll('.lnum')].map(x => x.textContent), ['1', '2', '3', '4', '5']);
     assert.deepEqual([...f.d.querySelectorAll('.side')].map(x => x.textContent), ['ח״ב', 'ח״ג', 'י״ג', '', 'י״ד']);
     assert.equal(f.d.querySelector('.side').dataset.missingUnits, '2.4');
-    assert.equal(f.d.querySelector('.sheet-head'), null); assert.match(f.d.querySelector('.page-footer').textContent, /1 of 1$/);
+    assert.equal(f.d.querySelector('.sheet-head'), null); assert.match(f.d.querySelector('.page-footer').textContent, /1 of 1/);
     assert.equal(f.d.querySelectorAll('[data-move-word]').length, 10);
   } finally { f.dom.window.close(); }
 });

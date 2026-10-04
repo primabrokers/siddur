@@ -24,10 +24,14 @@
     mode.addEventListener('change', function () { settings().column_start = mode.value; getDraft().vavei_haamudim = mode.value === 'vav'; });
     host.appendChild(u.el('label', { class: 'field' }, [u.el('span', { text: 'Column starts' }), mode]));
     host.appendChild(toggle('Narrow columns after Vavei / Hamelech moves to fill every line', 'fit_boundary_page'));
-    host.appendChild(toggle('Fit the last page of each segment; round the page count to the nearest whole page', 'fit_last_page'));
+    var fitting = u.el('select', { id: 'flow-page-fit' }, [['none','Keep column widths'],['last','Fit the last page of each segment'],['balance','Balance every page in each segment']].map(function (item) { return u.el('option', { value: item[0], text: item[1] }); }));
+    fitting.value = flow.balance_segments ? 'balance' : flow.fit_last_page ? 'last' : 'none';
+    fitting.addEventListener('change', function () { settings().fit_last_page = fitting.value === 'last'; settings().balance_segments = fitting.value === 'balance'; });
+    host.appendChild(u.el('label', { class: 'field' }, [u.el('span', { text: 'Page fitting — round segment page count to the nearest whole page' }), fitting]));
+    host.appendChild(toggle('Follow Davidovitch 245 page starts (v); unchecked ignores these markers', 'follow_reference_pages'));
     host.appendChild(toggle('Recalculate following text after moving words', 'reflow_word_moves'));
     host.appendChild(u.el('p', { class: 'profile-help', text: 'Page fitting changes column width in mm and units. Base letter size stays the same. Explicit song rows and paragraph spacing remain fixed.' }));
-    var starts = u.el('details', { class: 'flow-list', open: true }, [u.el('summary', { text: 'Selected page starts (t)' })]);
+    var starts = u.el('details', { class: 'flow-list' }, [u.el('summary', { text: 'Selected page starts (t)' })]);
     (controls.page_starts || []).forEach(function (item) {
       var value = flow.starts?.[item.id] || { enabled: true }, mm = value.width_mm || getDraft().line_width_mm;
       var check = u.el('input', { type: 'checkbox', checked: value.enabled !== false, 'aria-label': 'Start a page before ' + item.first_word });
@@ -42,7 +46,7 @@
     });
     if (!controls.page_starts?.length) starts.appendChild(u.el('p', { class: 'profile-help', text: 'No t markers in the selected source.' }));
     host.appendChild(starts);
-    var gaps = u.el('details', { class: 'flow-list', open: true }, [u.el('summary', { text: 'Individual custom gaps (g)' })]);
+    var gaps = u.el('details', { class: 'flow-list' }, [u.el('summary', { text: 'Individual custom gaps (g)' })]);
     (controls.custom_gaps || []).forEach(function (item) {
       var value = flow.gaps?.[item.id] || { preset: 'yod-2.5', units: 0 };
       var select = u.el('select', { 'aria-label': 'Gap between ' + item.before + ' and ' + item.after }, [
@@ -74,6 +78,6 @@
   SS.documentSettings = { render: render, init: function (api, root, draft) {
     API = api; getDraft = draft; host = u.el('div', { id: 'document-flow-settings' }); root.appendChild(host);
     SS.bus.on('selection:changed', loadSource); SS.bus.on('sourceId:changed', loadSource); SS.bus.on('app:ready', loadSource);
-    SS.bus.on('calibration:draft-changed', render); loadSource();
+    SS.bus.on('calibration:draft-changed', render); render(); loadSource();
   } };
 })();

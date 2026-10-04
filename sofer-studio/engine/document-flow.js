@@ -1,5 +1,5 @@
 import { makeLine, autoSuggestLine, applyStretch, petuchaGapMm } from './layout.js';
-import { interWordGap } from './width.js';
+import { interWordGap, measurementUnitMm } from './width.js';
 import { composeSongLine } from './song-layout.js';
 import { songSettings } from './column-options.js';
 
@@ -77,8 +77,8 @@ function fit(stream, start, stop, width, profile, geometry, maxRows = Infinity, 
 }
 
 // Pick the narrowest width that can hold these words in the requested rows.
-// Where equal word widths skip a row count, split an ordinary row at a safe
-// word boundary; never split a fixed song, paragraph gap or individual word.
+// Keep every row greedily packed, including the last row of a page. Equal word
+// widths can skip a row count; do not manufacture short rows just to fill it.
 function fillRows(stream, profile, geometry, target, originalWidth) {
   if (stream.some(item => item.type === 'row' || item.type === 'section_start' || item.type === 'width_break')) return null;
   if (stream.filter(item => item.type === 'word').length < target) return null;
@@ -91,22 +91,64 @@ function fillRows(stream, profile, geometry, target, originalWidth) {
   }
   const width = Math.ceil(high * 1000) / 1000;
   const result = fit(stream, 0, stream.length, width, profile, geometry);
-  while (result.lines.length < target) {
-    const candidates = result.lines.map((line, index) => ({ line, index })).sort((a, b) => b.line.words.length - a.line.words.length);
-    let split = false;
-    for (const { line, index } of candidates) {
-      if (line.song_layout || line.blank_line) continue;
-      const cuts = line.items.map((item, i) => i).filter(i => i > 0 && line.items[i].type === 'word' && line.items[i - 1].type === 'word');
-      if (!cuts.length) continue;
-      const cut = cuts.reduce((a, b) => Math.abs(a - line.items.length / 2) < Math.abs(b - line.items.length / 2) ? a : b);
-      result.lines.splice(index, 1, row(line.items.slice(0, cut), width, profile),
-        row(line.items.slice(cut), width, profile, { explicit: line.manual_line_end, petucha: line.petucha_end, sefer: line.sefer_end }));
-      split = true; break;
-    }
-    if (!split) return null;
-  }
   if (result.lines.some(line => line.width_mm + (line.petucha_end ? petuchaGapMm(profile) : 0) > width + .001)) return null;
   return { ...result, width, previous_width_mm: originalWidth };
+}
+
+// Search integral row-unit widths against cumulative source measurements. Each
+// chosen endpoint is a whole-word boundary; the next target uses what remains.
+function balancePages(stream, original, profile, geometry, maxRows) {
+  if (original.some(page => page.manual_width)) return null;
+  const start = original[0].start, end = original.at(-1).end;
+  const count = Math.max(1, Math.round(original.reduce((sum, page) => sum + page.lines.length, 0) / maxRows));
+  const unit = measurementUnitMm(profile), prefix = [0];
+  for (let i = start; i < end; i++) {
+    const item = stream[i];
+    const width = item.type === 'row' ? widthOf(item.line.items, profile) : Number(item.width_mm) || 0;
+    const gap = item.type === 'word' && stream[i - 1]?.type === 'word' ? interWordGap(profile) : 0;
+    prefix.push(prefix.at(-1) + width + gap);
+  }
+  const at = cursor => prefix[cursor - start];
+  const pages = []; let cursor = start;
+  for (let remaining = count; remaining > 0 && cursor < end; remaining--) {
+    const target = at(cursor) + (at(end) - at(cursor)) / remaining;
+    const cache = new Map();
+    const candidate = units => {
+      if (cache.has(units)) return cache.get(units);
+      let page = fit(stream, cursor, end, units * unit, profile, geometry, maxRows);
+      const mode = geometry.document_flow?.column_start;
+      if (remaining > 1 && ['vav', 'hamelech'].includes(mode) && !page.lines.some(line => line.fixed_pattern)) {
+        for (let cut = page.cursor - 1; cut > cursor; cut--) {
+          const item = stream[cut];
+          if (item.type === 'word' && !gapItem(stream[cut - 1]) && !gapItem(stream[cut + 1]) &&
+              (mode === 'vav' ? item.consonant?.startsWith('ו') : item.consonant === 'המלך')) {
+            page = fit(stream, cursor, cut, units * unit, profile, geometry, maxRows); break;
+          }
+        }
+      }
+      const overfull = page.lines.some(line => line.width_mm + (line.petucha_end ? petuchaGapMm(profile) : 0) > units * unit + .001);
+      const score = overfull || page.cursor <= cursor || (remaining > 1 && page.cursor >= end) ? Infinity : Math.abs(at(page.cursor) - target);
+      const result = { ...page, score, units }; cache.set(units, result); return result;
+    };
+    let low = 1, high = Math.max(1, Math.floor(1000 / unit));
+    while (low < high) {
+      const middle = Math.floor((low + high) / 2), page = candidate(middle);
+      if (at(page.cursor) < target) low = middle + 1; else high = middle;
+    }
+    // Inspect either side of the endpoint jump. In the final page, choose the
+    // narrowest integral width that fits everything without splitting words.
+    for (let n = Math.max(1, low - 2); n <= Math.min(Math.floor(1000 / unit), low + 2); n++) candidate(n);
+    candidate(Math.max(1, Math.round(original[0].width / unit)));
+    const best = [...cache.values()].filter(page => Number.isFinite(page.score) && (remaining !== 1 || page.cursor === end))
+      .sort((a, b) => a.score - b.score || a.units - b.units)[0];
+    if (!best) return null;
+    pages.push({ ...best, start: cursor, end: best.cursor, previous_width_mm: original[0].width }); cursor = best.cursor;
+  }
+  if (cursor !== end || pages.length !== count) return null;
+  if (original[0].lines[0]?.page_start) {
+    pages[0].lines[0].page_start = true; pages[0].lines[0].segment_start_id = original[0].lines[0].segment_start_id;
+  }
+  return pages;
 }
 
 export function reflowDocument(lines, profile, geometry, options = {}) {
@@ -114,8 +156,13 @@ export function reflowDocument(lines, profile, geometry, options = {}) {
   const stream = measuredStream(lines, settings.page_widths), pages = [], warnings = [];
   let cursor = 0, sectionWidth = geometry.line_width_mm, sectionStart = null, segmentPages = [];
   const finishSegment = () => {
+    if (settings.balance_segments && segmentPages.length) {
+      const balanced = balancePages(stream, segmentPages, profile, geometry, maxRows);
+      if (balanced) segmentPages = balanced;
+      else warnings.push('This segment keeps its existing widths because fixed rows, page-width edits or paragraph gaps prevent balanced whole-word pages.');
+    }
     const last = segmentPages.at(-1);
-    if (last && !last.manual_width && last.lines.length < maxRows && (settings.fit_last_page || settings.fit_boundary_page)) {
+    if (!settings.balance_segments && last && !last.manual_width && last.lines.length < maxRows && (settings.fit_last_page || settings.fit_boundary_page)) {
       const merge = settings.fit_last_page && last.lines.length / maxRows < .5 && segmentPages.length > 1 && !segmentPages.at(-2).manual_width;
       const first = merge ? segmentPages.at(-2) : last;
       const fitted = fillRows(stream.slice(first.start, last.end), profile, geometry, maxRows, first.width);

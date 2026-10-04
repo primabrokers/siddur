@@ -34,6 +34,7 @@ export function validateProfileInput(body) {
     else {
       const validPercent = value => value === 'unlimited' || (typeof value === 'number' && Number.isFinite(value) && value >= 0);
       if (![1, 2].includes(policy.version)) errs.push('stretch_policy.version must be 1 or 2');
+      if (policy.holy_name_percent != null && !validPercent(policy.holy_name_percent)) errs.push('Holy-name cap must be a non-negative percentage or unlimited');
       if (!policy.caps_percent || typeof policy.caps_percent !== 'object' || Array.isArray(policy.caps_percent)) errs.push('caps_percent must be an object');
       else for (const [letter, value] of Object.entries(policy.caps_percent)) {
         if (!validPercent(value)) errs.push('caps_percent[' + letter + '] must be a non-negative percentage or unlimited');

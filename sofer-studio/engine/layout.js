@@ -156,7 +156,7 @@ export function buildWordUnits(source) {
   const units = [];
   const verseLetters = []; // [{ ref, letters: [{id,base,grapheme}] }] for override resolution
   let letterIdx = 0;
-  let wordIdx = 0, pageMarker = 0, gapMarker = 0;
+  let wordIdx = 0, pageMarker = 0, referenceMarker = 0, gapMarker = 0;
   let prevBook = null;
   for (const verse of source.verses) {
     if (verse.book !== prevBook && prevBook !== null) {
@@ -170,6 +170,7 @@ export function buildWordUnits(source) {
         // Inline marker: preserves the gap boundary BETWEEN words (not verse end).
         units.push({ type: t.marker, break_kind: t.break_kind || null, verse: verse.ref,
           ...(t.marker === 'page_break' ? { marker_id: 't-' + pageMarker++ } : {}),
+          ...(t.marker === 'reference_page_break' ? { marker_id: 'v-' + referenceMarker++ } : {}),
           ...(t.marker === 'custom_gap' ? { marker_id: 'g-' + gapMarker++ } : {}) });
         continue;
       }
@@ -218,7 +219,9 @@ export function buildWordUnits(source) {
 
 function buildLayoutUnits(source, profile, geometry) {
   const built = buildWordUnits(source), settings = documentSettings(source, geometry);
-  built.units = built.units.filter(unit => unit.type !== 'page_break' || settings.starts?.[unit.marker_id]?.enabled !== false)
+  built.units = built.units.filter(unit => unit.type !== 'reference_page_break' || settings.follow_reference_pages === true)
+    .map(unit => unit.type === 'reference_page_break' ? { ...unit, type: 'page_break' } : unit)
+    .filter(unit => unit.type !== 'page_break' || settings.starts?.[unit.marker_id]?.enabled !== false)
     .map(unit => unit.type === 'custom_gap' ? { ...unit, width_mm: customGapWidth(settings.gaps?.[unit.marker_id], profile) } : unit);
   return built;
 }
@@ -517,10 +520,11 @@ function startsWithVav(word) {
 
 function primaryStretchCandidatesOf(line, profile) {
   const exclusive = line.words.flatMap(word => word.letters.filter(letter => hasLetterMark(letter, 'exclusive_stretch')).map(letter => ({ word, letter })));
-  if (exclusive.length) return exclusive.filter(({ word, letter }) => !letter.holy && (profile.stretch_policy?.version === 2 || !word.isShem)).map(({ word, letter }) => ({
+  if (exclusive.length) return exclusive.filter(({ word, letter }) => profile.stretch_policy?.version === 2 || !word.isShem).map(({ word, letter }) => ({
     letter_occurrence_id: letter.id, letter: letter.base, word: word.text, kind: 'letter', priority: 1,
-    cap_mm: baseBudget(line), cap_percent: 'unlimited', base_width_mm: measuredLetterWidth(word, letter, profile),
-  }));
+    cap_mm: letter.holy ? (profile.non_stretchable.includes(letter.base) ? 0 : letterCap(word, letter, profile, baseBudget(line))) : baseBudget(line),
+    cap_percent: letter.holy ? profile.stretch_policy?.holy_name_percent ?? 0 : 'unlimited', base_width_mm: measuredLetterWidth(word, letter, profile),
+  })).filter(candidate => candidate.cap_mm > 0);
   // A paragraph-break line is gap-only. A finite gap cap must never cause
   // fallback stretching of letters or normal spaces on that same line.
   if (profile.stretch_policy && (line.has_setuma || line.petucha_end)) {
@@ -532,7 +536,8 @@ function primaryStretchCandidatesOf(line, profile) {
   line.words.forEach((w, wi) => {
     const n = w.letters.length;
     w.letters.forEach((l, li) => {
-      if (l.holy || (profile.stretch_policy?.version !== 2 && w.isShem)) return;
+      if (profile.stretch_policy?.version !== 2 && w.isShem) return;
+      if (l.holy && !(profile.stretch_policy?.holy_name_percent === 'unlimited' || Number(profile.stretch_policy?.holy_name_percent) > 0)) return;
       if (profile.non_stretchable.includes(l.base)) return;
       const cap = letterCap(w, l, profile, baseBudget(line));
       let posOk = true;
@@ -542,7 +547,8 @@ function primaryStretchCandidatesOf(line, profile) {
       const mark = (w.override || []).find(o => o.id === l.id && o.stam_hyphens > 0);
       if (profile.stretch_policy?.version === 2 && mark) {
         const base = Number(mark.stam_hyphens) * Number(mark.stam_hyphen_units) * stamMarkerUnitMm(profile);
-        const hyphenCap = percentageCap(base, profile.stretch_policy.hyphen_percent ?? 0, baseBudget(line));
+        const hyphenCap = Math.min(percentageCap(base, profile.stretch_policy.hyphen_percent ?? 0, baseBudget(line)),
+          l.holy ? percentageCap(base, profile.stretch_policy.holy_name_percent ?? 0, baseBudget(line)) : Infinity);
         if (hyphenCap > 0) cands.push({letter_occurrence_id:'hyphen-'+l.id, kind:'hyphen', letter:'-', word:w.text,
           base_width_mm:base, cap_mm:hyphenCap, cap_percent:profile.stretch_policy.hyphen_percent,
           priority:profile.stretch_priorities?.hyphen ?? 3});

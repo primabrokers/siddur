@@ -684,13 +684,18 @@
     function group(viewName, entries) {
       var bar = util.el('nav', { class: 'workspace-subnav', role: 'tablist', 'aria-label': labels[viewName] + ' tools' });
       sections[viewName] = {}; sectionTabs[viewName] = {};
-      views[viewName].appendChild(bar);
+      if (viewName !== 'setup') views[viewName].appendChild(bar);
       entries.forEach(function (entry) {
         var key = entry[0], id = viewName + '-' + key;
         var button = util.el('button', { id: 'tool-' + id, type: 'button', role: 'tab', 'aria-controls': 'section-' + id, text: entry[1] });
         button.addEventListener('click', function () { open(viewName, key); });
         var section = util.el('section', { id: 'section-' + id, class: 'workspace-section', role: 'tabpanel', 'aria-labelledby': button.id });
-        bar.appendChild(button); views[viewName].appendChild(section);
+        if (viewName === 'setup') {
+          section.removeAttribute('role'); section.removeAttribute('aria-labelledby');
+          section.setAttribute('aria-label', entry[1]);
+          if (key === 'layouts') { button.removeAttribute('role'); button.className = 'btn btn-ghost btn-sm'; selectors.appendChild(button); }
+        } else bar.appendChild(button);
+        views[viewName].appendChild(section);
         sections[viewName][key] = section; sectionTabs[viewName][key] = button;
       });
       keyboardTabs(bar);
@@ -708,10 +713,16 @@
         ev.preventDefault(); ev.stopPropagation(); items[next].click(); items[next].focus();
       });
     }
-    heading(views.setup, 'Start with your book', 'Load the classic Tikkun, or use your own measurements. Your saved work stays separate.');
+    heading(views.setup, 'Setup', 'Choose a source, profile or geometry to open its settings.');
     var selectors = util.el('div', { class: 'workspace-selectors' });
     ['source-select', 'profile-select', 'geometry-select'].forEach(function (id) {
-      var select = util.byId(id); if (select) move(select.closest('label'), selectors);
+      var select = util.byId(id); if (select) {
+        move(select.closest('label'), selectors);
+        var key = { 'source-select': 'book', 'profile-select': 'calibration', 'geometry-select': 'geometry' }[id];
+        select.addEventListener('pointerdown', function () { open('setup', key); });
+        select.addEventListener('focus', function () { open('setup', key); });
+        select.addEventListener('change', function () { open('setup', key); });
+      }
     });
     move('btn-compute', selectors); views.setup.appendChild(selectors);
     group('setup', [['book', 'Book & source'], ['calibration', 'Measurements'], ['geometry', 'Column settings'], ['layouts', 'Saved layouts']]);
@@ -723,6 +734,14 @@
     move('panel-calibration', sections.setup.calibration);
     move('panel-geometry', sections.setup.geometry);
     move('layouts-body', sections.setup.layouts);
+    var mainMeasurements = util.el('div', { class: 'setup-main-measurements' });
+    var heightField = util.qs('[data-field="letter_height_units"]');
+    if (heightField) move(heightField.closest('label'), mainMeasurements);
+    var rowUnits = util.byId('cal-units-per-row');
+    if (rowUnits) move(rowUnits.closest('label'), mainMeasurements);
+    selectors.after(mainMeasurements);
+    var summary = util.el('details', { id: 'setup-summary', class: 'setup-summary' }, [util.el('summary', { text: 'Summary' })]);
+    move(util.qs('.big-klaf'), summary); move('geom-derived', summary); views.setup.appendChild(summary);
 
     // The document and a single optional inspector are the only Layout content.
     var layoutBar = util.el('div', { class: 'workspace-document-label' }, [
@@ -759,6 +778,7 @@
     var reportLink = util.el('button', { class: 'btn btn-ghost', text: 'View / download stretch report' });
     reportLink.addEventListener('click', function () { open('review', 'stretch'); }); views.download.appendChild(reportLink);
 
+    app.appendChild(util.el('footer', { class: 'workspace-copyright', text: 'Copyright Yehuda Weisz — no one has rights to use this or copy without paying.' }));
     // Old panels are retained, but no longer expandable competing columns.
     util.qsa('.panel', main).forEach(function (panel) {
       panel.classList.remove('is-collapsed');
@@ -786,7 +806,8 @@
       Object.keys(sections).forEach(function (view) {
         Object.keys(sections[view]).forEach(function (key) {
           var active = key === selected[view]; sections[view][key].hidden = !active;
-          sectionTabs[view][key].setAttribute('aria-selected', String(active)); sectionTabs[view][key].tabIndex = active ? 0 : -1;
+          if (view === 'setup') { sectionTabs[view][key].setAttribute('aria-expanded', String(active)); sectionTabs[view][key].tabIndex = 0; }
+          else { sectionTabs[view][key].setAttribute('aria-selected', String(active)); sectionTabs[view][key].tabIndex = active ? 0 : -1; }
         });
       });
       // The existing preview observes its box; notify also covers older browsers.

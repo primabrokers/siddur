@@ -124,29 +124,11 @@
     root.appendChild(util.el('p', {class:'profile-help',text:'This is a custom measurement draft, not the verified Simanim Layout 1. Computing it reflows text. Save a copy and adjust measurements with your sofer; do not use it as an exact printed tikkun reference.'}));
     root.appendChild(util.el('div', { class: 'sirtut' }));
 
-    var mode = util.el('select', {id:'geom-document-mode'}, [
-      util.el('option',{value:'torah',text:'Torah / other text'}),
-      util.el('option',{value:'rosh',text:'Tefillin shel rosh — 4 lines per page'}),
-      util.el('option',{value:'yad',text:'Tefillin shel yad — 7 lines per page'})]);
-    mode.addEventListener('change', function(){ selectTefillin(mode.value); });
-    root.appendChild(util.el('label',{class:'field'},[util.el('span',{text:'Document type'}),mode]));
-    var tefillin = util.el('div',{id:'geom-tefillin',class:'geom-grid',hidden:true});
-    ['קדש','והיה כי יביאך','שמע','והיה אם שמוע'].forEach(function(name,index){
-      var input=util.el('input',{type:'number',min:'0.01',step:'0.1',id:'tefillin-width-'+index,placeholder:'Enter width in mm'});
-      input.addEventListener('input',function(){draft.tefillin.widths_mm[index]=input.value===''?null:Number(input.value);bus.emit('geometry:draft-changed');});
-      tefillin.appendChild(util.el('label',{class:'field'},[util.el('span',{text:(index+1)+'. '+name+' — width (mm)'}),input]));
-    });
-    var paper=util.el('select',{id:'tefillin-paper'},[util.el('option',{value:'A4',text:'A4 landscape'}),util.el('option',{value:'A3',text:'A3 landscape'})]);
-    paper.addEventListener('change',function(){draft.tefillin.paper=paper.value;});
-    tefillin.appendChild(util.el('label',{class:'field'},[util.el('span',{text:'Print all four pages on'}),paper]));
-    tefillin.appendChild(util.el('p',{class:'profile-help full',text:'Load the four Tefillin passages in Book & source. Choose each page width, then save and compute. The letter-width table and the calibration column width below keep the same physical letter size on all four pages.'}));
-    root.appendChild(tefillin);
-
     // lines per amud selector
     var linesWrap = util.el('div', { class: 'lines-selector' });
     linesWrap.appendChild(util.el('span', { class: 'field-label', text: 'Lines per amud' }));
     var seg = util.el('div', { class: 'seg', id: 'geom-lines-seg' });
-    [['42', '42'], ['48', '48'], ['60', '60'], ['custom', 'custom']].forEach(function (pair) {
+    ['4', '7', '11', '21', '22', '42', '48', '60', 'custom'].map(function (value) { return [value, value]; }).forEach(function (pair) {
       var b = util.el('button', { type: 'button', 'data-lines': pair[0], text: pair[1] });
       b.addEventListener('click', function () { setLinesPerAmud(pair[0]); });
       seg.appendChild(b);
@@ -196,7 +178,7 @@
 
     // derived results
     bigKlafEl = util.el('div', { class: 'big-klaf', hidden: true },
-      [util.el('div', { class: 'label', text: 'Total klaf length' }),
+      [util.el('div', { class: 'label', text: 'Total klaf length including first and last columns and end margins' }),
        util.el('div', { class: 'value', id: 'geom-klaf-value' })]);
     root.appendChild(bigKlafEl);
 
@@ -232,7 +214,7 @@
 
   function updateLinesSegUI() {
     var L = draft.lines_per_amud;
-    var isPreset = !customLines && (L === 42 || L === 48 || L === 60);
+    var isPreset = !customLines && [4, 7, 11, 21, 22, 42, 48, 60].includes(L);
     util.qsa('#geom-lines-seg button').forEach(function (b) {
       var d = b.getAttribute('data-lines');
       var active = (d === 'custom') ? !isPreset : (parseInt(d, 10) === L);
@@ -302,7 +284,7 @@
   }
 
   function renderFromDraft() {
-    customLines = ![42, 48, 60].includes(draft.lines_per_amud);
+    customLines = ![4, 7, 11, 21, 22, 42, 48, 60].includes(draft.lines_per_amud);
     util.byId('geom-name').value = draft.name || '';
     FIELDS.forEach(function (f) {
       var el = util.qs('[data-field="' + f[0] + '"]', root);
@@ -314,10 +296,6 @@
     var k = util.qs('[data-field="amudim_per_yeria"]', root);
     if (k) k.value = draft.amudim_per_yeria;
     syncLineWidthDisplay();
-    util.byId('geom-document-mode').value=draft.tefillin?draft.tefillin.kind:'torah';
-    util.byId('geom-tefillin').hidden=!draft.tefillin;
-    util.byId('geom-lines-seg').closest('.lines-selector').hidden=!!draft.tefillin;
-    if(draft.tefillin){draft.tefillin.widths_mm.forEach(function(width,i){util.byId('tefillin-width-'+i).value=width==null?'':width;});util.byId('tefillin-paper').value=draft.tefillin.paper||'A4';}
     ensureSongs();
     ['hayam','haazinu'].forEach(function(kind){['total_mm','right_mm','left_mm'].forEach(function(key){util.byId('song-'+kind+'-'+key).value=draft.song_layouts[kind][key];});});
     SS.documentSettings?.render();

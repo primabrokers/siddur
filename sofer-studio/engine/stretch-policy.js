@@ -27,7 +27,9 @@ export function baseBudget(line) {
 
 export function letterCap(word, letter, profile, budget) {
   if (profile.stretch_policy) {
-    return percentageCap(measuredLetterWidth(word, letter, profile), profile.stretch_policy.caps_percent[letter.base] ?? 0, budget);
+    const width = measuredLetterWidth(word, letter, profile);
+    const ordinary = percentageCap(width, profile.stretch_policy.caps_percent[letter.base] ?? 0, budget);
+    return letter.holy ? Math.min(ordinary, percentageCap(width, profile.stretch_policy.holy_name_percent ?? 0, budget)) : ordinary;
   }
   return Number(profile.max_stretch?.[letter.base]) || 0;
 }

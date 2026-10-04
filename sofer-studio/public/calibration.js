@@ -42,7 +42,7 @@
   }
   function defaultPolicy() {
     var caps = {}; SS.LETTERS.forEach(function (ch) { caps[ch] = '\u05d3\u05d4\u05e8\u05ea'.indexOf(ch) >= 0 ? 'unlimited' : 50; });
-    return { version: 2, caps_percent: caps, distribution: 'equal_percent', word_space_percent: 50, hyphen_percent: 0,
+    return { version: 2, caps_percent: caps, distribution: 'equal_percent', word_space_percent: 50, hyphen_percent: 0, holy_name_percent: 'unlimited',
       petucha_percent: 'unlimited', setuma_percent: 'unlimited', stam_hyphen_units: 1,
       special_widths_units: Object.assign({}, SPECIAL_DEFAULTS), priorities: defaultPriorities(),
       song_widths_mm: { page: 0, middle: 0, side: 0 } };
@@ -183,7 +183,7 @@
       util.el('span', { text: 'Skeleton widths ', class: '' })));
     var foot = util.qs('.panel-foot', root);
     foot.innerHTML = '<strong>New profiles use no added stroke allowance or inter-letter gap;</strong> lower stretch-preference numbers are used first. ' +
-      'Holy-letter protection comes only from human input and can never be inferred or bypassed.';
+      'Only human-marked holy letters use the additional holy-name cap. Their individual letter limits still apply.';
   }
 
   function tableScaffold() {
@@ -191,7 +191,7 @@
     var tbl = util.el('table', { class: 'letter-table' });
     var thr = util.el('tr', {}, [
       util.el('th', { text: 'Letter' }),
-      util.el('th', { text: 'Skeleton units' }),
+      util.el('th', { text: 'Width units' }),
       util.el('th', { text: 'Total mm' }),
       util.el('th', { id: 'cal-cap-heading', text: 'Cap %' }),
       util.el('th', { text: 'Stretch preference' }),
@@ -329,11 +329,11 @@
    * Rendering
    * ------------------------------------------------------------------ */
   function setFieldValue(path, value) {
-    var el = util.qs('[data-field="' + path + '"]', root);
+    var el = util.qs('[data-field="' + path + '"]');
     if (el) el.value = value;
   }
   function getFieldValue(path) {
-    var el = util.qs('[data-field="' + path + '"]', root);
+    var el = util.qs('[data-field="' + path + '"]');
     return el ? el.value : '';
   }
   function nestedGet(path) {
@@ -508,6 +508,17 @@
       appendSecondaryCells(tr, key);
       tbody.appendChild(tr);
     });
+    appendHolyCap(tbody);
+  }
+
+  function appendHolyCap(tbody) {
+    if (draft.stretch_policy?.version !== 2) return;
+    var row = util.el('tr', { class: 'special-measurement', 'data-measurement': 'holy_name' });
+    row.appendChild(util.el('td', { class: 'let', text: 'Holy-name maximum' }));
+    row.appendChild(util.el('td', { text: '—' })); row.appendChild(util.el('td', { text: '—' }));
+    row.appendChild(capCell('holy names', draft.stretch_policy.holy_name_percent ?? 0, true, function (value) { draft.stretch_policy.holy_name_percent = value; }));
+    row.appendChild(util.el('td', { colspan: '3', text: 'Additional limit; individual letter rules still apply.' }));
+    tbody.appendChild(row);
   }
 
   function appendSecondaryCells(row, key) {

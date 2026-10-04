@@ -503,11 +503,14 @@ table.data tr.sev-warn td { background: rgba(199,154,63,.08); }
 .marker-backward_nun { transform: scaleX(-1); }
 .marker-backward { transform: scaleX(-1); }
 .marker-backward.marker-broken::after { transform:rotate(25deg); }
-.marker-broken::after { content:''; position:absolute; left:0; top:var(--roof-middle,45%); width:100%; height:1.3px; background:white; transform:rotate(-25deg); transform-origin:center; z-index:3; pointer-events:none; }
+.marker-broken::after { content:''; position:absolute; left:0; top:calc(var(--roof-middle,45%) + .045em); width:100%; height:1.3px; background:white; transform:rotate(-25deg); transform-origin:center; z-index:3; pointer-events:none; }
 .note-anchor { position:absolute; top:calc(var(--roof-top,0px) - .65em); right:30%; font: .5em Arial,sans-serif; }
 .four-tagin { position:absolute; width:70%; right:15%; pointer-events:none; }
 .margin-notes { position:absolute; right:-31mm; width:28mm; top:0; white-space:normal; font:11px/1.3 Arial,sans-serif; color:#444; }
-.amud.has-margin-notes { padding-right:34mm; }
+.amud.has-margin-notes { padding-right:var(--notes-gutter,34mm); }
+.margin-note { position:absolute; top:0; right:-16px; font:11px/1.3 Arial,sans-serif; color:#333; }
+.margin-comment { writing-mode:vertical-rl; text-orientation:sideways; white-space:normal; overflow-wrap:anywhere; width:max-content; max-height:100%; }
+.holy-name-note { white-space:nowrap; }
 .app-version { font:12px/1.2 var(--font-mono); margin-left:12px; }
 .flow-row { display:grid; grid-template-columns:1fr 100px 100px; gap:8px; margin:12px 0; align-items:center; }
 .flow-list { margin:18px 0; }
@@ -516,13 +519,19 @@ table.data tr.sev-warn td { background: rgba(199,154,63,.08); }
 .page-width-editor { display:flex; align-items:center; gap:8px; font:12px/1.3 var(--font-ui); margin:12px 0; }
 .page-width-editor input { width:95px; }
 .line-move { flex:0 0 104px; padding:0 4px; gap:2px; }
-.line-move .line-word-count { width:48px; min-width:0; padding:2px; font:11px var(--font-ui); height:25px; }
+.line-move .line-word-count { width:42px; min-width:0; padding:0 1px; font:10px var(--font-ui); height:min(13px,calc(var(--row-pitch,4mm) - 1px)); min-height:0; }
+.line-move .btn { padding:0 3px; line-height:1; font-size:10px; min-height:0; height:min(13px,calc(var(--row-pitch,4mm) - 1px)); }
+.hide-line-controls .line-move { display:none; }
 .hide-shortfall .line .side, .hide-numbers .line .lnum { visibility:hidden; }
 .show-letter-guides .lk { box-shadow:inset -1px 0 #91a8b3; }
+.show-letter-guides .word-box { box-shadow:inset -1px 0 #91a8b3; }
+.show-letter-guides .ltext { position:relative; box-shadow:inset 1px 0 #91a8b3, inset -1px 0 #91a8b3; }
+.show-letter-guides .ltext::after { content:''; position:absolute; pointer-events:none; left:0; right:0; top:var(--separator-top,100%); border-top:.5px solid #91a8b3; }
 .line.needs-secondary-stretch .ink-glyph { color:#c46b00; }
 @media print {
   .page-width-editor, .line-move { display:none !important; }
-  .show-letter-guides .lk { box-shadow:none; }
+  .show-letter-guides .lk, .show-letter-guides .word-box, .show-letter-guides .ltext { box-shadow:none; }
+  .show-letter-guides .ltext::after { display:none; }
   .line.needs-secondary-stretch .ink-glyph { color:black; }
   .marker-broken::after { print-color-adjust:exact; -webkit-print-color-adjust:exact; }
 }
@@ -1127,3 +1136,36 @@ body.sofer-workspace {
   #sample-print-area .ltext { flex:none; width:var(--line-width); }
   #sample-print-area .margin-notes { right:-27mm; width:24mm; }
 }
+
+/* Compact Setup keeps the measurement fields and summary in one place. */
+.sofer-workspace #view-setup { padding:12px 16px; }
+.sofer-workspace #view-setup .workspace-heading { margin-bottom:10px; }
+.sofer-workspace #view-setup .workspace-heading h1 { font-size:21px; }
+.sofer-workspace #view-setup .workspace-section { padding:10px 0; }
+.sofer-workspace #view-setup .panel-body { padding:10px; }
+.sofer-workspace #view-setup .panel-head { padding:6px 10px; }
+.sofer-workspace #view-setup .field { gap:3px; font-size:12px; }
+.sofer-workspace #view-setup input, .sofer-workspace #view-setup select { min-height:26px; padding:3px 6px; font-size:12px; }
+.sofer-workspace #view-setup .profile-help { margin:6px 0; font-size:11px; line-height:1.35; }
+.sofer-workspace #view-setup .geom-grid, .sofer-workspace #view-setup .master-grid { gap:8px 12px; }
+.sofer-workspace #view-setup .letter-table th, .sofer-workspace #view-setup .letter-table td { padding:3px 5px; font-size:11px; }
+.sofer-workspace #view-setup .letter-table .let { font-size:16px; }
+.sofer-workspace #view-setup .letter-table input, .sofer-workspace #view-setup .letter-table select { min-height:22px; height:22px; padding:1px 3px; font-size:11px; }
+.sofer-workspace #view-setup .letter-table input { width:58px; }
+.sofer-workspace #view-setup .letter-table .special-measurement .let { font:11px var(--font-ui); }
+.sofer-workspace #view-setup .stretch-policy-controls { padding:10px; margin:8px 0; }
+.sofer-workspace #view-setup .sirtut { margin:8px 0; }
+.setup-main-measurements { display:flex; gap:18px; align-items:flex-start; flex-wrap:wrap; margin:10px 0; }
+.setup-main-measurements > label { width:190px; }
+.setup-summary { margin-top:12px; border-top:1px solid var(--rule); padding-top:8px; }
+.setup-summary > summary { cursor:pointer; font-weight:600; }
+.workspace-copyright { padding:8px 16px; text-align:center; font:10px/1.4 var(--font-ui); color:var(--muted); }
+.page-copyright { font-size:9px; }
+.sample-cut-mark { position:absolute; width:0; height:0; z-index:20; }
+.sample-frame { position:absolute; right:3mm; top:3mm; overflow:hidden; }
+#sample-print-area .sample-frame .amudim-row { position:absolute; right:0; top:0; }
+.sample-cut-mark::before, .sample-cut-mark::after { content:''; position:absolute; background:#000; }
+.sample-cut-mark::before { width:4mm; height:.2mm; left:-2mm; top:-.1mm; }
+.sample-cut-mark::after { height:4mm; width:.2mm; top:-2mm; left:-.1mm; }
+.sample-copyright { position:absolute; right:3mm; left:3mm; text-align:center; font:8px/1.2 Arial,sans-serif; }
+@media print { .workspace-copyright { display:none; } .sample-cut-mark { print-color-adjust:exact; -webkit-print-color-adjust:exact; } }

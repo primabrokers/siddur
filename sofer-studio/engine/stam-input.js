@@ -12,9 +12,9 @@ export function parseStamInput(raw) {
   const flush = () => {
     if (!letters && hyphens.length) { markers.push({ type: '-', count: hyphens.length, after_word: words.length }); hyphens = []; return; }
     if (!letters) return;
-    if (pendingMarks.length) throw new Error('STAM modifier is not followed by a Hebrew letter');
+    if (pendingMarks.some(mark => mark.type !== 'margin_note')) throw new Error('STAM modifier is not followed by a Hebrew letter');
     words.push({ text: letters, holyLetterIndexes: holyLetterIndexes.slice(), hyphens: hyphens.slice(), letterMarks: letterMarks.slice() });
-    letters = ''; holyLetterIndexes = []; hyphens = []; letterMarks = []; pendingMarks = [];
+    letters = ''; holyLetterIndexes = []; hyphens = []; letterMarks = [];
   };
   const appendLetter = (letter, holy = false) => {
     const letterIndex = Array.from(letters).length;
@@ -56,7 +56,7 @@ export function parseStamInput(raw) {
       pendingMarks.push('dotted'); continue;
     }
     if (ch === '!') { pendingMarks.push('backward_nun'); appendLetter('נ'); continue; }
-    if ('psltg123me'.includes(ch)) { flush(); markers.push({ type: ch, after_word: words.length }); continue; }
+    if ('psltvg123me'.includes(ch)) { flush(); markers.push({ type: ch, after_word: words.length }); continue; }
     if (/\s/u.test(ch)) { flush(); continue; }
     throw new Error(`Unsupported STAM character U+${ch.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')}`);
   }
@@ -77,6 +77,7 @@ export function stamSourceText(parsed) {
       else if (marker.type === 's') out.push('{ס}');
       else if (marker.type === 'l') out.push('{blank-line}');
       else if (marker.type === 't') out.push('{page-start}');
+      else if (marker.type === 'v') out.push('{reference-page-start}');
       else if (marker.type === 'g') out.push('{custom-gap}');
       else if ('123me'.includes(marker.type)) out.push(`{song-${marker.type}}`);
     }

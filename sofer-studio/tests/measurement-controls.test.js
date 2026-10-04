@@ -94,7 +94,7 @@ test('v2 word spaces support percentages above 50 and Unlimited but retain expli
 });
 test('hyphen caps and priorities control marked width; two hyphens count twice and holy letters remain protected',()=>{
   for(const cap of [50,'unlimited']) {
-    const prof=effectiveProfile(p({hyphen_percent:cap,priorities:{hyphen:2}}),g), l=line('א--ב',prof);
+    const prof=effectiveProfile(p({hyphen_percent:cap,holy_name_percent:0,priorities:{hyphen:2}}),g), l=line('א--ב',prof);
     const c=stretchCandidatesOf(l,prof).find(c=>c.kind==='hyphen');
     assert(c);assert.equal(c.base_width_mm,1);assert.equal(c.priority,2);
     assert.equal(c.cap_mm,cap==='unlimited'?l.base_leftover_mm:.5);
