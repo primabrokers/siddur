@@ -510,6 +510,7 @@ table.data tr.sev-warn td { background: rgba(199,154,63,.08); }
 .amud.has-margin-notes { padding-right:var(--notes-gutter,34mm); }
 .margin-note { position:absolute; top:0; right:-16px; font:11px/1.3 Arial,sans-serif; color:#333; }
 .margin-comment { writing-mode:vertical-rl; text-orientation:sideways; white-space:normal; overflow-wrap:anywhere; width:max-content; max-height:100%; }
+.margin-comment:dir(rtl) { writing-mode:sideways-lr; }
 .holy-name-note { white-space:nowrap; }
 .app-version { font:12px/1.2 var(--font-mono); margin-left:12px; }
 .flow-row { display:grid; grid-template-columns:1fr 100px 100px; gap:8px; margin:12px 0; align-items:center; }
