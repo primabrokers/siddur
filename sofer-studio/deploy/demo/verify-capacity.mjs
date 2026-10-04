@@ -4,6 +4,8 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import {once} from 'node:events';
 import {createDemoGateway} from './gateway.mjs';
+import {readFileSync} from 'node:fs';
+const version=JSON.parse(readFileSync(new URL('../../public/version.json',import.meta.url),'utf8')).version;
 
 const server=createDemoGateway({html:'<html>Sofer capacity check</html>'});
 server.listen(0,'127.0.0.1');await once(server,'listening');
@@ -23,7 +25,7 @@ try{
     const result=await request();assert.equal(result.status,200,'workspace '+(i+1));cookies.push(result.cookie);
     const session=await request('/api/session',result.cookie);assert.equal(session.status,200);
     const token=JSON.parse(session.text).token;assert.ok(token);tokens.push(token);
-    const health=await request('/api/health',result.cookie);assert.equal(health.status,200);assert.equal(JSON.parse(health.text).version,'21');
+    const health=await request('/api/health',result.cookie);assert.equal(health.status,200);assert.equal(JSON.parse(health.text).version,version);
   }
   assert.equal(new Set(cookies).size,12);assert.equal(new Set(tokens).size,12);
   assert.equal((await request()).status,503);
@@ -35,7 +37,7 @@ try{
   for(const cookie of cookies)assert.equal((await request('/api/health',cookie)).status,200);
   const health=JSON.parse((await request('/health')).text);
   assert.equal(health.activeSessions,12);assert.equal(health.maxSessions,12);
-  console.log(JSON.stringify({ok:true,realWorkspaces:12,version:'21',fourthVisitorAllowed:true,workspaceDataIsolated:true,mutationTokensIsolated:true,existingWorkAccessibleAtCapacity:true}));
+  console.log(JSON.stringify({ok:true,realWorkspaces:12,version,fourthVisitorAllowed:true,workspaceDataIsolated:true,mutationTokensIsolated:true,existingWorkAccessibleAtCapacity:true}));
 }finally{
   await new Promise(resolve=>{server.close(resolve);server.closeAllConnections();});
 }

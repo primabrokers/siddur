@@ -110,7 +110,7 @@
     var tradInput = util.el('input', { type: 'text', placeholder: 'Tradition (optional)', 'data-i': 'tradition' });
     var fmtSel = util.el('select', { 'data-i': 'format' },
       [util.el('option', { value: 'txt', text: 'Text / STAM — detect English markers automatically' }),
-       util.el('option', { value: 'stam', text: 'STAM keyboard text (capitals, p / s / l / t, m / e, g, r / z, n / f / b)' }),
+        util.el('option', { value: 'stam', text: 'STAM keyboard text (capitals, p / s / l / t / v, m / e, g, r / z, n / f / b)' }),
        util.el('option', { value: 'json', text: 'JSON' }),
        util.el('option', { value: 'sefaria', text: 'Sefaria' })]);
     imp.appendChild(util.el('div', { class: 'import-row' }, [nameInput, tradInput]));

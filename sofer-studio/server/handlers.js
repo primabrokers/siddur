@@ -2,6 +2,7 @@
 // HTTP endpoint handlers wiring store + engine.
 
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { HttpError } from './http.js';
 import { sendJson } from './http.js';
 import * as engine from '../engine/layout.js';
@@ -25,6 +26,7 @@ import { loadTefillinSource } from './tefillin-source.js';
 import { songPageProfile } from '../engine/song-page-scale.js';
 import { letterMarks, letterSizeScale } from '../engine/letter-marks.js';
 import { sourceControls } from '../engine/document-options.js';
+const releaseInfo = JSON.parse(readFileSync(new URL('../public/version.json', import.meta.url), 'utf8'));
 
 // Strip internal engine fields for API lines. When a profile is supplied the
 // server-authoritative stretch candidates (cap_mm/letter/word_final/line_end) are
@@ -132,7 +134,7 @@ export function handleSession(ctx) {
 }
 
 export function handleHealth(ctx) {
-  sendJson(ctx.res, 200, { status: 'ok', db: true, version: '21', release: 'feedback-v21' });
+  sendJson(ctx.res, 200, { status: 'ok', db: true, ...releaseInfo });
 }
 
 // ---- sources --------------------------------------------------------------

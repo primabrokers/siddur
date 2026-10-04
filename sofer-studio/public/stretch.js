@@ -2,11 +2,11 @@
  * Sofer Studio — stretch.js
  * Per-line justification (stretch) inspector. Shown when a tikkun line is
  * selected: leftover display, candidate letters with positions, manual
- * stretch steppers (hard-capped, human-marked holy letters never candidates), auto-suggest,
+ * stretch steppers (individual and human-marked holy-name caps), auto-suggest,
  * and apply via POST /api/layouts/:id/stretch.
  *
- * The SERVER enforces the hard per-letter cap and never stretches human-marked holy
- * letters; this UI only proposes values and displays the server's answer.
+ * The SERVER intersects per-letter limits with the additional holy-name cap;
+ * this UI only proposes values and displays the server's answer.
  */
 (function () {
   'use strict';
