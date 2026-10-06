@@ -33,6 +33,23 @@ export function validateProfileInput(body) {
     if (typeof policy !== 'object' || Array.isArray(policy)) errs.push('stretch_policy must be an object');
     else {
       const validPercent = value => value === 'unlimited' || (typeof value === 'number' && Number.isFinite(value) && value >= 0);
+      if (policy.width_mode != null && !['millimetres', 'line_units'].includes(policy.width_mode)) errs.push('Choose millimetre widths or fractions of a line');
+      if (policy.stages != null) {
+        if (policy.version !== 2 || !Array.isArray(policy.stages) || policy.stages.length !== 3) errs.push('Choose exactly three stretch stages');
+        else for (const [index, stage] of policy.stages.entries()) {
+          if (!stage?.caps_percent || typeof stage.caps_percent !== 'object' || Array.isArray(stage.caps_percent)) errs.push('Stage ' + (index + 1) + ' needs stretch limits');
+          else for (const value of Object.values(stage.caps_percent)) if (!validPercent(value)) errs.push('Stage limits must be a non-negative percentage or unlimited');
+        }
+      }
+      if (policy.rendering != null) {
+        const r = policy.rendering;
+        if (!r || !['stam', 'asirit'].includes(r.font)) errs.push('Choose an available font');
+        if (!r?.overlap_percent || typeof r.overlap_percent !== 'object' || Array.isArray(r.overlap_percent)) errs.push('Letter overlap must be set for the selected font');
+        else {
+          for (const [font, value] of Object.entries(r.overlap_percent)) if (!['stam', 'asirit'].includes(font) || !Number.isFinite(value) || value <= -100 || value > 300) errs.push('Letter overlap must be greater than -100% and at most 300%');
+          if (r.overlap_percent[r.font] == null) errs.push('Set the selected font overlap');
+        }
+      }
       if (![1, 2].includes(policy.version)) errs.push('stretch_policy.version must be 1 or 2');
       if (policy.holy_name_percent != null && !validPercent(policy.holy_name_percent)) errs.push('Holy-name cap must be a non-negative percentage or unlimited');
       if (!policy.caps_percent || typeof policy.caps_percent !== 'object' || Array.isArray(policy.caps_percent)) errs.push('caps_percent must be an object');

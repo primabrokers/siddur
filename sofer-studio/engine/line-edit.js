@@ -1,6 +1,7 @@
 import { makeLine, computeLineKey, groupAndAnnotate, computeYerios, autoSuggestLine, applyStretch } from './layout.js';
 import { interWordGap } from './width.js';
 import { validateLayout } from './validate.js';
+import { scaleItems, lineLimits, measureFinishedLine } from './line-measurement.js';
 
 // Shift one boundary without reflowing the following text. Explicit paragraph,
 // song and written-line boundaries remain protected, including across pages.
@@ -19,7 +20,8 @@ export function moveWord(layout, { line_id, direction, line_key, next_line_key }
   if (current.petucha_end || current.sefer_end) throw new Error('Words cannot be moved across a paragraph or book ending');
   if (layout.snapshot.geometry.tefillin && (!following || current.tefillin_section !== following.tefillin_section)) throw new Error('Tefillin words stay within their own passage');
   if (direction === 'up' && !following) throw new Error('There is no following line');
-  const a = structuredClone(current.items || []), b = structuredClone(following?.items || []);
+  const originalItems = line => scaleItems(structuredClone(line?.items || []), 1 / (line?.line_measurement?.scale || 1));
+  const a = originalItems(current), b = originalItems(following);
   if (direction === 'down') {
     if (a.at(-1)?.type !== 'word') throw new Error('The last item must be a word');
     b.unshift(a.pop());
@@ -30,7 +32,8 @@ export function moveWord(layout, { line_id, direction, line_key, next_line_key }
   }
   for (const items of [a, b]) {
     if (layout.snapshot.geometry.tefillin && !items.some(item => item.type === 'word')) throw new Error('Keep at least one word on each fixed Tefillin line');
-    if (['setuma_gap', 'custom_gap'].includes(items[0]?.type) || ['setuma_gap', 'custom_gap'].includes(items.at(-1)?.type)) throw new Error('Keep the setumah gap together with its adjacent words');
+    const leadingGapAllowed = items[0]?.type === 'setuma_gap' && layout.snapshot.geometry.parsha_mode === 'rambam' && items[1]?.type === 'word';
+    if ((!leadingGapAllowed && ['setuma_gap', 'custom_gap'].includes(items[0]?.type)) || ['setuma_gap', 'custom_gap'].includes(items.at(-1)?.type)) throw new Error('Keep the setumah gap together with its adjacent words');
   }
   const profile = layout.snapshot.profile, geometry = layout.snapshot.geometry;
   const rebuild = (original, items) => {
@@ -39,7 +42,10 @@ export function moveWord(layout, { line_id, direction, line_key, next_line_key }
       width += Number(item.width_mm) || 0;
       if (i && item.type === 'word' && items[i - 1].type === 'word') width += interWordGap(profile);
     });
-    const line = makeLine(items, width, original?.column_width_mm || geometry.line_width_mm, profile, { endedBy: original?.petucha_end ? 'petucha' : original?.sefer_end ? 'sefer' : null });
+    const physicalWidth = original?.column_width_mm || geometry.line_width_mm;
+    const limits = lineLimits(profile, geometry, physicalWidth);
+    if (limits && width > limits.maximum + .001) throw new Error('This word count exceeds the maximum units per line.');
+    const line = measureFinishedLine(makeLine(items, width, physicalWidth, profile, { endedBy: original?.petucha_end ? 'petucha' : original?.sefer_end ? 'sefer' : null }), profile, geometry, physicalWidth);
     line.sefer_end = !!original?.sefer_end;
     line.column_width_mm = original?.column_width_mm || null; line.tefillin_section = original?.tefillin_section || null;
     if (original?.page_start) { line.page_start = true; line.segment_start_id = original.segment_start_id; }

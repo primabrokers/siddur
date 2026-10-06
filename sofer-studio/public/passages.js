@@ -245,11 +245,11 @@
     var summary = util.byId('section-break-summary'), list = util.byId('section-break-list');
     if (!summary || !list) return;
     var s = sourceSummary;
-    summary.textContent = !state.active.sourceId ? 'Choose a source to inspect its section markers.' : !s
-      ? 'Section metadata is unavailable. Do not assume this source contains all section breaks.'
+    summary.textContent = !state.active.sourceId ? 'Choose a text to inspect its section markers.' : !s
+      ? 'Section metadata is unavailable. Do not assume this text contains all section breaks.'
       : !s.present
-        ? 'This source has no petuchah/setumah markers. Import a marked Tikkun source; section positions will not be guessed.'
-        : 'Source markers: ' + s.petucha + ' petuchah · ' + s.setuma + ' setumah. Positions still require comparison with the chosen Tikkun and sofer review.';
+        ? 'This text has no petuchah/setumah markers. Import a marked Tikkun text; section positions will not be guessed.'
+        : 'Text markers: ' + s.petucha + ' petuchah · ' + s.setuma + ' setumah. Positions still require comparison with the chosen Tikkun and sofer review.';
     summary.className = 't--1' + (s && s.present ? '' : ' blocker');
     var layout = state.layout, entries = [];
     if (layout && (!layout.source_id || layout.source_id === state.active.sourceId)) {
@@ -292,7 +292,7 @@
     util.clear(el);
 
     if (!list || !list.length) {
-      el.appendChild(util.el('div', { class: 'empty', text: 'No unusual letters in this source.' }));
+      el.appendChild(util.el('div', { class: 'empty', text: 'No unusual letters in this text.' }));
       return;
     }
 

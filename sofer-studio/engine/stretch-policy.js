@@ -37,12 +37,24 @@ export function letterCap(word, letter, profile, budget) {
 export function effectiveProfile(profile, geometry) {
   const result = structuredClone(profile);
   result.small_letter_scale = 2 / 3;
-  if (result.letter_height_units != null) {
+  result.parsha_mode = geometry.parsha_mode || 'rambam_rosh';
+  if (geometry.line_measurement) result.line_measurement = structuredClone(geometry.line_measurement);
+  else delete result.line_measurement;
+  const rendering = result.stretch_policy?.rendering;
+  const overlap = rendering?.overlap_percent?.[rendering.font];
+  if (overlap != null) {
+    result.letter_height_mm = Number(geometry.baseline_pitch_mm) * (1 + Number(overlap) / 100);
+  } else if (result.letter_height_units != null) {
     const unit = result.units_per_row != null ? Number(geometry.line_width_mm) / Number(result.units_per_row) : Number(result.unit_mm);
     result.letter_height_mm = Number(result.letter_height_units) * unit;
     if (!(result.letter_height_mm > 0) || !Number.isFinite(result.letter_height_mm)) throw new Error('Letter height and unit size must be positive');
   }
-  if (result.units_per_row != null) {
+  if (result.stretch_policy?.width_mode === 'millimetres') {
+    result.units_per_row = Number(geometry.line_width_mm);
+    result.unit_column_width_mm = Number(geometry.line_width_mm);
+    result.unit_basis = 'line_units';
+    result.unit_mm = result.reference_height_mm / result.letter_height_mm;
+  } else if (result.units_per_row != null) {
     const units = Number(result.units_per_row), width = Number(geometry.line_width_mm);
     if (!(units > 0) || !Number.isFinite(units) || !(width > 0) || !Number.isFinite(width)) {
       throw new Error('Column-derived units require a positive column width and units per row');
@@ -111,8 +123,8 @@ export function spaceCandidatesOf(line, profile) {
         });
       }
       wi++;
-    } else if (item.type === 'setuma_gap' && index > 0 && index < items.length - 1
-      && items[index - 1].type === 'word' && items[index + 1].type === 'word') {
+    } else if (item.type === 'setuma_gap' && index < items.length - 1
+      && ((index === 0 && profile.parsha_mode === 'rambam') || items[index - 1]?.type === 'word') && items[index + 1].type === 'word') {
       const width = Number(item.width_mm), cap = percentageCap(width, policy.setuma_percent ?? 0, budget);
       if (cap > 0) candidates.push({
         letter_occurrence_id: 'setuma-gap-' + index, kind: 'setuma_gap', item_index: index,

@@ -24,6 +24,7 @@ import {effectiveProfile} from '../engine/stretch-policy.js';
 import { editWordCount, editPageWidth } from '../engine/document-edit.js';
 import { loadTefillinSource } from './tefillin-source.js';
 import { songPageProfile } from '../engine/song-page-scale.js';
+import { lineMeasurementProfile } from '../engine/line-measurement.js';
 import { letterMarks, letterSizeScale } from '../engine/letter-marks.js';
 import { sourceControls } from '../engine/document-options.js';
 const releaseInfo = JSON.parse(readFileSync(new URL('../public/version.json', import.meta.url), 'utf8'));
@@ -34,6 +35,7 @@ const releaseInfo = JSON.parse(readFileSync(new URL('../public/version.json', im
 export function publicLine(l, profile) {
   const documentUnitMm = profile ? measurementUnitMm(profile) : null;
   profile = songPageProfile(profile, l.song_page?.scale);
+  if (profile) profile = lineMeasurementProfile(profile, l);
   const words = l.words || [];
   const shem_tokens = words.filter((w) => w.isShem).map((w) => ({
     token: w.text,
@@ -58,6 +60,8 @@ export function publicLine(l, profile) {
     segment_start_id: l.segment_start_id || null,
     flow_page_start: !!l.flow_page_start, page_fit: l.page_fit || null,
     measurement_unit_mm: documentUnitMm,
+    line_measurement: l.line_measurement || null,
+    setuma_start_allowed: !!l.setuma_start_allowed,
     secondary_stretch: !!profile && engine.needsSecondaryStretch(l, profile),
     spacing_metadata_complete: !!l.spacing_metadata_complete,
     reference_page: l.reference_page || null,

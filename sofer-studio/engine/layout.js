@@ -13,6 +13,7 @@ import { hasLetterMark, letterSizeScale } from './letter-marks.js';
 import { documentSettings, customGapWidth, inferredSongKinds } from './document-options.js';
 import { reflowDocument } from './document-flow.js';
 import { computeTefillin } from './tefillin.js';
+import { lineMeasurementProfile } from './line-measurement.js';
 import { totalWidth, interLetterGap, interWordGap, wordWidth, minColumnWidth, measurementUnitMm } from './width.js';
 import { lettersOf, letterKeyOf } from './profile.js';
 import { stripNekud } from './text.js';
@@ -53,7 +54,7 @@ export function deriveGeometry(geometry, profile) {
   const outer = num(g.outer_margin_mm);
   const lineW = num(g.line_width_mm);
 
-  if (pitch < H) {
+  if (pitch < H && profile.stretch_policy?.rendering?.overlap_percent?.[profile.stretch_policy.rendering.font] == null) {
     throw new Error(`baseline pitch ${pitch}mm is below letter height ${H}mm (overlap)`);
   }
   const inkExtent = (lines_per_amud - 1) * pitch + H;
@@ -142,6 +143,7 @@ function paragraphReserve(units, index, profile, geometry, overrides) {
   if (profile.stretch_policy?.version !== 2) return 0;
   let reserve = 0, i = index;
   while (['setuma', 'custom_gap'].includes(units[i + 1]?.type)) {
+    if (units[i + 1].type === 'setuma' && profile.parsha_mode === 'rambam') break;
     reserve += units[i + 1].type === 'custom_gap' ? units[i + 1].width_mm : setumaGapMm(profile, geometry);
     if (units[i + 2]?.type !== 'word') return reserve;
     reserve += measureWord(units[i + 2], profile, overrides);
@@ -453,7 +455,8 @@ export function makeLine(items, width, lineW, profile, flags = {}) {
   const hasSetuma = setumaGaps.length > 0;
   const lastItem = items.length ? items[items.length - 1] : null;
   const firstItem = items.length ? items[0] : null;
-  const setumaAtEdge = hasSetuma && (!words.length || (firstItem && firstItem.type === 'setuma_gap') || (lastItem && lastItem.type === 'setuma_gap'));
+  const setumaStartAllowed = profile.parsha_mode === 'rambam';
+  const setumaAtEdge = hasSetuma && (!words.length || (!setumaStartAllowed && firstItem?.type === 'setuma_gap') || lastItem?.type === 'setuma_gap');
   const leftover = lineW - width;
   const wordTokens = words.map((w) => w.text);
   const consonantText = words.map((w) => w.consonant).join(' ');
@@ -471,6 +474,7 @@ export function makeLine(items, width, lineW, profile, flags = {}) {
     items,
     has_setuma: hasSetuma,
     setuma_at_edge: setumaAtEdge,
+    ...(setumaStartAllowed ? { setuma_start_allowed: true } : {}),
     petucha_end: !!flags.endedBy && flags.endedBy === 'petucha',
     sefer_end: !!flags.endedBy && flags.endedBy === 'sefer',
     first_word: wordTokens[0] || '',
@@ -518,7 +522,23 @@ function startsWithVav(word) {
 
 // ---- Stretch candidates & justification ----------------------------------
 
+// Each stage states the total allowed increase from the original width. Later
+// stages keep earlier allowances and add newly enabled targets, at equal percent.
+function stageProfile(profile, last) {
+  const policy = profile.stretch_policy, caps = {};
+  for (let stage = 0; stage <= last; stage++) {
+    for (const [key, cap] of Object.entries(policy.stages[stage]?.caps_percent || {})) {
+      caps[key] = caps[key] === 'unlimited' || cap === 'unlimited' ? 'unlimited' : Math.max(caps[key] || 0, Number(cap) || 0);
+    }
+  }
+  const next = { ...policy, caps_percent: caps, stages: null, secondary: null, distribution: 'equal_percent' };
+  for (const key of ['word_space', 'hyphen', 'petucha', 'setuma']) next[key + '_percent'] = caps[key] || 0;
+  return { ...profile, stretch_policy: next, stretch_priorities: Object.fromEntries(Object.keys(caps).map(key => [key, 1])) };
+}
+
 function primaryStretchCandidatesOf(line, profile) {
+  profile = lineMeasurementProfile(profile, line);
+  if (profile.stretch_policy?.stages) profile = stageProfile(profile, 0);
   const exclusive = line.words.flatMap(word => word.letters.filter(letter => hasLetterMark(letter, 'exclusive_stretch')).map(letter => ({ word, letter })));
   if (exclusive.length) return exclusive.filter(({ word, letter }) => profile.stretch_policy?.version === 2 || !word.isShem).map(({ word, letter }) => ({
     letter_occurrence_id: letter.id, letter: letter.base, word: word.text, kind: 'letter', priority: 1,
@@ -574,6 +594,14 @@ function primaryStretchCandidatesOf(line, profile) {
 // The second maximum is a TOTAL increase from the original width. It becomes
 // available only when every first-pass target together cannot fill this row.
 export function stretchCandidatesOf(line, profile) {
+  if (profile.stretch_policy?.stages) {
+    let result = [];
+    for (let stage = 0; stage < 3; stage++) {
+      result = primaryStretchCandidatesOf(line, stageProfile(profile, stage));
+      if (result.reduce((sum, c) => sum + c.cap_mm, 0) >= baseBudget(line) - .001) break;
+    }
+    return result;
+  }
   const primary = primaryStretchCandidatesOf(line, profile);
   const secondary = profile.stretch_policy?.version === 2 && profile.stretch_policy.secondary;
   if (!secondary || primary.reduce((sum, c) => sum + c.cap_mm, 0) >= baseBudget(line) - 0.001) return primary;
@@ -600,6 +628,23 @@ export function autoSuggestLine(line, profile, opts = {}) {
     return { suggestions: [], unjustifiable: false, shortfall_mm: 0, skipped: 'intentional spacing or fixed passage' };
   }
   const cands = primaryStretchCandidatesOf(line, profile);
+  if (profile.stretch_policy?.stages) {
+    const budget = baseBudget(line), used = new Map(); let reached = 0;
+    for (let stage = 0; stage < 3; stage++) {
+      const remaining = Math.max(0, budget - [...used.values()].reduce((sum, d) => sum + d.stretch_mm, 0));
+      if (remaining < .001) break;
+      const candidates = primaryStretchCandidatesOf(line, stageProfile(profile, stage)).map(c => ({ ...c,
+        cap_mm: Math.max(0, c.cap_mm - (used.get(c.letter_occurrence_id)?.stretch_mm || 0)) }));
+      const added = balancedSuggestions(candidates, remaining, 'equal_percent');
+      if (added.length) reached = stage + 1;
+      for (const decision of added) {
+        const previous = used.get(decision.letter_occurrence_id);
+        used.set(decision.letter_occurrence_id, { ...decision, stretch_mm: round(decision.stretch_mm + (previous?.stretch_mm || 0)) });
+      }
+    }
+    const suggestions = [...used.values()], shortfall = round(Math.max(0, budget - suggestions.reduce((sum, d) => sum + d.stretch_mm, 0)));
+    return { suggestions, unjustifiable: shortfall >= .001, shortfall_mm: shortfall, stretch_stage: reached };
+  }
   if (profile.stretch_policy) {
     const budget = baseBudget(line);
     const suggestions = balancedSuggestions(cands, budget, profile.stretch_policy.distribution);
@@ -1017,7 +1062,9 @@ function reflowMeasuredReference(referenceLines,lineW,profile) {
     if(!buffer.length)return;
     const packs=[];
     for(const item of buffer){
-      if(item.type==='setuma_gap'){
+      if(item.type==='setuma_gap' && profile.parsha_mode==='rambam'){
+        packs.push([item]);
+      }else if(item.type==='setuma_gap'){
         if(!packs.length||packs.at(-1).at(-1).type!=='word')throw new Error('Reflow blocked: setumah lacks a preceding word');
         packs.at(-1).push(item);
       }else if(packs.length&&packs.at(-1).at(-1).type==='setuma_gap')packs.at(-1).push(item);
@@ -1089,7 +1136,7 @@ export function computeLayout(source, profile, geometry, opts = {}) {
 
 function finalizeLayout(lines, totalLetters, geometry, profile, g, blockers = [], excerpt = false, studyPreview = false) {
   let flowWarnings = [];
-  if (geometry.document_flow && !geometry.tefillin && !lines.some(line => line.reference_page && profile.layout_mode !== 'reflow')) {
+  if ((geometry.document_flow || geometry.line_measurement || geometry.parsha_mode === 'rambam') && !geometry.tefillin && !lines.some(line => line.reference_page && profile.layout_mode !== 'reflow')) {
     const flowed = reflowDocument(lines, profile, geometry); lines = flowed.lines; flowWarnings = flowed.warnings;
   }
   fillSongPages(lines, profile, geometry);

@@ -43,9 +43,10 @@ test('measurement table follows column width and row units and matches the engin
       assert(Math.abs(draft.unit_mm - calculated.unit_mm) < 1e-10);
       assert(Math.abs(totalWidth('א', calculated) - (2 * width / units + calculated.stroke_mm * calculated.stroke_factors['א'])) < 1e-10);
       const row = f.d.querySelector('[data-letter="א"]');
-      assert(Math.abs(Number(row.children[2].textContent) - totalWidth('א', calculated)) < .006);
+      assert.equal(Number(row.querySelector('input').value), draft.letter_widths['א']);
+      assert.equal(row.children.length,5);
       const space = f.d.querySelector('[data-measurement="word_space"]');
-      assert(Math.abs(Number(space.children[2].textContent) - calculated.gaps.inter_word) < .006);
+      assert.equal(Number(space.querySelector('input').value), calculated.special_widths_units.word_space);
       assert.equal(calculated.units_per_row, units);
     };
     check(180, 62); check(180, 80); check(140, 80);

@@ -44,7 +44,7 @@
     if (!layoutId) { SS.toast('Open a locked layout first.', 'error'); return; }
     var prof = SS.activeProfile ? SS.activeProfile() : null;
     var geom = SS.activeGeometry ? SS.activeGeometry() : null;
-    if (!prof || !geom) { SS.toast('Select a target profile and geometry first.', 'error'); return; }
+    if (!prof || !geom) { SS.toast('Select a target kulmus and klaf first.', 'error'); return; }
 
     try {
       var cand = await API.createCandidate(layoutId, { profile_id: prof.id, geometry_id: geom.id });
@@ -98,8 +98,8 @@
 
   function buildDeltaChip(cand) {
     var parts = [];
-    if (cand.profile_name || cand.profile_id) parts.push('profile \u2192 ' + (cand.profile_name || cand.profile_id));
-    if (cand.geometry_name || cand.geometry_id) parts.push('geometry \u2192 ' + (cand.geometry_name || cand.geometry_id));
+    if (cand.profile_name || cand.profile_id) parts.push('kulmus \u2192 ' + (cand.profile_name || cand.profile_id));
+    if (cand.geometry_name || cand.geometry_id) parts.push('klaf \u2192 ' + (cand.geometry_name || cand.geometry_id));
     if (!parts.length) return null;
     return util.el('div', { class: 'banner info', text: 'Candidate uses ' + parts.join(' · ') });
   }

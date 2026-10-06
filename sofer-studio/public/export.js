@@ -42,6 +42,14 @@
 
     row.appendChild(bPrint);
     root.appendChild(row);
+    var pagesPerSheet = util.el('input', { id:'print-pages-per-sheet', type:'number', min:'1', max:'16', step:'1', value:'1' });
+    var direction = util.el('select', { id:'print-page-direction' }, [util.el('option',{value:'down',text:'Downwards'}),util.el('option',{value:'across',text:'Widthways'})]);
+    var nupPaper = util.el('select', {id:'print-sheet-paper'}, ['A4-portrait','A4-landscape','A3-portrait','A3-landscape'].map(function(value){return util.el('option',{value:value,text:value.replace('-',' ')});}));
+    root.appendChild(util.el('div',{class:'print-sheet-controls'},[
+      util.el('label',{class:'field'},[util.el('span',{text:'Pages per sheet'}),pagesPerSheet]),
+      util.el('label',{class:'field'},[util.el('span',{text:'Arrange pages'}),direction]),
+      util.el('label',{class:'field'},[util.el('span',{text:'Sheet size'}),nupPaper]),
+      util.el('p',{class:'profile-help',text:'Multiple pages per sheet are reduced proportionally to fit the selected paper.'})]));
     var samplePaper=util.el('select',{id:'sample-paper'},['A4-landscape','A4-portrait','A3-landscape','A3-portrait','A2-portrait'].map(function(value){return util.el('option',{value:value,text:value.replace('-',' ')});}));
     var sampleButton=util.el('button',{class:'btn btn-ghost',text:'Print sample at actual size',id:'print-sample'});
     sampleButton.addEventListener('click',function(){printLayout('sample');});
@@ -90,6 +98,8 @@
     if (!state.active.layoutId || !state.layout) { SS.toast('Open or compute a layout first.', 'error'); return; }
     if (state.layout.summary && state.layout.summary.study_preview) { SS.toast('This study preview has unverified special passages. Complete their verification before export.', 'error'); return; }
     if (!SS.tikkun || !SS.tikkun.isReady()) { SS.toast('The pages are still rendering. Please wait before printing.', 'error'); return; }
+    var count=Number(util.byId('print-pages-per-sheet').value);
+    if(kind!=='sample'&&(!Number.isInteger(count)||count<1||count>16)){SS.toast('Choose between 1 and 16 pages per sheet.', 'error');return;}
     preparingPrint = true;
     returnView = SS.workspace ? SS.workspace.current() : null;
     if (SS.workspace) SS.workspace.open('layout');
@@ -98,6 +108,7 @@
       if (!await SS.tikkun.preparePrint()) { SS.toast('Layout changed. Please try printing again.', 'error'); finishPrint(); return; }
       SS.tikkun.refreshPrintNote();
       if(kind==='sample')SS.tikkun.prepareSamplePaper(util.byId('sample-paper').value);
+      else if(count>1) SS.tikkun.prepareMultiplePages(count,util.byId('print-page-direction').value,util.byId('print-sheet-paper').value);
       else if(SS.tikkun.prepareTefillinPaper)SS.tikkun.prepareTefillinPaper(util.byId('export-tefillin-paper').value);
       // Browser print includes every amud, not only the page on screen.
       window.print();

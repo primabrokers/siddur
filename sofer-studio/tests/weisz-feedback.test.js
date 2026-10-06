@@ -94,13 +94,13 @@ test('profile preset and both fallback columns save the supplied measurements an
     const select = f.d.getElementById('cal-preset'); select.value = '4mm-yad'; select.dispatchEvent(new f.w.Event('change')); await tick();
     assert.equal(f.SS.calibration.getDraft().name, '4mm yad'); assert.equal(f.SS.calibration.getDraft().units_per_row, 73.3);
     assert.deepEqual(JSON.parse(JSON.stringify(f.SS.calibration.getDraft().letter_widths)), preset.letter_widths);
-    const units = f.d.querySelector('[aria-label="skeleton units for א"]'); units.stepUp(); units.dispatchEvent(new f.w.Event('input'));
+    const units = f.d.querySelector('[aria-label="Width units for א"]'); units.value=2.4; units.dispatchEvent(new f.w.Event('input'));
     assert.equal(f.SS.calibration.getDraft().letter_widths['א'], 2.4);
     for (const [letter, value] of [['א', 150], ['ב', 200]]) {
-      const cap = f.d.querySelector('[aria-label="stretch cap for second ' + letter + '"]'); cap.value = value; cap.dispatchEvent(new f.w.Event('input'));
+      const cap = f.d.querySelector('[aria-label="stretch cap for second stage ' + letter + '"]'); cap.value = value; cap.dispatchEvent(new f.w.Event('input'));
     }
     f.d.querySelector('#calibration-body .grid-crud .btn-primary').click(); await tick();
-    assert.equal(body.stretch_policy.secondary.caps_percent['א'], 150); assert.equal(body.stretch_policy.secondary.caps_percent['ב'], 200);
+    assert.equal(body.stretch_policy.stages[1].caps_percent['א'], 150); assert.equal(body.stretch_policy.stages[1].caps_percent['ב'], 200);
     assert.deepEqual(validateProfileInput(body), []);
   } finally { f.dom.window.close(); }
 });

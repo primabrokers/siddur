@@ -105,9 +105,9 @@ test('compact Setup preserves editable main measurements, selector navigation, a
     const ready=new Promise(resolve=>SS.bus.on('app:ready',resolve));w.eval(asset('app.js'));await ready;
     const d=w.document;
     assert.equal(d.querySelectorAll('#view-setup .workspace-subnav').length,0);
-    const input=d.querySelector('[data-field="letter_height_units"]');
-    assert(input.closest('.setup-main-measurements'));input.value='3.2';input.dispatchEvent(new w.Event('input'));
-    assert.equal(SS.calibration.getDraft().letter_height_units,3.2);
+    const input=d.querySelector('#cal-letter-overlap');
+    assert(input.closest('.setup-main-measurements'));input.value='20';input.dispatchEvent(new w.Event('input'));
+    assert.equal(SS.calibration.getDraft().letter_height_mm,9);
     d.getElementById('profile-select').dispatchEvent(new w.Event('focus'));
     assert.equal(d.getElementById('section-setup-calibration').hidden,false);
     assert(d.querySelector('[data-measurement="holy_name"]'));

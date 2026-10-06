@@ -79,7 +79,7 @@
     if (!sel) return;
     util.clear(sel);
     if (activeKey === 'profileId' && state.calibrationDraftDirty && !state.active.profileId) {
-      sel.appendChild(util.el('option', { value: '', text: 'New profile — save first' }));
+      sel.appendChild(util.el('option', { value: '', text: 'New kulmus — save first' }));
       (items || []).forEach(function (it) { sel.appendChild(util.el('option', { value: it.id, text: it[labelField] || it.id })); });
       sel.value = '';
       return;
@@ -143,13 +143,13 @@
   function initProfileStart() {
     var bench = util.byId('workbench');
     if (!bench || util.byId('profile-start')) return;
-    var start = util.el('button', { id: 'btn-new-profile', type: 'button', class: 'btn btn-primary', text: 'Create a new profile' });
+    var start = util.el('button', { id: 'btn-new-profile', type: 'button', class: 'btn btn-primary', text: 'Create a new kulmus' });
     start.addEventListener('click', function () {
       if (SS.calibration && SS.calibration.startNew()) showCalibration();
     });
     var starter = util.el('button', {id:'btn-starter-layout',type:'button',class:'btn btn-ghost',text:'New 42-line measurement draft'});
     starter.addEventListener('click', async function () {
-      if (state.calibrationDraftDirty && !window.confirm('Leave your unsaved profile draft and select a new editable starter?')) return;
+      if (state.calibrationDraftDirty && !window.confirm('Leave your unsaved kulmus draft and select a new editable starter?')) return;
       starter.disabled = true;
       try {
         // Create new entities; never overwrite an existing measured profile/layout.
@@ -165,7 +165,7 @@
       finally { starter.disabled = false; }
     });
     var guide = util.el('div', { id: 'profile-start', class: 'profile-start' }, [start,starter,
-      util.el('span', { text: '1. Create and save your measured profile  →  2. Load a book  →  3. Choose column geometry and compute  →  4. Review, then Print / Save PDF' })]);
+      util.el('span', { text: '1. Create and save your measured kulmus  →  2. Load a book  →  3. Choose klaf and compute  →  4. Review, then Print / Save PDF' })]);
     bench.parentNode.insertBefore(guide, bench);
   }
 
@@ -479,16 +479,16 @@
 
   async function computeLayout() {
     if (SS.calibration && SS.calibration.isDirty && SS.calibration.isDirty()) {
-      SS.toast('Save your new or edited calibration profile before computing.', 'error');
+      SS.toast('Save your new or edited kulmus before computing.', 'error');
       showCalibration();
       return;
     }
     var src = activeSource();
     var prof = activeProfile();
     var geom = activeGeometry();
-    if (!prof) { SS.toast('Create and save a calibration profile first.', 'error'); showCalibration(); return; }
-    if (!src) { SS.toast('Import a Torah source first.', 'error'); return; }
-    if (!geom) { SS.toast('Select or create a column geometry.', 'error'); return; }
+    if (!prof) { SS.toast('Create and save a kulmus first.', 'error'); showCalibration(); return; }
+    if (!src) { SS.toast('Import a Torah text first.', 'error'); return; }
+    if (!geom) { SS.toast('Select or create a klaf.', 'error'); return; }
 
     var btn = util.byId('btn-compute');
     if (btn) { btn.disabled = true; btn.textContent = 'Computing…'; }
@@ -713,7 +713,7 @@
         ev.preventDefault(); ev.stopPropagation(); items[next].click(); items[next].focus();
       });
     }
-    heading(views.setup, 'Setup', 'Choose a source, profile or geometry to open its settings.');
+    heading(views.setup, 'Setup', 'Choose a text, kulmus or klaf to open its settings.');
     var selectors = util.el('div', { class: 'workspace-selectors' });
     ['source-select', 'profile-select', 'geometry-select'].forEach(function (id) {
       var select = util.byId(id); if (select) {
@@ -725,7 +725,7 @@
       }
     });
     move('btn-compute', selectors); views.setup.appendChild(selectors);
-    group('setup', [['book', 'Book & source'], ['calibration', 'Measurements'], ['geometry', 'Column settings'], ['layouts', 'Saved layouts']]);
+    group('setup', [['book', 'Book & text'], ['calibration', 'Measurements'], ['geometry', 'Column settings'], ['layouts', 'Saved layouts']]);
     move(util.qs('.reference-start'), sections.setup.book);
     var searchField = util.byId('search-input');
     if (searchField) move(searchField.closest('.app-field'), sections.setup.book);
@@ -735,10 +735,9 @@
     move('panel-geometry', sections.setup.geometry);
     move('layouts-body', sections.setup.layouts);
     var mainMeasurements = util.el('div', { class: 'setup-main-measurements' });
-    var heightField = util.qs('[data-field="letter_height_units"]');
-    if (heightField) move(heightField.closest('label'), mainMeasurements);
+    ['cal-font', 'cal-letter-overlap'].forEach(function (id) { var control = util.byId(id); if (control) move(control.closest('label'), mainMeasurements); });
     var rowUnits = util.byId('cal-units-per-row');
-    if (rowUnits) move(rowUnits.closest('label'), mainMeasurements);
+    if (rowUnits) move(rowUnits.closest('label'), util.byId('geom-line-measurements') || mainMeasurements);
     selectors.after(mainMeasurements);
     var summary = util.el('details', { id: 'setup-summary', class: 'setup-summary' }, [util.el('summary', { text: 'Summary' })]);
     move(util.qs('.big-klaf'), summary); move('geom-derived', summary); views.setup.appendChild(summary);

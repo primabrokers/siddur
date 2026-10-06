@@ -82,7 +82,7 @@ test('line notes show missing units before stretch, independently of current ali
 test('approved profile caps above 2 mm are editable rather than silently clamped',async()=>{
   const f=fixture();try{
     f.SS.activeProfile=()=>null;f.w.eval(source('calibration.js'));f.SS.calibration.init({api:{}});
-    const input=f.w.document.querySelector('[aria-label="stretch cap for ב"]');input.value='6';input.dispatchEvent(new f.w.Event('input'));
+    const input=f.w.document.querySelector('[aria-label="stretch cap for third stage ב"]');input.value='6';input.dispatchEvent(new f.w.Event('input'));
     assert.equal(input.value,'6');
   }finally{f.dom.window.close();}
 });

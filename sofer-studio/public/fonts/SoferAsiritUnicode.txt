@@ -1,0 +1,10 @@
+Sofer Asirit Unicode
+
+Original font: x-asirt0.TTF, supplied by Yehuda Weisz on 6 October 2026.
+Original family: X-asirit5 tagim.
+Original copyright: Copyright 1994, hafozas oas.
+
+This conversion maps the original symbol slots F0E0-F0FA to Unicode Hebrew
+U+05D0-U+05EA. The glyph outlines, widths, and original copyright remain intact.
+It does not claim to verify letter forms for writing. Original embedding flags
+are retained. The conversion script is tools/convert-asirit.py.

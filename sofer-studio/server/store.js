@@ -212,7 +212,7 @@ function insertLayoutLines(db, id, lines) {
         l.status || 'pending', nowIso()
       );
       db.prepare('UPDATE layout_lines SET layout_flags=? WHERE layout_id=? AND line_id=?').run(
-        json({petucha_end:!!l.petucha_end,sefer_end:!!l.sefer_end,fixed_pattern:!!l.fixed_pattern,blank_line:!!l.blank_line,manual_line_end:!!l.manual_line_end,page_start:!!l.page_start,segment_start_id:l.segment_start_id||null,flow_page_start:!!l.flow_page_start,page_fit:l.page_fit||null,line_in_amud:l.line_in_amud||null,book_boundary_blank:!!l.book_boundary_blank,reference_page:l.reference_page||null,column_width_mm:l.column_width_mm||null,song_layout:l.song_layout||null,song_page:l.song_page||null,tefillin_section:l.tefillin_section||null}),id,l.line_id
+        json({line_measurement:l.line_measurement||null,setuma_start_allowed:!!l.setuma_start_allowed,petucha_end:!!l.petucha_end,sefer_end:!!l.sefer_end,fixed_pattern:!!l.fixed_pattern,blank_line:!!l.blank_line,manual_line_end:!!l.manual_line_end,page_start:!!l.page_start,segment_start_id:l.segment_start_id||null,flow_page_start:!!l.flow_page_start,page_fit:l.page_fit||null,line_in_amud:l.line_in_amud||null,book_boundary_blank:!!l.book_boundary_blank,reference_page:l.reference_page||null,column_width_mm:l.column_width_mm||null,song_layout:l.song_layout||null,song_page:l.song_page||null,tefillin_section:l.tefillin_section||null}),id,l.line_id
       );
     }
 }
@@ -265,7 +265,7 @@ export function getLayoutLines(db, layoutId, page) {
       const firstItem = items.length ? items[0] : null;
       const lastItem = items.length ? items[items.length - 1] : null;
       const hasSetuma = items.some((i) => i.type === 'setuma_gap');
-      const setumaAtEdge = hasSetuma && (!words.length || (firstItem && firstItem.type === 'setuma_gap') || (lastItem && lastItem.type === 'setuma_gap'));
+      const setumaAtEdge = hasSetuma && (!words.length || (!flags?.setuma_start_allowed && firstItem && firstItem.type === 'setuma_gap') || (lastItem && lastItem.type === 'setuma_gap'));
       return {
         id: r.id, line_id: r.line_id, line_key: r.line_key || null, line_index: r.line_index, amud: r.amud, tokens: parse(r.tokens),
         text: r.text, consonant_text: r.consonant_text, width_mm: r.width_mm, leftover_mm: r.leftover_mm,
@@ -275,7 +275,7 @@ export function getLayoutLines(db, layoutId, page) {
         words, items,
         base_leftover_mm: r.base_leftover_mm != null ? r.base_leftover_mm : r.leftover_mm,
         stretched_width_mm: r.stretched_width_mm != null ? r.stretched_width_mm : r.width_mm,
-        has_setuma: hasSetuma, setuma_at_edge: setumaAtEdge,
+        has_setuma: hasSetuma, setuma_at_edge: setumaAtEdge, setuma_start_allowed: !!flags?.setuma_start_allowed, line_measurement: flags?.line_measurement || null,
         fixed_pattern: !!(flags && flags.fixed_pattern) || items.some((i) => i.type === 'segment_gap'),
         book_boundary_blank: !!(flags && flags.book_boundary_blank),
         blank_line: !!flags?.blank_line, manual_line_end: !!flags?.manual_line_end, page_start: !!flags?.page_start, segment_start_id: flags?.segment_start_id || null, flow_page_start: !!flags?.flow_page_start, page_fit: flags?.page_fit || null,
@@ -393,7 +393,7 @@ export function createLockedLayout(db, meta, lines, summary) {
         l.status || 'pending', nowIso()
       );
       db.prepare('UPDATE layout_lines SET layout_flags=? WHERE layout_id=? AND line_id=?').run(
-        json({petucha_end:!!l.petucha_end,sefer_end:!!l.sefer_end,fixed_pattern:!!l.fixed_pattern,blank_line:!!l.blank_line,manual_line_end:!!l.manual_line_end,page_start:!!l.page_start,segment_start_id:l.segment_start_id||null,flow_page_start:!!l.flow_page_start,page_fit:l.page_fit||null,line_in_amud:l.line_in_amud||null,reference_page:l.reference_page||null,column_width_mm:l.column_width_mm||null,song_layout:l.song_layout||null,song_page:l.song_page||null,tefillin_section:l.tefillin_section||null}),id,l.line_id);
+        json({line_measurement:l.line_measurement||null,setuma_start_allowed:!!l.setuma_start_allowed,petucha_end:!!l.petucha_end,sefer_end:!!l.sefer_end,fixed_pattern:!!l.fixed_pattern,blank_line:!!l.blank_line,manual_line_end:!!l.manual_line_end,page_start:!!l.page_start,segment_start_id:l.segment_start_id||null,flow_page_start:!!l.flow_page_start,page_fit:l.page_fit||null,line_in_amud:l.line_in_amud||null,reference_page:l.reference_page||null,column_width_mm:l.column_width_mm||null,song_layout:l.song_layout||null,song_page:l.song_page||null,tefillin_section:l.tefillin_section||null}),id,l.line_id);
     }
   });
   tx(lines);

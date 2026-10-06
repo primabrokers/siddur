@@ -44,7 +44,7 @@
       units.addEventListener('input', function () { millimetres.value = +(Number(units.value) * unit()).toFixed(4); save(); });
       starts.appendChild(u.el('div', { class: 'flow-row' }, [u.el('label', { class: 'toggle' }, [check, u.el('span', { dir: 'rtl', text: item.first_word })]), u.el('label', { class: 'field' }, [u.el('span', { text: 'mm' }), millimetres]), u.el('label', { class: 'field' }, [u.el('span', { text: 'units' }), units])]));
     });
-    if (!controls.page_starts?.length) starts.appendChild(u.el('p', { class: 'profile-help', text: 'No t markers in the selected source.' }));
+    if (!controls.page_starts?.length) starts.appendChild(u.el('p', { class: 'profile-help', text: 'No t markers in the selected text.' }));
     host.appendChild(starts);
     var gaps = u.el('details', { class: 'flow-list' }, [u.el('summary', { text: 'Individual custom gaps (g)' })]);
     (controls.custom_gaps || []).forEach(function (item) {
@@ -58,7 +58,7 @@
       select.addEventListener('change', save); input.addEventListener('input', save);
       gaps.appendChild(u.el('label', { class: 'field' }, [u.el('span', { dir: 'rtl', text: item.before + ' … ' + item.after }), select, input]));
     });
-    if (!controls.custom_gaps?.length) gaps.appendChild(u.el('p', { class: 'profile-help', text: 'No g markers in the selected source.' }));
+    if (!controls.custom_gaps?.length) gaps.appendChild(u.el('p', { class: 'profile-help', text: 'No g markers in the selected text.' }));
     host.appendChild(gaps);
   }
   async function loadSource() {

@@ -97,7 +97,7 @@ test('new profile is available before loading text and saves independently witho
   const f=await profileFixture();try{
     f.w.document.getElementById('btn-new-profile').click();
     assert.equal(f.SS.state.active.profileId,null);
-    assert.match(f.w.document.getElementById('profile-select').textContent,/New profile — save first/);
+    assert.match(f.w.document.getElementById('profile-select').textContent,/New kulmus — save first/);
     assert.equal(f.w.document.activeElement.id,'cal-name');
     const input=f.w.document.getElementById('cal-name');input.value='Sofer’s own profile';input.dispatchEvent(new f.w.Event('input'));
     f.SS.bus.emit('selection:changed');await tick();assert.equal(input.value,'Sofer’s own profile');

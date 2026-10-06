@@ -9,6 +9,17 @@ export function songSettings(geometry, kind = 'hayam') {
 }
 export function columnOptionsErrors(input) {
   const errors = documentOptionsErrors(input);
+  if (input.parsha_mode != null && !['rambam', 'rambam_rosh'].includes(input.parsha_mode)) errors.push('Choose Rambam only or Rambam and Rosh');
+  if (input.line_measurement != null) {
+    const rules = input.line_measurement;
+    if (!rules || typeof rules !== 'object' || Array.isArray(rules)) errors.push('Line measurements must be an object');
+    else {
+      for (const key of ['reference_units', 'recommended_units', 'max_units', 'stretch_units']) {
+        if (!Number.isFinite(rules[key]) || rules[key] <= 0 || rules[key] > 10000) errors.push(key + ' must be greater than zero and at most 10000');
+      }
+      if (rules.recommended_units > rules.max_units) errors.push('Recommended units cannot exceed maximum units');
+    }
+  }
   if (input.song_layouts != null) {
     const songs = input.song_layouts;
     if (!songs || typeof songs !== 'object' || Array.isArray(songs)) return ['Song settings must be an object'];
@@ -29,6 +40,8 @@ export function columnOptionsErrors(input) {
 }
 export function copyColumnOptions(input) {
   return {
+    ...(input.parsha_mode ? { parsha_mode: input.parsha_mode } : {}),
+    ...(input.line_measurement ? { line_measurement: structuredClone(input.line_measurement) } : {}),
     ...(input.song_layouts ? { song_layouts: structuredClone(input.song_layouts) } : {}),
     ...(input.tefillin ? { tefillin: structuredClone(input.tefillin) } : {}),
     ...(input.document_flow ? { document_flow: structuredClone(input.document_flow) } : {}),

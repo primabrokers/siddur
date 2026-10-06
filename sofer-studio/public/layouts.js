@@ -104,8 +104,8 @@
 
   function snapshotSummary(lay) {
     var parts = [];
-    if (lay.source_rev || lay.source_hash) parts.push('source ' + shortId(lay.source_rev || lay.source_hash));
-    if (lay.profile_name) parts.push('profile ' + lay.profile_name);
+    if (lay.source_rev || lay.source_hash) parts.push('text ' + shortId(lay.source_rev || lay.source_hash));
+    if (lay.profile_name) parts.push('kulmus ' + lay.profile_name);
     if (lay.geometry_name) parts.push('geom ' + lay.geometry_name);
     if (lay.created_at) parts.push(util.esc(String(lay.created_at).slice(0, 10)));
     if (lay.locked_at) parts.push('writing began ' + util.esc(String(lay.locked_at).slice(0, 10)));

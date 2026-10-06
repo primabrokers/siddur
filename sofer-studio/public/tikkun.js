@@ -169,7 +169,7 @@
   }
 
   async function preparePrint() {
-    if (document.fonts) await document.fonts.load('24px "Stam Ashkenaz CLM"', 'אבגד');
+    if (document.fonts) await document.fonts.load('24px "' + selectedFont().family + '"', 'אבגד');
     if (!pageEls.length || !buildPage) return false;
     preparingPrint = true;
     try {
@@ -192,6 +192,8 @@
   }
 
   function finishPrint() {
+    document.body.classList.remove('printing-multiple');
+    util.byId('multiple-print-area')?.remove(); util.byId('multiple-page-style')?.remove();
     document.body.classList.remove('printing-sample');
     util.byId('sample-print-area')?.remove(); util.byId('sample-page-style')?.remove();
     if(currentSheet)currentSheet.classList.remove('tefillin-print');
@@ -212,6 +214,48 @@
     currentSheet.classList.add('tefillin-print');document.body.classList.add('printing-tefillin');
     currentSheet.style.setProperty('--tefillin-columns',cols.map(function(w){return w+'mm';}).join(' '));
     var style=util.el('style',{id:'tefillin-page-style',text:'@page { size: '+paper+' landscape; margin: 10mm; }'});document.head.appendChild(style);
+  }
+
+  function prepareMultiplePages(count, direction, paper) {
+    if (!Number.isInteger(count) || count < 2 || count > 16) throw new Error('Choose between 2 and 16 pages per sheet.');
+    if (!['down','across'].includes(direction)) throw new Error('Choose downwards or widthways.');
+    var papers={'A4-portrait':[210,297],'A4-landscape':[297,210],'A3-portrait':[297,420],'A3-landscape':[420,297]};
+    var size=papers[paper]; if(!size)throw new Error('Choose A4 or A3 paper.');
+    util.byId('multiple-print-area')?.remove(); util.byId('multiple-page-style')?.remove();
+    var area=util.el('div',{id:'multiple-print-area'});
+    if(reverseLines)area.classList.add('reverse-lines');
+    ['hide-shortfall','hide-numbers'].forEach(function(name){if(container.classList.contains(name))area.classList.add(name);});
+    document.body.appendChild(area);
+    var gap=4, availableW=size[0]-16, availableH=size[1]-16;
+    var cellW=direction==='across'?(availableW-gap*(count-1))/count:availableW;
+    var cellH=direction==='down'?(availableH-gap*(count-1))/count:availableH;
+    container.classList.add('print-measuring');
+    try {
+    for(var start=0;start<pageEls.length;start+=count){
+      var sheet=util.el('div',{class:'multiple-print-sheet'});
+      sheet.style.width=availableW+'mm';sheet.style.height=availableH+'mm';area.appendChild(sheet);
+      for(var j=0;j<count&&start+j<pageEls.length;j++){
+        var cell=util.el('div',{class:'multiple-print-cell'}), clone=pageEls[start+j].cloneNode(true);
+        clone.classList.remove('screen-page-hidden');
+        clone.querySelectorAll('.line-move,.page-width-editor,.print-study-label').forEach(function(node){node.remove();});
+        clone.style.transform='none';clone.style.margin='0';clone.style.width=pageEls[start+j].offsetWidth+'px';
+        cell.style.width=cellW+'mm';cell.style.height=cellH+'mm';
+        cell.style.left=(direction==='across'?j*(cellW+gap):0)+'mm';cell.style.top=(direction==='down'?j*(cellH+gap):0)+'mm';
+        cell.appendChild(clone);sheet.appendChild(cell);
+        var scale=Math.min(cellW*96/25.4/Math.max(clone.offsetWidth,clone.scrollWidth),cellH*96/25.4/Math.max(clone.offsetHeight,clone.scrollHeight));
+        clone.style.transformOrigin='top left';clone.style.transform='scale('+scale+')';clone.dataset.printScale=String(scale);
+      }
+    }
+    } finally { container.classList.remove('print-measuring'); }
+    document.body.classList.add('printing-multiple');
+    document.head.appendChild(util.el('style',{id:'multiple-page-style',text:'@page { size:'+size[0]+'mm '+size[1]+'mm; margin:8mm; }'}));
+  }
+
+  function selectedFont(layout) {
+    var profile=(layout||renderedLayout)?.snapshot?.profile;
+    return profile?.stretch_policy?.rendering?.font==='asirit'
+      ? {family:'Sofer Asirit Unicode',em:1000,inkHeight:1489,roofTop:577,roofBottom:405,lamedRoof:973,lamedGuide:764}
+      : {family:'Stam Ashkenaz CLM',em:2048,inkHeight:3080,roofTop:1050,roofBottom:700,lamedRoof:1960,lamedGuide:1410};
   }
 
   function prepareSamplePaper(paper) {
@@ -310,15 +354,16 @@
         var baseline=(height-ascent-descent)/2+ascent;
         // STaM Ashkenaz's common roof occupies font units 700..1050 of 2048.
         // Align the roof itself, excluding crowns and the lamed's ascender.
-        roofTop=baseline-size*1050/2048;
-        var roofBottom=baseline-size*700/2048;
+        var fontMetrics=selectedFont();
+        roofTop=baseline-size*fontMetrics.roofTop/fontMetrics.em;
+        var roofBottom=baseline-size*fontMetrics.roofBottom/fontMetrics.em;
         offset=(1-vertical)*(vertical>1?roofBottom:roofTop);
         ink.parentNode.style.setProperty('--roof-top',(roofTop*vertical+offset)+'px');
-        ink.parentNode.style.setProperty('--roof-middle',((roofTop+size*175/2048)*vertical+offset)+'px');
-        ink.parentNode.dataset.inkTop = String((baseline - (ink.textContent === 'ל' ? size * 1410 / 2048 : bounds.actualBoundingBoxAscent)) * vertical + offset);
+        ink.parentNode.style.setProperty('--roof-middle',(((roofTop+roofBottom)/2)*vertical+offset)+'px');
+        ink.parentNode.dataset.inkTop = String((baseline - (ink.textContent === 'ל' ? size * fontMetrics.lamedGuide / fontMetrics.em : bounds.actualBoundingBoxAscent)) * vertical + offset);
         ink.parentNode.dataset.inkBottom = String((baseline + bounds.actualBoundingBoxDescent) * vertical + offset);
         if(ink.parentNode.classList.contains('marker-four_tagin')){
-          var crownRoof=ink.textContent==='ל'?baseline-size*1960/2048:roofTop;
+          var crownRoof=ink.textContent==='ל'?baseline-size*fontMetrics.lamedRoof/fontMetrics.em:roofTop;
           ink.style.clipPath='inset('+Math.max(0,crownRoof)+'px -100% -100% -100%)';
           var crown=ink.parentNode.querySelector('.four-tagin');
           if(crown){crown.style.height=(size*360/2048*vertical)+'px';crown.style.top=(crownRoof*vertical+offset-size*360/2048*vertical)+'px';}
@@ -340,6 +385,12 @@
   }
 
   function letterMarks(letter) { return letter.stam_letter_marks || (letter.stam_letter_mark ? [letter.stam_letter_mark] : []); }
+  function sizeNote(letter, word) {
+    var types=letterMarks(letter).map(function(mark){return mark.type;});
+    var override=(word.override||[]).find(function(value){return value.id===letter.id;});
+    if(override?.type)types.push(override.type);
+    return types.includes('large') ? letter.base+'׳ רבתי' : types.includes('small') ? letter.base+'׳ זעירא' : '';
+  }
   function holyLabel(word) {
     var letters = word.letters || [], marked = letters.filter(function (letter) { return letter.holy; }).length;
     if (!marked || (word.consonant || letters.map(function (letter) { return letter.base; }).join('')).includes('יהוה')) return '';
@@ -368,7 +419,7 @@
         var height = Math.min(maxHeight, note.offsetHeight), lane = 0, top;
         while (top == null) {
           lanes[lane] ||= []; top = notePosition(wanted, height, maxHeight, lanes[lane]);
-          if (note.classList.contains('holy-name-note') && top !== Math.max(0, Math.min(maxHeight - height, wanted))) top = undefined;
+          if ((note.classList.contains('holy-name-note') || note.classList.contains('size-note')) && top !== Math.max(0, Math.min(maxHeight - height, wanted))) top = undefined;
           if (top == null) lane++;
         }
         lanes[lane].push({ top: top, height: height, width: note.offsetWidth });
@@ -426,13 +477,14 @@
     var msg = util.el('div', { class: 'empty' },
       [util.el('span', { class: 'emark', text: '\u05e1\u05e4\u05e8' }),
        util.el('p', { text: 'No layout computed yet.' }),
-       util.el('p', { class: 't--1', text: 'Choose a source, profile and geometry, then click “Compute layout”.' })]);
+       util.el('p', { class: 't--1', text: 'Choose a text, kulmus and klaf, then click “Compute layout”.' })]);
     container.appendChild(msg);
     if (refEl) refEl.textContent = '';
   }
 
   function render(layout) {
     var token = ++renderToken;
+    if (document.fonts && layout?.snapshot?.profile) document.fonts.load('24px "'+selectedFont(layout).family+'"', 'אבגד').then(scheduleFit).catch(function(){SS.toast('The selected font could not load. Please reload before printing.','error');});
     renderedCount = 0;
     if (!container) return;
     if (!layout || !Array.isArray(layout.lines) || layout.lines.length === 0) {
@@ -491,7 +543,7 @@
       var lastYeria = layout.summary && layout.summary.amudim_per_yeria &&
         (g.num % layout.summary.amudim_per_yeria === 0);
       var el = buildAmud(g, gi, layout, lastYeria, placeholder);
-      el.appendChild(util.el('div', { class: 'print-study-label', text: 'Sofer Studio · ' + (layout.summary && layout.summary.layout_mode==='reflow' ? 'Reflowed from Tikkun · '+layout.summary.units_per_row+' units per line — new pagination; sofer review required' : layout.summary && layout.summary.reference ? 'Tikkun reference column '+g.lines[0].reference_page+' — sofer review required' : isStudyPreview ? 'STUDY PREVIEW — NOT WRITING-READY' : isExcerpt ? 'SAMPLE TEXT — NOT A FULL TORAH LAYOUT' : 'Study layout — verify source, calibration and special passages before writing.') }));
+      el.appendChild(util.el('div', { class: 'print-study-label', text: 'Sofer Studio · ' + (layout.summary && layout.summary.layout_mode==='reflow' ? 'Reflowed from Tikkun · '+layout.summary.units_per_row+' units per line — new pagination; sofer review required' : layout.summary && layout.summary.reference ? 'Tikkun reference column '+g.lines[0].reference_page+' — sofer review required' : isStudyPreview ? 'STUDY PREVIEW — NOT WRITING-READY' : isExcerpt ? 'SAMPLE TEXT — NOT A FULL TORAH LAYOUT' : 'Study layout — verify text, calibration and special passages before writing.') }));
       // Reserve the complete column height even for a short sample. This is a
       // viewport treatment only; no lines, words or measured boxes are changed.
       var geometry = layoutGeometry(layout) || {};
@@ -539,14 +591,17 @@
     var songPage = g.lines[0] && g.lines[0].song_page;
     var pitch = (songPage && songPage.baseline_pitch_mm) || (geom && geom.baseline_pitch_mm) || 10;
     var profile = layout.snapshot && layout.snapshot.profile;
+    var fontMetrics = selectedFont(layout);
+    linesWrap.style.fontFamily = '"'+fontMetrics.family+'"';
+    linesWrap.style.setProperty('--font-he','"'+fontMetrics.family+'"');
     var letterHeight = (songPage && songPage.letter_height_mm) || (profile && profile.letter_height_mm);
-    if (letterHeight) linesWrap.style.fontSize = (Number(letterHeight) * 1.3) + 'mm';
+    if (letterHeight) linesWrap.style.fontSize = (Number(letterHeight) * (profile?.stretch_policy?.rendering ? fontMetrics.em/fontMetrics.inkHeight : 1.3)) + 'mm';
     var pageWidth = Math.max.apply(null, g.lines.map(function (l) { return l.column_width_mm || (geom && geom.line_width_mm) || 125; }));
     linesWrap.style.setProperty('--line-width', pageWidth + 'mm');
     amud.style.setProperty('--line-width', pageWidth + 'mm');
     linesWrap.style.minHeight = Number(geom?.lines_per_amud || g.lines.length) * Number(geom?.baseline_pitch_mm || pitch) + 'mm';
     if (songPage) { linesWrap.style.height=linesWrap.style.minHeight; linesWrap.style.overflow='visible'; }
-    if (g.lines.some(function(line){return (line.words||[]).some(function(word){return holyLabel(word) || (word.letters||[]).some(function(letter){return letterMarks(letter).some(function(mark){return mark.type==='margin_note';});});});})) amud.classList.add('has-margin-notes');
+    if (g.lines.some(function(line){return (line.words||[]).some(function(word){return holyLabel(word) || (word.letters||[]).some(function(letter){return sizeNote(letter,word) || letterMarks(letter).some(function(mark){return mark.type==='margin_note';});});});})) amud.classList.add('has-margin-notes');
 
     if (placeholder) {
       // Keep the page's full geometry in the scroll track without its glyph DOM.
@@ -560,7 +615,7 @@
 
     amud.appendChild(linesWrap);
     var source = (state.sources || []).find(function (s) { return s.id === layout.source_id; });
-    var sourceName = layout.source_name || (source && source.name) || 'Untitled source';
+    var sourceName = layout.source_name || (source && source.name) || 'Untitled text';
     amud.appendChild(util.el('div', { class: 'page-footer', dir: 'ltr' }, [
       util.el('div', { class: 'page-source', dir: 'auto', text: sourceName }),
       util.el('div', { text: 'Line width: ' + util.fmt(pageWidth, 2) + ' mm · Line height: ' + util.fmt(pitch, 2) + ' mm · ' + (gi + 1) + ' of ' + pageGroups.length }),
@@ -623,7 +678,9 @@
     (line.words||[]).forEach(function(word){
       var label = holyLabel(word);
       if (label) el.appendChild(util.el('span', { class: 'margin-note holy-name-note', dir: 'rtl', text: '° ' + label }));
-      (word.letters||[]).forEach(function(letter){letterMarks(letter).forEach(function(mark){
+      (word.letters||[]).forEach(function(letter){
+        var size=sizeNote(letter,word); if(size)el.appendChild(util.el('span',{class:'margin-note size-note',dir:'rtl',lang:'he',text:size}));
+        letterMarks(letter).forEach(function(mark){
         if(mark.type==='margin_note') el.appendChild(util.el('span',{class:'margin-note margin-comment',dir:'auto',text:'° '+mark.note}));
       });});
     });
@@ -697,7 +754,7 @@
       var reserved = Math.max(20, Number(profile.special_widths_units?.petucha || profile.stretch_policy?.special_widths_units?.petucha || 20)) * unit;
       if (missing < reserved - 0.001) missing -= reserved;
     }
-    var units = unit > 0 ? missing / unit : NaN, text = '—', title = 'Original line units unavailable';
+    var units = line.line_measurement ? line.line_measurement.reference_units - line.line_measurement.original_units : unit > 0 ? missing / unit : NaN, text = '—', title = 'Original line units unavailable';
     if (Number.isFinite(units)) {
       // The engine rounds millimetres to 0.001. Remove that rounding noise only.
       if (Math.abs(units - Math.round(units)) * unit <= 0.0011) units = Math.round(units);
@@ -996,6 +1053,8 @@
     isPrintReady: function () { return printReady; },
     prepareTefillinPaper: prepareTefillinPaper,
     prepareSamplePaper: prepareSamplePaper,
+    prepareMultiplePages: prepareMultiplePages,
+    selectedFont: selectedFont,
     suggestsDrop: suggestsDrop,
     refreshPrintNote: function () { if (renderedLayout) fillPrintNote(renderedLayout); }
   };

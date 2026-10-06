@@ -21,14 +21,14 @@
   var customLines = false;
 
   var FIELDS = [
+    ['line_width_mm', 'Column width (mm)', 0.1],
     ['baseline_pitch_mm', 'Line height', 0.1],
     ['top_margin_mm', 'Top margin', 0.1],
     ['bottom_margin_mm', 'Bottom margin', 0.1],
     ['inter_column_gap_mm', 'Column gap', 0.1],
     ['outer_margin_mm', 'Outer margin', 0.1],
     ['initial_margin_mm', 'Initial document margin (blank = outer)', 0.1],
-    ['final_margin_mm', 'Final document margin (blank = outer)', 0.1],
-    ['line_width_mm', 'Line (column) width', 0.1]
+    ['final_margin_mm', 'Final document margin (blank = outer)', 0.1]
   ];
 
   function init(ctx) {
@@ -69,7 +69,7 @@
 
   function normalizeGeometry(g) {
     return {
-      _isDefault: false, id: g.id, name: g.name || 'Geometry',
+      _isDefault: false, id: g.id, name: g.name || 'Klaf',
       lines_per_amud: toInt(g.lines_per_amud, 42),
       baseline_pitch_mm: toNum(g.baseline_pitch_mm, 8.0),
       top_margin_mm: toNum(g.top_margin_mm, 30),
@@ -89,6 +89,8 @@
       small_letter_reference: g.small_letter_reference || 'י',
       initial_margin_mm: g.initial_margin_mm ?? null, final_margin_mm: g.final_margin_mm ?? null,
       document_flow: g.document_flow ? JSON.parse(JSON.stringify(g.document_flow)) : null,
+      line_measurement: g.line_measurement ? JSON.parse(JSON.stringify(g.line_measurement)) : null,
+      parsha_mode: g.parsha_mode || 'rambam_rosh',
       song_layouts: g.song_layouts ? JSON.parse(JSON.stringify(g.song_layouts)) : null,
       tefillin: g.tefillin ? JSON.parse(JSON.stringify(g.tefillin)) : null,
       vavei_haamudim: g.vavei_haamudim !== false
@@ -112,8 +114,8 @@
     // name + save
     var crud = util.el('div', { class: 'grid-crud' });
     crud.appendChild(util.el('label', { class: 'field', style: 'flex:1' },
-      [util.el('span', { text: 'Geometry name' }),
-       util.el('input', { type: 'text', id: 'geom-name', placeholder: 'Geometry name' })]));
+      [util.el('span', { text: 'Klaf name' }),
+       util.el('input', { type: 'text', id: 'geom-name', placeholder: 'Klaf name' })]));
     var bSave = util.el('button', { class: 'btn btn-primary btn-sm', text: 'Save as new' });
     var bNew = util.el('button', { class: 'btn btn-ghost btn-sm', text: 'New' });
     bSave.addEventListener('click', saveGeometry);
@@ -145,7 +147,7 @@
     FIELDS.forEach(function (f) {
       grid.appendChild(mmField(f[1], f[0], f[2]));
     });
-    grid.appendChild(util.el('p', {class:'profile-help full',text:'Column width is measured in millimetres. Units per row and the letter-width table determine how the text fits.'}));
+    grid.appendChild(util.el('p', {class:'kulmus-help full',text:'Column width is measured in millimetres. Units per row and the letter-width table determine how the text fits.'}));
     grid.appendChild(intField('Amudim per yeria', 'amudim_per_yeria'));
     var pfy = util.el('label', { class: 'field full' },
       [util.el('span', { text: 'Partial final yeria' }),
@@ -154,6 +156,24 @@
           util.el('option', { value: 'exact', text: 'Exact (narrow final sheet)' })])]);
     grid.appendChild(pfy);
     root.appendChild(grid);
+
+    var measurements = util.el('div', { class: 'geom-grid', id: 'geom-line-measurements' });
+    [['reference_units', 'חסר / יתר reference units'], ['recommended_units', 'Preferred units per line'],
+      ['max_units', 'Maximum units per line'], ['stretch_units', 'Stretch below (units)']].forEach(function (pair) {
+      var input = util.el('input', { id: 'geom-' + pair[0], type: 'number', min: '0.001', max: '10000', step: 'any' });
+      input.addEventListener('input', function () {
+        draft.line_measurement = Object.assign(measurementDefaults(), draft.line_measurement || {}, { [pair[0]]: Number(input.value) });
+        bus.emit('geometry:draft-changed');
+      });
+      measurements.appendChild(util.el('label', { class: 'field' }, [util.el('span', { text: pair[1] }), input]));
+    });
+    root.appendChild(measurements);
+    root.appendChild(util.el('p', { class: 'profile-help', text: 'Choose the whole-word ending nearest the preferred count, within the maximum. Above the stretching threshold, all widths fit equally. Below it, the three letter-stretch stages apply. חסר / יתר compares the original count with its reference.' }));
+    var parsha = util.el('select', { id: 'geom-parsha-mode' }, [
+      util.el('option', { value: 'rambam_rosh', text: 'Rambam and Rosh — a word before and after a setuma' }),
+      util.el('option', { value: 'rambam', text: 'Rambam only — a setuma may start the line' })]);
+    parsha.addEventListener('change', function () { draft.parsha_mode = parsha.value; bus.emit('geometry:draft-changed'); });
+    root.appendChild(util.el('label', { class: 'field' }, [util.el('span', { text: 'Parshos' }), parsha]));
 
     var songs=util.el('details',{class:'song-settings'},[util.el('summary',{text:'Song column settings'})]);
     songs.appendChild(util.el('p',{class:'profile-help',text:'Letters keep the same physical size as the rest of the document. Wider song columns contain more units.'}));
@@ -239,6 +259,17 @@
     util.qs('.unit', el.parentNode).textContent = 'mm';
     el.closest('label').firstChild.textContent = 'Column width (mm)';
     el.value = draft.line_width_mm;
+    renderLineMeasurements();
+  }
+  function measurementDefaults() {
+    var profile = SS.calibration?.getDraft?.() || SS.activeProfile?.();
+    var units = profile?.stretch_policy?.width_mode === 'millimetres' ? draft.line_width_mm : Number(profile?.units_per_row || 62);
+    return { reference_units: units, recommended_units: units, max_units: units, stretch_units: units };
+  }
+  function renderLineMeasurements() {
+    var values = Object.assign(measurementDefaults(), draft.line_measurement || {});
+    Object.keys(values).forEach(function (key) { var input = util.byId('geom-' + key); if (input && document.activeElement !== input) input.value = values[key]; });
+    var parsha = util.byId('geom-parsha-mode'); if (parsha) parsha.value = draft.parsha_mode || 'rambam_rosh';
   }
   function intField(label, path) {
     var input = util.el('input', { type: 'number', step: '1', min: '1', 'data-field': path });
@@ -365,8 +396,9 @@
    * ------------------------------------------------------------------ */
   function renderDerived() {
     if (!guardEl || !derivedEl) return;
+    renderLineMeasurements();
 
-    var prof = SS.activeProfile ? SS.activeProfile() : null;
+    var prof = SS.calibration?.getDraft?.() || (SS.activeProfile ? SS.activeProfile() : null);
     var L = draft.lines_per_amud;
     var P = draft.baseline_pitch_mm;
     var H = prof ? (prof.letter_height_mm || 0) : 0;
@@ -405,7 +437,7 @@
     derivedItem(derivedEl, 'Full yeria width', util.mm(fullYeria),
       '2\u00d7' + util.fmt(draft.outer_margin_mm) + ' + ' + k + '\u00d7' + util.fmt(draft.line_width_mm) + ' + ' + (k - 1) + '\u00d7' + util.fmt(draft.inter_column_gap_mm));
 
-    if (overlap) {
+    if (overlap && !prof?.stretch_policy?.rendering) {
       var warn = util.el('div', { class: 'banner warn', text: 'Line height (' + util.mm(P) + ') is less than letter height (' + util.mm(H) + ') — lines would overlap.' });
       derivedEl.prepend ? derivedEl.prepend(warn) : derivedEl.insertBefore(warn, derivedEl.firstChild);
     }
@@ -448,7 +480,7 @@
    * ------------------------------------------------------------------ */
   async function saveGeometry() {
     var name = util.byId('geom-name').value.trim();
-    if (!name) { SS.toast('Give the geometry a name.', 'error'); return; }
+    if (!name) { SS.toast('Give the klaf a name.', 'error'); return; }
     var body = {
       name: name,
       lines_per_amud: draft.lines_per_amud,
@@ -471,6 +503,7 @@
       vavei_haamudim: !!draft.vavei_haamudim
     };
     body.song_layouts=draft.song_layouts;
+    body.line_measurement=draft.line_measurement; body.parsha_mode=draft.parsha_mode;
     body.document_flow=draft.document_flow; body.initial_margin_mm=draft.initial_margin_mm; body.final_margin_mm=draft.final_margin_mm;
     if(draft.tefillin) body.tefillin=draft.tefillin;
     try {
@@ -480,7 +513,7 @@
       draft = normalizeGeometry(saved);
       renderFromDraft();
       bus.emit('geometryId:changed');
-      SS.toast('Geometry saved.');
+      SS.toast('Klaf saved.');
     } catch (e) { SS.toast(e.message || String(e), 'error'); }
   }
 
@@ -496,7 +529,7 @@
     var clean = function(g) { var c = normalizeGeometry(g); delete c.id; delete c._isDefault; return JSON.stringify(c); };
     if (active && clean(active) === clean(draft)) return active;
     var body = JSON.parse(JSON.stringify(draft)); delete body.id; delete body._isDefault;
-    if (!body.name?.trim()) throw new Error('Give the geometry a name.');
+    if (!body.name?.trim()) throw new Error('Give the klaf a name.');
     var saved = await API.createGeometry(body); await refreshGeometries();
     state.active.geometryId = saved.id; draft = normalizeGeometry(saved); renderFromDraft();
     bus.emit('geometryId:changed'); return saved;

@@ -28,7 +28,7 @@ test('new profile matches requested groups and caps, with column-derived units',
     width.value='200';width.dispatchEvent(new f.w.Event('input'));
     const units=f.d.getElementById('cal-units-per-row');units.value='80';units.dispatchEvent(new f.w.Event('input'));
     assert(Math.abs(2*p.unit_mm*(p.letter_height_mm/p.reference_height_mm)-2*200/80)<1e-9);
-    assert.match(f.d.getElementById('cal-unit-formula').textContent,/200 mm column ÷ 80 units/);
+    assert.match(f.d.getElementById('cal-unit-formula').textContent,/200 mm ÷ 80.000 units/);
   }finally{f.dom.window.close();}
 });
 test('legacy profile adopts fixed choices in its draft, retaining caps until preset action',async()=>{

@@ -14,6 +14,7 @@
 
 /* --- 1. Colour tokens ----------------------------------------------- */
 @font-face { font-family: 'Stam Ashkenaz CLM'; src: url('/fonts/StamAshkenazCLM.ttf') format('truetype'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Sofer Asirit Unicode'; src: url('/fonts/SoferAsiritUnicode.ttf') format('truetype'); font-weight: 400; font-style: normal; font-display: swap; }
 :root {
   --klaf:        #F2E7CE;
   --klaf-seam:   #DFC99F;
@@ -1170,3 +1171,46 @@ body.sofer-workspace {
 .sample-cut-mark::after { height:4mm; width:.2mm; top:-2mm; left:-.1mm; }
 .sample-copyright { position:absolute; right:3mm; left:3mm; text-align:center; font:8px/1.2 Arial,sans-serif; }
 @media print { .workspace-copyright { display:none; } .sample-cut-mark { print-color-adjust:exact; -webkit-print-color-adjust:exact; } }
+
+/* Compact Kulmus and Klaf controls. */
+.kulmus-tables { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; align-items:start; }
+.kulmus-tables .letter-table { table-layout:fixed; width:100%; min-width:0; }
+.kulmus-tables .letter-table th { padding:4px 2px; font-size:10px; letter-spacing:0; white-space:normal; text-align:center; }
+.kulmus-tables .letter-table th:first-child { width:32px; }
+.kulmus-tables .letter-table th:nth-child(2) { width:45px; }
+.kulmus-tables .letter-table td { padding:2px; }
+.kulmus-tables .letter-table input.cell { min-width:0; width:100%; height:23px; padding:0 3px; font-size:11px; }
+.kulmus-tables .letter-table td.cap select { display:block; min-width:0; width:100%; height:24px; padding:0 2px; font:10px var(--font-ui); }
+.kulmus-tables .letter-table input[hidden] { display:none; }
+.kulmus-tables .special-table { grid-column:1/-1; max-width:680px; }
+.kulmus-tables .special-table th:first-child { width:130px; }
+.kulmus-tables .special-table td.let { font:12px var(--font-ui); direction:ltr; text-align:left; }
+#geometry-body .geom-grid { grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px 14px; }
+#geometry-body .field { display:grid; grid-template-columns:minmax(90px,1fr) minmax(80px,1fr); gap:6px; align-items:center; margin:0; }
+#geometry-body .field > span { font-size:11px; }
+#geometry-body .field input, #geometry-body .field select { min-width:0; width:100%; padding:4px; font-size:12px; }
+#geometry-body .field .mm-input { min-width:0; }
+#geometry-body .field.full { grid-column:auto; }
+#geom-line-measurements { margin:12px 0; padding:10px; background:var(--panel); border:1px solid var(--rule); }
+#geometry-body .profile-help { font-size:11px; margin:8px 0; }
+.setup-main-measurements { display:flex; gap:12px; align-items:center; }
+.setup-main-measurements .field { max-width:260px; }
+.size-note { white-space:nowrap; }
+.print-sheet-controls { display:flex; gap:12px; flex-wrap:wrap; margin:12px 0; }
+.print-sheet-controls .field { max-width:180px; }
+.print-sheet-controls .profile-help { width:100%; margin:0; }
+#multiple-print-area { position:absolute; left:-100000px; top:0; visibility:hidden; }
+.multiple-print-sheet { position:relative; overflow:hidden; background:white; }
+.multiple-print-cell { position:absolute; overflow:hidden; }
+.multiple-print-cell .amud { display:block!important; min-width:0; min-height:0; position:absolute; left:0; top:0; box-sizing:border-box; }
+@media(max-width:1000px) { #geometry-body .geom-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:700px) { .kulmus-tables { grid-template-columns:1fr; } #geometry-body .geom-grid { grid-template-columns:1fr; } }
+@media print {
+  body.printing-multiple > :not(#multiple-print-area) { display:none!important; }
+  body.printing-multiple > #multiple-print-area { display:block!important; position:static; visibility:visible; margin:0; padding:0; }
+  .multiple-print-sheet { break-after:page; page-break-after:always; }
+  .multiple-print-sheet:last-child { break-after:auto; page-break-after:auto; }
+  .multiple-print-cell .amud { break-after:auto; page-break-after:auto; border:0; box-shadow:none; }
+  .multiple-print-cell .line { width:var(--line-width); }
+  .multiple-print-cell .page-footer { display:block; }
+}

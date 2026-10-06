@@ -27,10 +27,10 @@ test('all special rows share numeric percentage and Unlimited controls, includin
   const f=ui(null);
   try {
     for(const key of ['word_space','hyphen','petucha','setuma']) {
-      const mode='[aria-label="stretch limit type for '+key+'"]', cap='[aria-label="stretch cap for '+key+'"]';
-      assert.deepEqual([...f.d.querySelector(mode).options].map(x=>x.value),['percent','unlimited']);
+      const mode='[aria-label="stretch limit type for first stage '+key+'"]', cap='[aria-label="stretch cap for first stage '+key+'"]';
+      assert.deepEqual([...f.d.querySelector(mode).options].map(x=>x.value),['none','percent','unlimited']);
       f.input(mode,'percent','change'); f.input(cap,125);
-      assert.equal(f.SS.calibration.getDraft().stretch_policy[key==='word_space'?'word_space_percent':key+'_percent'],125);
+      assert.equal(f.SS.calibration.getDraft().stretch_policy.stages[0].caps_percent[key],125);
       f.input(mode,'unlimited','change'); assert(f.d.querySelector(cap).disabled);
       f.input(mode,'percent','change'); assert.equal(f.d.querySelector(cap).value,'125');
       f.input(mode,'unlimited','change');
@@ -38,17 +38,17 @@ test('all special rows share numeric percentage and Unlimited controls, includin
     f.input('#cal-name','Measurement controls');
     f.d.querySelector('#calibration-body .grid-crud .btn-primary').click(); await tick();
     assert.deepEqual(validateProfileInput(f.body),[]);
-    for(const key of ['word_space','hyphen','petucha','setuma']) assert.equal(f.body.stretch_policy[key+'_percent'],'unlimited');
+    for(const key of ['word_space','hyphen','petucha','setuma']) assert.equal(f.body.stretch_policy.stages[0].caps_percent[key],'unlimited');
     const reloaded=ui({...f.body,id:'saved'}); await tick();
-    try { for(const key of ['word_space','hyphen','petucha','setuma']) assert.equal(reloaded.d.querySelector('[aria-label="stretch limit type for '+key+'"]').value,'unlimited'); }
+    try { for(const key of ['word_space','hyphen','petucha','setuma']) assert.equal(reloaded.d.querySelector('[aria-label="stretch limit type for first stage '+key+'"]').value,'unlimited'); }
     finally { reloaded.dom.window.close(); }
   } finally { f.dom.window.close(); }
 });
-test('only Letter height is editable, in units defaulting to 2.5, and changes preserve the horizontal row budget',()=>{
+test('Letter overlap replaces height controls while preserving the horizontal row budget',()=>{
   const f=ui(null);
   try {
-    const field=f.d.querySelector('[data-field="letter_height_units"]');
-    assert.equal(field.value,'2.5'); assert.equal(field.closest('label').querySelector('.unit').textContent,'units');
+    const field=f.d.querySelector('#cal-letter-overlap');
+    assert(field); assert.equal(f.d.querySelector('[data-field="letter_height_units"]'),null);
     for(const name of ['letter_height_mm','reference_height_mm','min_letter_height_mm','stroke_mm','min_nib_mm','gaps.inter_letter']) assert.equal(f.d.querySelector('[data-field="'+name+'"]'),null);
     assert.equal(f.SS.calibration.getDraft().stroke_mm,0);
     assert.equal(f.SS.calibration.getDraft().min_nib_mm,0);
@@ -58,10 +58,10 @@ test('only Letter height is editable, in units defaulting to 2.5, and changes pr
     assert.equal(defaultProfile().stroke_mm,0);
     f.input('#geometry-body [data-field="line_width_mm"]',124); // one row unit = 2mm.
     const p=f.SS.calibration.getDraft(); assert.equal(p.letter_height_mm,5);
-    const before=totalWidth('א',effectiveProfile(normalizeProfile(p),{line_width_mm:124}));
-    f.input('[data-field="letter_height_units"]',3); assert.equal(p.letter_height_mm,6);
-    assert.equal(totalWidth('א',effectiveProfile(normalizeProfile(p),{line_width_mm:124})),before);
-    f.input('#geometry-body [data-field="line_width_mm"]',186); assert.equal(p.letter_height_mm,9); assert.equal(field.value,'3');
+    const before=totalWidth('א',effectiveProfile(normalizeProfile(p),{line_width_mm:124,baseline_pitch_mm:7.5}));
+    f.input('#cal-letter-overlap',20); assert.equal(p.letter_height_mm,9);
+    assert.equal(totalWidth('א',effectiveProfile(normalizeProfile(p),{line_width_mm:124,baseline_pitch_mm:7.5})),before);
+    f.input('#geometry-body [data-field="line_width_mm"]',186); assert.equal(p.letter_height_mm,9); assert.equal(field.value,'20');
   } finally { f.dom.window.close(); }
 });
 test('legacy millimetre heights display as units without changing stored measurements on save',async()=>{

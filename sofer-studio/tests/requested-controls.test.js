@@ -24,7 +24,7 @@ test('requested defaults save, custom lines remain editable even at a preset, an
     assert.equal(f.SS.calibration.getDraft().letter_height_units,2.5);
     for(const id of ['cal-policy-mode','cal-unit-mode','cal-stretch-distribution','cal-stretch-position','geom-small_letter_reference','geom-setuma_reference_letter']) assert.equal(f.d.getElementById(id),null);
     for(const key of ['unit_mm','min_inter_word_gap_mm','max_inter_word_gap_mm','max_inter_word_gap_factor']) assert.equal(f.d.querySelector('[data-field="'+key+'"]'),null);
-    assert.deepEqual([...f.d.querySelectorAll('.letter-table th')].map(el=>el.textContent),['Letter','Width units','Total mm','Maximum increase','Stretch preference','Second maximum increase','Second stretch preference']);
+    assert.deepEqual([...f.d.querySelectorAll('.letter-table:first-child th')].map(el=>el.textContent),['Letter / space','Width','First stage','Second stage','Third stage']);
     const input=f.d.getElementById('geom-lines-custom-input'),custom=f.d.querySelector('[data-lines="custom"]');
     custom.click();assert.equal(f.d.getElementById('geom-lines-custom').hidden,false);assert.equal(custom.getAttribute('aria-pressed'),'true');
     for(const value of [45,42,53]) {input.value=value;input.dispatchEvent(new f.w.Event('input'));assert.equal(f.SS.geometry.getDraft().lines_per_amud,value);assert.equal(f.d.getElementById('geom-lines-custom').hidden,false);}

@@ -228,7 +228,7 @@
     var editRules=util.el('button',{type:'button',class:'btn btn-ghost btn-sm',text:'Edit whole-book stretch rules'});
     editRules.addEventListener('click',function(){if(SS.workspace)SS.workspace.open('setup','calibration');});
     batchRoot.appendChild(editRules);
-    batchRoot.appendChild(util.el('p',{text:'In Setup → Measurements, choose “Use requested stretch rules”, save the profile, and compute a new draft before suggesting. This does not change older saved layouts.'}));
+    batchRoot.appendChild(util.el('p',{text:'In Setup → Measurements, choose “Use requested stretch rules”, save the kulmus, and compute a new draft before suggesting. This does not change older saved layouts.'}));
     batchPreview=util.el('button',{type:'button',class:'btn btn-ghost btn-sm',text:'Auto-suggest whole book'});
     batchApply=util.el('button',{type:'button',class:'btn btn-primary btn-sm',text:'Apply reviewed suggestions',disabled:true});
     batchReport=util.el('button',{type:'button',class:'btn btn-ghost btn-sm',text:'Show applied stretch report'});
@@ -262,7 +262,7 @@
     batchApply.disabled=true;batchDownload.disabled=true;
     batchPreview.disabled=batchBusy||!state.active.layoutId||!!(state.layout&&state.layout.status==='locked');
     batchReport.disabled=batchBusy||!state.active.layoutId;
-    if(fitCreate){fitCreate.disabled=true;fitPreview.disabled=batchBusy||!state.active.layoutId;fitOutput.textContent='No profile limits change without your approval.';}
+    if(fitCreate){fitCreate.disabled=true;fitPreview.disabled=batchBusy||!state.active.layoutId;fitOutput.textContent='No kulmus limits change without your approval.';}
     batchOutput.textContent=state.layout&&state.layout.status==='locked'?'Locked: the applied report is available, but changes require a new draft.':'Generate suggestions to see exactly which words and letters would be stretched.';
   }
   function busy(on){batchBusy=on;batchPreview.disabled=on||!state.active.layoutId||state.layout.status==='locked';batchReport.disabled=on||!state.active.layoutId;batchApply.disabled=on||!batchPlan||!batchPlan.lines.length;if(fitPreview){fitPreview.disabled=on||!state.active.layoutId;fitCreate.disabled=on||!fitPlan;}}
@@ -284,7 +284,7 @@
   }
   async function createFit(){
     if(batchBusy||!fitPlan)return;
-    if(SS.calibration&&SS.calibration.isDirty&&SS.calibration.isDirty()){SS.toast('Save your edited profile before creating a fitted copy.','error');return;}
+    if(SS.calibration&&SS.calibration.isDirty&&SS.calibration.isDirty()){SS.toast('Save your edited kulmus before creating a fitted copy.','error');return;}
     if(!window.confirm('Approve the displayed per-letter limits and create a separate fitted review copy? The original layout is unchanged. Review the letter shapes with your sofer.'))return;
     var id=state.active.layoutId,plan=fitPlan;busy(true);
     try{

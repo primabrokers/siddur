@@ -2,6 +2,7 @@ import { makeLine, autoSuggestLine, applyStretch, petuchaGapMm } from './layout.
 import { interWordGap, measurementUnitMm } from './width.js';
 import { composeSongLine } from './song-layout.js';
 import { songSettings } from './column-options.js';
+import { lineLimits, shouldWrap, scaleItems, measureFinishedLine } from './line-measurement.js';
 
 const gapItem = item => ['setuma_gap', 'custom_gap'].includes(item?.type);
 const firstId = line => line.words?.[0]?.letters?.[0]?.id;
@@ -18,7 +19,7 @@ export function measuredStream(lines, overrides = {}) {
       if (overrides[firstId(line)]) stream.push({ type: 'width_break', width_mm: overrides[firstId(line)] });
       stream.push({ type: 'row', line }); continue;
     }
-    for (const item of line.items) {
+    for (const item of line.line_measurement?.scale && line.line_measurement.scale !== 1 ? scaleItems(line.items, 1 / line.line_measurement.scale) : line.items) {
       const override = item.type === 'word' && overrides[item.letters?.[0]?.id];
       if (override) stream.push({ type: 'width_break', width_mm: override });
       stream.push(item);
@@ -42,10 +43,12 @@ function row(items, width, profile, end = {}) {
 
 function fit(stream, start, stop, width, profile, geometry, maxRows = Infinity, resizeSongs = false) {
   const lines = []; let cursor = start, items = [];
+  const rules = lineLimits(profile, geometry, width);
   const flush = flags => { if (items.length) { lines.push(row(items, width, profile, flags)); items = []; } };
   const reserve = index => {
     let reserved = 0;
     while (gapItem(stream[index + 1]) && index + 1 < stop) {
+      if (stream[index + 1].type === 'setuma_gap' && profile.parsha_mode === 'rambam') break;
       reserved += stream[index + 1].width_mm;
       if (stream[index + 2]?.type !== 'word' || index + 2 >= stop) return reserved;
       reserved += stream[index + 2].width_mm; index += 2;
@@ -68,8 +71,13 @@ function fit(stream, start, stop, width, profile, geometry, maxRows = Infinity, 
     }
     if (item.type === 'line_end' || item.type === 'end') { flush({ ...item, explicit: item.type === 'line_end' }); cursor++; continue; }
     const together = [...items, item];
-    if (items.length && !gapItem(item) && !gapItem(items.at(-1)) && widthOf(together, profile) + reserve(cursor) > width + 1e-9) {
+    const rambamGap = item.type === 'setuma_gap' && profile.parsha_mode === 'rambam';
+    const reserved = rambamGap ? Number(stream[cursor + 1]?.width_mm || 0) : reserve(cursor);
+    if (items.length && (!gapItem(item) || rambamGap) && !gapItem(items.at(-1)) && shouldWrap(widthOf(items, profile), widthOf(together, profile) + reserved, width, rules)) {
       flush(); if (lines.length >= maxRows) break;
+    }
+    if (rules && !items.length && Number(item.width_mm || 0) + reserved > rules.maximum + .001) {
+      throw Object.assign(new Error('A whole word or paragraph group exceeds the maximum units per line. Increase the maximum or adjust the Kulmus widths.'), {code:'MAX_LINE_UNITS'});
     }
     items.push(item); cursor++;
   }
@@ -86,12 +94,14 @@ function fillRows(stream, profile, geometry, target, originalWidth) {
   if (low > high || fit(stream, 0, stream.length, high, profile, geometry).lines.length > target) return null;
   for (let i = 0; i < 28; i++) {
     const middle = (low + high) / 2;
-    if (fit(stream, 0, stream.length, middle, profile, geometry).lines.length > target) low = middle;
-    else high = middle;
+    try {
+      if (fit(stream, 0, stream.length, middle, profile, geometry).lines.length > target) low = middle;
+      else high = middle;
+    } catch(error) { if(error.code!=='MAX_LINE_UNITS')throw error;low=middle; }
   }
   const width = Math.ceil(high * 1000) / 1000;
   const result = fit(stream, 0, stream.length, width, profile, geometry);
-  if (result.lines.some(line => line.width_mm + (line.petucha_end ? petuchaGapMm(profile) : 0) > width + .001)) return null;
+  if (!geometry.line_measurement && result.lines.some(line => line.width_mm + (line.petucha_end ? petuchaGapMm(profile) : 0) > width + .001)) return null;
   return { ...result, width, previous_width_mm: originalWidth };
 }
 
@@ -115,7 +125,12 @@ function balancePages(stream, original, profile, geometry, maxRows) {
     const cache = new Map();
     const candidate = units => {
       if (cache.has(units)) return cache.get(units);
-      let page = fit(stream, cursor, end, units * unit, profile, geometry, maxRows);
+      let page;
+      try { page = fit(stream, cursor, end, units * unit, profile, geometry, maxRows); }
+      catch(error) {
+        if(error.code!=='MAX_LINE_UNITS')throw error;
+        const invalid={lines:[],cursor,width:units*unit,score:Infinity,units};cache.set(units,invalid);return invalid;
+      }
       const mode = geometry.document_flow?.column_start;
       if (remaining > 1 && ['vav', 'hamelech'].includes(mode) && !page.lines.some(line => line.fixed_pattern)) {
         for (let cut = page.cursor - 1; cut > cursor; cut--) {
@@ -126,7 +141,7 @@ function balancePages(stream, original, profile, geometry, maxRows) {
           }
         }
       }
-      const overfull = page.lines.some(line => line.width_mm + (line.petucha_end ? petuchaGapMm(profile) : 0) > units * unit + .001);
+      const overfull = page.lines.some(line => (!geometry.line_measurement || line.fixed_pattern) && line.width_mm + (line.petucha_end ? petuchaGapMm(profile) : 0) > units * unit + .001);
       const score = overfull || page.cursor <= cursor || (remaining > 1 && page.cursor >= end) ? Infinity : Math.abs(at(page.cursor) - target);
       const result = { ...page, score, units }; cache.set(units, result); return result;
     };
@@ -215,7 +230,7 @@ export function reflowDocument(lines, profile, geometry, options = {}) {
     segmentPages.push({ ...page, start, end: cursor, manual_width: manual });
   }
   finishSegment();
-  const output = pages.flatMap((page, index) => page.lines.map((line, rowIndex) => ({ ...line,
+  const output = pages.flatMap((page, index) => page.lines.map((line, rowIndex) => ({ ...measureFinishedLine(line, profile, geometry, page.width),
     flow_page_start: rowIndex === 0, column_width_mm: page.width,
     ...(rowIndex === 0 && page.previous_width_mm ? { page_fit: { previous_width_mm: page.previous_width_mm, width_mm: page.width } } : {}),
   })));

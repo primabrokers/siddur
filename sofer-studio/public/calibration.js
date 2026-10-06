@@ -75,7 +75,7 @@
   }
 
   function confirmDiscard() {
-    return window.confirm('Discard unsaved calibration changes and load the selected profile?');
+    return window.confirm('Discard unsaved calibration changes and load the selected kulmus?');
   }
 
   /* ------------------------------------------------------------------ *
@@ -85,7 +85,7 @@
     // warning banner (top)
     warnEl = util.el('div', { class: 'banner warn', hidden: true });
     root.appendChild(warnEl);
-    root.appendChild(util.el('p', { class: 'profile-help', text: 'Start with your own named profile. Measure the sofer’s actual writing before saving; the initial numbers are examples, not recommended or verified measurements.' }));
+    root.appendChild(util.el('p', { class: 'profile-help', text: 'Start with your own named kulmus. Measure the sofer’s actual writing before saving; the initial numbers are examples, not recommended or verified measurements.' }));
     root.appendChild(util.el('p', { id: 'cal-draft-status', class: 'profile-help', role: 'status' }));
 
     // app-bar warning chip (created once)
@@ -103,16 +103,16 @@
     // profile CRUD row
     var crud = util.el('div', { class: 'grid-crud' });
     var nameField = util.el('label', { class: 'field', style: 'flex:1' },
-      [util.el('span', { text: 'Profile name' }),
-       util.el('input', { type: 'text', id: 'cal-name', placeholder: 'Profile name' })]);
+      [util.el('span', { text: 'Kulmus name' }),
+       util.el('input', { type: 'text', id: 'cal-name', placeholder: 'Kulmus name' })]);
     crud.appendChild(nameField);
 
-    var btnSave = util.el('button', { class: 'btn btn-primary btn-sm', title: 'Save profile', text: 'Save' });
-    var btnNew = util.el('button', { class: 'btn btn-ghost btn-sm', title: 'New profile', text: 'New profile' });
-    var btnDup = util.el('button', { class: 'btn btn-ghost btn-sm', title: 'Duplicate active profile', text: 'Duplicate' });
-    var btnImport = util.el('button', { class: 'btn btn-ghost btn-sm', title: 'Import profile JSON', text: 'Import' });
-    var btnExport = util.el('button', { class: 'btn btn-ghost btn-sm', title: 'Export profile JSON', text: 'Export' });
-    var btnDelete = util.el('button', { class: 'btn btn-danger btn-sm', title: 'Delete profile', text: 'Delete' });
+    var btnSave = util.el('button', { class: 'btn btn-primary btn-sm', title: 'Save kulmus', text: 'Save' });
+    var btnNew = util.el('button', { class: 'btn btn-ghost btn-sm', title: 'New kulmus', text: 'New kulmus' });
+    var btnDup = util.el('button', { class: 'btn btn-ghost btn-sm', title: 'Duplicate active kulmus', text: 'Duplicate' });
+    var btnImport = util.el('button', { class: 'btn btn-ghost btn-sm', title: 'Import kulmus JSON', text: 'Import' });
+    var btnExport = util.el('button', { class: 'btn btn-ghost btn-sm', title: 'Export kulmus JSON', text: 'Export' });
+    var btnDelete = util.el('button', { class: 'btn btn-danger btn-sm', title: 'Delete kulmus', text: 'Delete' });
     var fileInput = util.el('input', { type: 'file', accept: 'application/json,.json', hidden: true });
 
     btnSave.addEventListener('click', saveProfile);
@@ -129,15 +129,15 @@
     crud.appendChild(row);
     crud.appendChild(fileInput);
     root.appendChild(crud);
-    var preset = util.el('select', { id: 'cal-preset', 'aria-label': 'Profile preset' }, [
-      util.el('option', { value: '', text: 'Choose a profile preset…' }),
+    var preset = util.el('select', { id: 'cal-preset', 'aria-label': 'Kulmus preset' }, [
+      util.el('option', { value: '', text: 'Choose a kulmus preset…' }),
       util.el('option', { value: '4mm-yad', text: '4mm yad' }),
       util.el('option', { value: 'classic-sefer-torah', text: 'Classic Sefer Torah' })
     ]);
     preset.addEventListener('change', async function() {
       if (!preset.value) return;
       var label = preset.options[preset.selectedIndex].text;
-      if (dirty && !window.confirm('Replace the unsaved profile draft with the ' + label + ' preset?')) { preset.value = ''; return; }
+      if (dirty && !window.confirm('Replace the unsaved kulmus draft with the ' + label + ' preset?')) { preset.value = ''; return; }
       try {
         var response = await fetch('/profiles/' + preset.value + '.profile.json');
         if (!response.ok) throw new Error('Cannot load the selected preset');
@@ -148,12 +148,12 @@
       } catch(e) { SS.toast(e.message || String(e), 'error'); }
       preset.value = '';
     });
-    root.appendChild(util.el('label', { class: 'field' }, [util.el('span', { text: 'Profile preset' }), preset]));
+    root.appendChild(util.el('label', { class: 'field' }, [util.el('span', { text: 'Kulmus preset' }), preset]));
 
     // Master scale controls
     root.appendChild(util.el('div', { class: 'sirtut' }));
     var master = util.el('div', { class: 'master-grid' });
-    master.appendChild(mmField('Letter height', 'letter_height_units', 0.1, 'Height in the same units as the measurement table.', 'units'));
+    buildFontControls(master);
     root.appendChild(master);
     buildPolicyControls();
 
@@ -174,7 +174,7 @@
 
     // letter table
     root.appendChild(tableScaffold());
-    root.appendChild(util.el('p', { class: 'profile-help', text: 'Second stretch limits are used only when the first limits cannot fill a line. They are the total maximum increase from the original width, not an additional percentage. Zero leaves the first limit unchanged. Lower second preference numbers are used first.' }));
+    root.appendChild(util.el('p', { class: 'profile-help', text: 'Stages run from first to third only while space remains. Percentages are total limits from the original width; later stages retain earlier increases. Every active letter or space grows by the same percentage until its limit is reached.' }));
 
 
 
@@ -182,27 +182,17 @@
     root.appendChild(util.el('div', { class: 'panel-foot' },
       util.el('span', { text: 'Skeleton widths ', class: '' })));
     var foot = util.qs('.panel-foot', root);
-    foot.innerHTML = '<strong>New profiles use no added stroke allowance or inter-letter gap;</strong> lower stretch-preference numbers are used first. ' +
+    foot.innerHTML = '<strong>Three stages control stretching.</strong> ' +
       'Only human-marked holy letters use the additional holy-name cap. Their individual letter limits still apply.';
   }
 
   function tableScaffold() {
-    var wrap = util.el('div', { class: 'table-scroll' });
-    var tbl = util.el('table', { class: 'letter-table' });
-    var thr = util.el('tr', {}, [
-      util.el('th', { text: 'Letter' }),
-      util.el('th', { text: 'Width units' }),
-      util.el('th', { text: 'Total mm' }),
-      util.el('th', { id: 'cal-cap-heading', text: 'Cap %' }),
-      util.el('th', { text: 'Stretch preference' }),
-      util.el('th', { text: 'Second maximum increase' }),
-      util.el('th', { text: 'Second stretch preference' })
-    ]);
-    var thead = util.el('thead', {}, thr);
-    tbl.appendChild(thead);
-    var tbody = util.el('tbody', { id: 'cal-letter-rows' });
-    tbl.appendChild(tbody);
-    wrap.appendChild(tbl);
+    var wrap = util.el('div', { class: 'kulmus-tables' });
+    ['cal-letter-rows', 'cal-letter-rows-end', 'cal-special-rows'].forEach(function (id) {
+      var table = util.el('table', { class: 'letter-table' + (id === 'cal-special-rows' ? ' special-table' : '') });
+      table.appendChild(util.el('thead', {}, util.el('tr', {}, ['Letter / space', 'Width', 'First stage', 'Second stage', 'Third stage'].map(function (text) { return util.el('th', { text: text }); }))));
+      table.appendChild(util.el('tbody', { id: id })); wrap.appendChild(table);
+    });
     return wrap;
   }
 
@@ -290,7 +280,7 @@
     return {
       _isDefault: false,
       id: p.id,
-      name: p.name || 'Profile',
+      name: p.name || 'Kulmus',
       letter_height_mm: toNum(p.letter_height_mm, 4.5),
       letter_height_units: p.letter_height_units == null ? null : Number(p.letter_height_units),
       stroke_mm: toNum(p.stroke_mm, 0.2),
@@ -371,8 +361,8 @@
     markSaved(!dirty && !draft._isDefault);
     var status = util.byId('cal-draft-status');
     if (status) status.textContent = draft.id
-      ? (dirty ? 'Unsaved changes — save before computing a layout.' : 'Saved profile — ready to choose a source and column geometry.')
-      : 'New, unsaved profile — name it, enter your measurements, then Save. Existing profiles are unchanged.';
+      ? (dirty ? 'Unsaved changes — save before computing a layout.' : 'Saved kulmus — ready to choose a text and klaf.')
+      : 'New, unsaved kulmus — name it, enter your measurements, then Save. Existing kulmus profiles are unchanged.';
   }
 
   function applyFixedChoices() {
@@ -410,7 +400,7 @@
   function renderScaleNote() {
     var el = util.byId('cal-scale-note');
     if (!el) return;
-    el.textContent = 'Letter height: ' + util.fmt(draft.letter_height_units == null ? draft.letter_height_mm / heightUnitMm() : draft.letter_height_units, 3) + ' units. Row units and the table determine horizontal widths.';
+    el.textContent = 'Letter height: ' + util.mm(draft.letter_height_mm) + '. Width entries use ' + (draft.stretch_policy?.width_mode === 'millimetres' ? 'millimetres.' : 'line units.');
   }
 
   function computeTotal(letter) {
@@ -426,138 +416,75 @@
     return units * unitMm * scale();
   }
 
+  function stagesFor(policy) {
+    if (policy?.stages) return policy.stages;
+    var result = [0, 1, 2].map(function () { return { caps_percent: {} }; });
+    SS.LETTERS.concat(Object.keys(SPECIAL_DEFAULTS)).forEach(function (key) {
+      var cap = SS.LETTERS.includes(key) ? policy?.caps_percent?.[key] || 0 : policy?.[key + '_percent'] || 0;
+      var priority = Math.max(1, Math.min(3, policy?.priorities?.[key] || 1));
+      if (SS.LETTERS.includes(key) && isRestricted(key)) cap = 0;
+      result[priority - 1].caps_percent[key] = cap;
+      var second = policy?.secondary?.caps_percent?.[key];
+      if (second != null) result[2].caps_percent[key] = second === 'unlimited' || cap === 'unlimited' ? 'unlimited' : Math.max(Number(second), Number(result[2].caps_percent[key] || 0));
+    });
+    return result;
+  }
+  function ensureStages() {
+    var policy = draft.stretch_policy || defaultPolicy(), stages = stagesFor(policy);
+    draft.stretch_policy = Object.assign(defaultPolicy(), policy, { version: 2, stages: stages, secondary: null, distribution: 'equal_percent' });
+    draft.non_stretchable = [];
+    return draft.stretch_policy.stages;
+  }
   function renderRows() {
-    var tbody = util.byId('cal-letter-rows');
-    if (!tbody) return;
-    util.clear(tbody);
-
-    SS.LETTERS.forEach(function (letter) {
-      var restricted = isRestricted(letter);
-      var skel = draft.letter_widths[letter];
-      var cap = draft.stretch_policy ? (draft.stretch_policy.caps_percent[letter] || 0) : ((draft.max_stretch[letter] != null) ? draft.max_stretch[letter] : 0);
-      var total = computeTotal(letter);
-
-      var tr = util.el('tr', { class: restricted ? 'restricted' : '' });
-      tr.dataset.letter = letter;
-
-      // Letter
-      var tdLet = util.el('td', { class: 'let' }, letter);
-      tdLet.setAttribute('lang', 'he');
-      tr.appendChild(tdLet);
-
-      // Skeleton (editable)
-      var skelInput = util.el('input', { class: 'cell', type: 'number', step: '0.1', value: skel, 'aria-label': 'skeleton units for ' + letter });
-      skelInput.addEventListener('input', function () {
-        draft.letter_widths[letter] = util.parseNum(skelInput.value);
-        markDirty();
-        totalCell.textContent = util.fmt(computeTotal(letter));
-      });
-      skelInput.addEventListener('change',refreshColumnUnit);
-      tr.appendChild(util.el('td', { class: 'num' }, skelInput));
-
-      // Total
-      var totalCell = util.el('td', { class: 'num', text: util.fmt(total) });
-      tr.appendChild(totalCell);
-
-      tr.appendChild(capCell(letter, cap, !!draft.stretch_policy, function(value) {
-        if (draft.stretch_policy) draft.stretch_policy.caps_percent[letter] = value;
-        else draft.max_stretch[letter] = value;
-      }));
-
-      // Numeric preference: lower numbers are used first.
-      var btn = util.el('input', { class: 'cell stretch-priority', type: 'number', min: '1', step: '1',
-        value: hasPreferences() ? draft.stretch_policy.priorities[letter] : '', 'aria-label': 'stretch preference for ' + letter });
-      btn.disabled = !hasPreferences();
-      if (!hasPreferences()) btn.title = 'Saved rules retained. Use requested stretch rules to enable numeric preferences.';
-      btn.addEventListener('input', function () {
-        draft.stretch_policy.priorities[letter] = Math.max(1, Math.round(util.parseNum(btn.value) || 1));
-        markDirty();
-      });
-      var tdStretch = util.el('td', { class: 'cap' }, btn);
-      tr.appendChild(tdStretch);
-      appendSecondaryCells(tr, letter);
-
-      // hover preview
-      tr.addEventListener('mouseenter', function () { showPreview(letter); });
-      tr.addEventListener('mouseleave', function () { hidePreview(); });
-
-      tbody.appendChild(tr);
-    });
-
-    if (!hasPreferences()) return;
-    ['word_space', 'hyphen', 'petucha', 'setuma'].forEach(function (key) {
-      var minimum = key === 'petucha' || key === 'setuma' ? 20 : 0;
-      var tr = util.el('tr', { class: 'special-measurement', 'data-measurement': key });
-      tr.appendChild(util.el('td', { class: 'let', text: SPECIAL_LABELS[key] }));
-      var width = util.el('input', { class: 'cell', type: 'number', min: String(minimum), step: '0.1', value: draft.stretch_policy.special_widths_units[key] });
+    var bodies = ['cal-letter-rows', 'cal-letter-rows-end', 'cal-special-rows'].map(util.byId);
+    if (bodies.some(function (body) { return !body; })) return;
+    bodies.forEach(util.clear);
+    var stages = stagesFor(draft.stretch_policy), mm = draft.stretch_policy?.width_mode === 'millimetres';
+    SS.LETTERS.concat(Object.keys(SPECIAL_DEFAULTS)).forEach(function (key, index) {
+      var special = index >= SS.LETTERS.length, minimum = ['petucha', 'setuma'].includes(key) ? 20 : 0;
+      var row = util.el('tr', special ? { class: 'special-measurement', 'data-measurement': key } : { 'data-letter': key });
+      row.appendChild(util.el('td', { class: 'let', text: special ? SPECIAL_LABELS[key] : key, lang: special ? 'en' : 'he' }));
+      var width = util.el('input', { class: 'cell', type: 'number', min: String(minimum), step: 'any',
+        value: special ? draft.stretch_policy?.special_widths_units?.[key] ?? SPECIAL_DEFAULTS[key] : draft.letter_widths[key],
+        'aria-label': (mm ? 'Millimetre width for ' : 'Width units for ') + key });
       width.addEventListener('input', function () {
-        draft.stretch_policy.special_widths_units[key] = Math.max(minimum, util.parseNum(width.value) || minimum);
-        if (key === 'hyphen') draft.stretch_policy.stam_hyphen_units = draft.stretch_policy.special_widths_units[key];
+        if (special) { ensureStages(); draft.stretch_policy.special_widths_units[key] = Number(width.value); }
+        else draft.letter_widths[key] = Number(width.value);
         markDirty();
-        refreshColumnUnit();
       });
-      tr.appendChild(util.el('td', { class: 'num' }, width));
-      tr.appendChild(util.el('td', { class: 'num', text: util.fmt(specialWidthMm(key)) }));
-      var capKey = key === 'word_space' ? 'word_space_percent' : key + '_percent';
-      tr.appendChild(capCell(key, draft.stretch_policy[capKey] == null ? 0 : draft.stretch_policy[capKey], true, function(value) {
-        draft.stretch_policy[capKey] = value;
-      }));
-      var priority = util.el('input', { class: 'cell stretch-priority', type: 'number', min: '1', step: '1', value: draft.stretch_policy.priorities[key] });
-      priority.addEventListener('input', function () { draft.stretch_policy.priorities[key] = Math.max(1, Math.round(util.parseNum(priority.value) || 1)); markDirty(); });
-      tr.appendChild(util.el('td', { class: 'cap' }, priority));
-      appendSecondaryCells(tr, key);
-      tbody.appendChild(tr);
+      row.appendChild(util.el('td', { class: 'num' }, width));
+      stages.forEach(function (stage, stageIndex) {
+        row.appendChild(capCell(['first', 'second', 'third'][stageIndex] + ' stage ' + key, stage.caps_percent[key] || 0, true, function (value) {
+          ensureStages()[stageIndex].caps_percent[key] = value;
+        }));
+      });
+      if (!special) { row.addEventListener('mouseenter', function () { showPreview(key); }); row.addEventListener('mouseleave', hidePreview); }
+      bodies[special ? 2 : index < 14 ? 0 : 1].appendChild(row);
     });
-    appendHolyCap(tbody);
-  }
-
-  function appendHolyCap(tbody) {
-    if (draft.stretch_policy?.version !== 2) return;
-    var row = util.el('tr', { class: 'special-measurement', 'data-measurement': 'holy_name' });
-    row.appendChild(util.el('td', { class: 'let', text: 'Holy-name maximum' }));
-    row.appendChild(util.el('td', { text: '—' })); row.appendChild(util.el('td', { text: '—' }));
-    row.appendChild(capCell('holy names', draft.stretch_policy.holy_name_percent ?? 0, true, function (value) { draft.stretch_policy.holy_name_percent = value; }));
-    row.appendChild(util.el('td', { colspan: '3', text: 'Additional limit; individual letter rules still apply.' }));
-    tbody.appendChild(row);
-  }
-
-  function appendSecondaryCells(row, key) {
-    if (!hasPreferences()) {
-      row.appendChild(util.el('td', { text: '—' })); row.appendChild(util.el('td', { text: '—' })); return;
-    }
-    var secondary = draft.stretch_policy.secondary || (draft.stretch_policy.secondary = { caps_percent: {}, priorities: {} });
-    function save() { draft.stretch_policy.secondary = secondary; markDirty(); }
-    row.appendChild(capCell('second ' + key, secondary.caps_percent[key] || 0, true, function(value) {
-      secondary.caps_percent[key] = value; save();
-    }));
-    var priority = util.el('input', { class: 'cell stretch-priority', type: 'number', min: '1', step: '1',
-      value: secondary.priorities[key] || draft.stretch_policy.priorities[key] || 3,
-      'aria-label': 'second stretch preference for ' + key });
-    priority.addEventListener('input', function() {
-      secondary.priorities[key] = Math.max(1, Math.round(util.parseNum(priority.value) || 1)); save();
-    });
-    row.appendChild(util.el('td', { class: 'cap' }, priority));
+    var holy = util.el('tr', { class: 'special-measurement', 'data-measurement': 'holy_name' });
+    holy.appendChild(util.el('td', { class: 'let', text: 'Holy-name maximum' }));
+    holy.appendChild(util.el('td', { text: '—' }));
+    holy.appendChild(capCell('holy names', draft.stretch_policy?.holy_name_percent ?? 0, true, function (value) { draft.stretch_policy.holy_name_percent = value; }));
+    holy.appendChild(util.el('td', { colspan: '2', text: 'Additional limit in every stage.' }));
+    bodies[2].appendChild(holy);
   }
 
   function capCell(key, cap, percentage, save) {
-    var lastPercent = cap === 'unlimited' ? 50 : cap;
-    var input = util.el('input', { class:'cell', type:'number', min:'0', step:percentage?'1':'0.05',
-      value:cap==='unlimited'?'':cap, 'aria-label':'stretch cap for '+key });
-    input.disabled = cap === 'unlimited';
-    input.addEventListener('input', function() { lastPercent = util.parseNum(input.value); save(lastPercent); markDirty(); });
-    var cell = util.el('td', {class:'num cap'}, input);
-    if (percentage) {
-      var mode = util.el('select', {'aria-label':'stretch limit type for '+key}, [
-        util.el('option', {value:'percent',text:'% increase'}), util.el('option', {value:'unlimited',text:'Unlimited'})]);
-      mode.value = cap === 'unlimited' ? 'unlimited' : 'percent';
-      mode.addEventListener('change', function() {
-        var unlimited = mode.value === 'unlimited';
-        input.disabled = unlimited; input.value = unlimited ? '' : lastPercent;
-        save(unlimited ? 'unlimited' : lastPercent); markDirty();
-      });
-      cell.appendChild(mode);
-    }
-    return cell;
+    var lastPercent = typeof cap === 'number' && cap > 0 ? cap : 50;
+    var input = util.el('input', { class: 'cell', type: 'number', min: '0', step: 'any', value: lastPercent, 'aria-label': 'stretch cap for ' + key });
+    var mode = util.el('select', { 'aria-label': 'stretch limit type for ' + key }, [
+      util.el('option', { value: 'none', text: 'No increase' }),
+      util.el('option', { value: 'percent', text: '% increase' }),
+      util.el('option', { value: 'unlimited', text: 'Unlimited' })]);
+    mode.value = cap === 'unlimited' ? 'unlimited' : Number(cap) > 0 ? 'percent' : 'none';
+    input.hidden = input.disabled = mode.value !== 'percent';
+    input.addEventListener('input', function () { lastPercent = Number(input.value); save(lastPercent); markDirty(); });
+    mode.addEventListener('change', function () {
+      input.hidden = input.disabled = mode.value !== 'percent';
+      input.value = lastPercent;
+      save(mode.value === 'unlimited' ? 'unlimited' : mode.value === 'none' ? 0 : lastPercent); markDirty();
+    });
+    return util.el('td', { class: 'num cap' }, [mode, input]);
   }
 
   function specialWidthMm(key) {
@@ -578,11 +505,10 @@
     previewEl.hidden = false;
     util.byId('cal-preview-letter').textContent = letter;
     var total = computeTotal(letter);
-    var cap = draft.stretch_policy ? draft.stretch_policy.caps_percent[letter] : draft.max_stretch[letter];
-    var priority = hasPreferences() ? draft.stretch_policy.priorities[letter] : 'saved rules';
+    var caps = stagesFor(draft.stretch_policy).map(function (stage) { return stage.caps_percent[letter] || 0; });
     util.byId('cal-preview-meta').textContent =
       util.fmt(draft.letter_widths[letter], 1) + ' units skel \u00b7 total ' + util.mm(total) +
-      ' \u00b7 preference ' + priority + ' \u00b7 cap ' + cap;
+      ' \u00b7 stages ' + caps.join(' / ');
   }
   function hidePreview() { if (previewEl) previewEl.hidden = true; }
 
@@ -629,7 +555,7 @@
     bus.emit('calibration:dirty', draft);
     bus.emit('calibration:draft-changed');
     var status = util.byId('cal-draft-status');
-    if (status) status.textContent = 'Unsaved profile — save your measurements before computing a layout.';
+    if (status) status.textContent = 'Unsaved kulmus — save your measurements before computing a layout.';
   }
   function markSaved(saved) {
     var btn = util.qs('#calibration-body .btn-primary');
@@ -663,7 +589,7 @@
   function currentBody() {
     refreshColumnUnit();
     return {
-      name: draft.name || 'Profile',
+      name: draft.name || 'Kulmus',
       letter_height_mm: draft.letter_height_mm,
       letter_height_units: draft.letter_height_units,
       stroke_mm: draft.stroke_mm,
@@ -686,7 +612,7 @@
   async function saveProfile() {
     if (saving) return;
     var name = util.byId('cal-name').value.trim();
-    if (!name) { SS.toast('Give the profile a name.', 'error'); return; }
+    if (!name) { SS.toast('Give the kulmus a name.', 'error'); return; }
     draft.name = name;
     var body = currentBody();
     saving = true;
@@ -702,7 +628,7 @@
       await refreshProfiles();
       renderFromDraft();
       bus.emit('profileId:changed');
-      SS.toast('Profile saved.');
+      SS.toast('Kulmus saved.');
     } catch (e) {
       SS.toast(e.message || String(e), 'error');
     } finally { saving = false; }
@@ -725,7 +651,7 @@
   async function duplicateProfile() {
     var prof = SS.activeProfile ? SS.activeProfile() : null;
     var srcId = draft.id || (prof && prof.id);
-    if (!srcId) { SS.toast('Save a profile before duplicating.', 'error'); return; }
+    if (!srcId) { SS.toast('Save a kulmus before duplicating.', 'error'); return; }
     try {
       var name = draft.name + ' copy';
       var saved = await API.duplicateProfile(srcId, { name: name });
@@ -737,13 +663,13 @@
       state.calibrationDraftDirty = false;
       renderFromDraft();
       bus.emit('profileId:changed');
-      SS.toast('Profile duplicated.');
+      SS.toast('Kulmus duplicated.');
     } catch (e) { SS.toast(e.message || String(e), 'error'); }
   }
 
   async function deleteProfile() {
     if (!draft.id) { SS.toast('Nothing to delete.', 'error'); return; }
-    if (!window.confirm('Delete profile “' + draft.name + '”? This cannot be undone.')) return;
+    if (!window.confirm('Delete kulmus “' + draft.name + '”? This cannot be undone.')) return;
     try {
       await API.deleteProfile(draft.id);
       ++loadRevision;
@@ -755,12 +681,12 @@
       await refreshProfiles();
       renderFromDraft();
       bus.emit('calibration:draft-changed');
-      SS.toast('Profile deleted.');
+      SS.toast('Kulmus deleted.');
     } catch (e) { SS.toast(e.message || String(e), 'error'); }
   }
 
   async function exportProfile() {
-    if (!draft.id) { SS.toast('Save the profile before exporting.', 'error'); return; }
+    if (!draft.id) { SS.toast('Save the kulmus before exporting.', 'error'); return; }
     try {
       var prof = await API.exportProfile(draft.id);
       var blob = new Blob([JSON.stringify(prof, null, 2)], { type: 'application/json' });
@@ -783,7 +709,7 @@
       state.calibrationDraftDirty = false;
       renderFromDraft();
       bus.emit('profileId:changed');
-      SS.toast('Profile imported.');
+      SS.toast('Kulmus imported.');
     } catch (e) {
       SS.toast('Import failed: ' + (e.message || String(e)), 'error');
     } finally {
@@ -805,15 +731,18 @@
   function buildPolicyControls() {
     var box = util.el('section', {class:'stretch-policy-controls', 'aria-label':'Whole-book stretch rules'});
     box.appendChild(util.el('h3',{text:'Units and whole-book stretch rules'}));
+    var widthMode = field('Letter-width measurements', util.el('select', {id:'cal-width-mode'}, [util.el('option',{value:'line_units',text:'Fractions of a line (units)'}),util.el('option',{value:'millimetres',text:'Millimetre widths'})]));
+    widthMode.addEventListener('change', function () { draft.stretch_policy.width_mode = widthMode.value; markDirty(); renderPolicy(); });
     var requested=util.el('button',{type:'button',class:'btn btn-primary btn-sm',text:'Use requested stretch rules'});
     requested.addEventListener('click',function(){
-      draft.stretch_policy=newPolicy();
-      draft.non_stretchable=SS.LETTERS.filter(function(letter){return !draft.stretch_policy.caps_percent[letter];});
+      var previous=draft.stretch_policy;
+      draft.stretch_policy=Object.assign(newPolicy(), {width_mode:previous.width_mode, rendering:previous.rendering});
+      draft.non_stretchable=[]; ensureStages();
       draft.stretch_position='anywhere';markDirty();renderFromDraft();
-      SS.toast('Requested rules loaded into this profile draft. Save, then compute a new layout. Existing layouts are unchanged.');
+      SS.toast('Requested rules loaded into this kulmus draft. Save, then compute a new layout. Existing layouts are unchanged.');
     });
     box.appendChild(requested);
-    box.appendChild(util.el('p',{class:'profile-help',text:'Requested preset: ד ה ר ת unlimited; other letters and word spaces +50% maximum. Gaps have preference 1, אדהטלמםקרת preference 2, and the rest preference 3. Equal percentage increases within each preference, stopping at each cap. Stretch can be placed anywhere on the line.'}));
+    box.appendChild(util.el('p',{class:'profile-help',text:'First stage: paragraph gaps. Second stage: preferred letters. Third stage: remaining letters and word spaces. Edit each stage below.'}));
     function field(label, element) { box.appendChild(util.el('label',{class:'field'},[util.el('span',{text:label}),element])); return element; }
     var layoutMode=field('Line breaks and amudim',util.el('select',{id:'cal-layout-mode'},[
       util.el('option',{value:'reflow',text:'Reflow words to units per line — recalculate amudim'}),
@@ -840,12 +769,49 @@
     if (!current) current = (state.geometries||[]).find(function(g){return g.id===state.active.geometryId;});
     return Number(current && current.line_width_mm) || 125;
   }
+  function linePitch() {
+    var g = SS.geometry?.getDraft?.() || SS.activeGeometry?.();
+    return Number(g?.baseline_pitch_mm) || 7.5;
+  }
+  function buildFontControls(master) {
+    var font = util.el('select', { id: 'cal-font' }, [util.el('option', { value: 'stam', text: 'STaM Ashkenaz' }), util.el('option', { value: 'asirit', text: 'Asirit — supplied font' })]);
+    var overlap = util.el('input', { id: 'cal-letter-overlap', type: 'number', min: '-99', max: '300', step: 'any', 'aria-label': 'Letter overlap (%)' });
+    master.appendChild(util.el('label', { class: 'field' }, [util.el('span', { text: 'Font' }), font]));
+    master.appendChild(util.el('label', { class: 'field' }, [util.el('span', { text: 'Letter overlap (%)' }), overlap]));
+    function rendering() {
+      var policy = draft.stretch_policy;
+      if (!policy.rendering) policy.rendering = { font: 'stam', overlap_percent: { stam: draft.letter_height_mm / linePitch() * 100 - 100 } };
+      return policy.rendering;
+    }
+    font.addEventListener('change', function () {
+      var r = rendering(); r.font = font.value;
+      if (r.overlap_percent[r.font] == null) r.overlap_percent[r.font] = 0;
+      refreshColumnUnit(); markDirty();
+    });
+    overlap.addEventListener('input', function () {
+      var r = rendering(); r.overlap_percent[r.font] = Number(overlap.value);
+      refreshColumnUnit(); markDirty();
+    });
+  }
+  function renderFontControls() {
+    var r = draft.stretch_policy?.rendering, font = util.byId('cal-font'), overlap = util.byId('cal-letter-overlap');
+    if (!font || !overlap) return;
+    font.value = r?.font || 'stam';
+    if (document.activeElement !== overlap) overlap.value = Number((r?.overlap_percent?.[font.value] ?? (draft.letter_height_mm / linePitch() * 100 - 100)).toFixed(3));
+    overlap.title = 'Letter height = line height × (1 + overlap / 100). Negative values leave space between lines. Stored separately for each font.';
+  }
   function heightUnitMm() {
     return draft.units_per_row > 0 ? columnWidth() / draft.units_per_row : Number(draft.unit_mm);
   }
   function refreshColumnUnit() {
     if (!draft || !root) return;
-    if (draft.letter_height_units != null) draft.letter_height_mm = Number(draft.letter_height_units) * heightUnitMm();
+    var mmMode = draft.stretch_policy?.width_mode === 'millimetres';
+    if (mmMode) draft.units_per_row = columnWidth();
+    var rendering = draft.stretch_policy?.rendering;
+    if (rendering?.overlap_percent?.[rendering.font] != null) draft.letter_height_mm = linePitch() * (1 + rendering.overlap_percent[rendering.font] / 100);
+    else if (draft.letter_height_units != null) draft.letter_height_mm = Number(draft.letter_height_units) * heightUnitMm();
+    renderFontControls();
+    var unitInput = util.byId('cal-units-per-row'); if (unitInput) unitInput.value = draft.units_per_row;
     setFieldValue('letter_height_units', draft.letter_height_units == null ? Number((draft.letter_height_mm / heightUnitMm()).toFixed(6)) : draft.letter_height_units);
     if (draft.units_per_row != null && Number(draft.units_per_row)>0) {
       var nextUnitMm=columnWidth()/Number(draft.units_per_row);
@@ -862,7 +828,7 @@
       if(draft.units_per_row!=null){
         var physicalUnit=columnWidth()/draft.units_per_row;
         var hyphenUnits=draft.stretch_policy && draft.stretch_policy.stam_hyphen_units!=null?Number(draft.stretch_policy.stam_hyphen_units):1;
-        formula.textContent=columnWidth()+' mm column ÷ '+draft.units_per_row+' units per row = '+util.fmt(physicalUnit,6)+' mm per '+(draft.unit_basis==='line_units'?'row unit. A 2-unit letter uses 2 row units and a 3-unit letter uses 3. At 62 units, at most 31 two-unit letters fit; stroke and spaces use additional width.':'reference-height skeleton unit (legacy).')+' Each STAM hyphen = '+util.fmt(hyphenUnits,3)+' line units = '+util.fmt(hyphenUnits*physicalUnit,6)+' mm. Spaces also count towards the line. Save and compute a new draft to reflow whole words, change line breaks and recalculate the number of amudim.';
+        formula.textContent = columnWidth() + ' mm ÷ ' + util.fmt(draft.units_per_row, 3) + ' units = ' + util.fmt(physicalUnit, 4) + ' mm per unit. Spaces count towards the line.';
       } else {
         formula.textContent='Legacy manual unit size. Choose row units to calculate from the letter widths in the table and a fixed row budget.';
       }
@@ -879,7 +845,8 @@
     util.byId('cal-units-per-row').value=draft.units_per_row==null?'':draft.units_per_row;
     ['cal-space-percent','cal-setuma-mode','cal-setuma-percent','cal-hyphen-units'].forEach(function(id){util.byId(id).disabled=!policy;});
     ['cal-space-percent','cal-setuma-mode','cal-setuma-percent','cal-hyphen-units'].forEach(function(id){util.byId(id).parentNode.hidden=preferences;});
-    util.byId('cal-cap-heading').textContent=policy?'Maximum increase':'Cap mm';
+    util.byId('cal-width-mode').value = policy?.width_mode || 'line_units';
+    util.byId('cal-units-per-row').readOnly = policy?.width_mode === 'millimetres';
     if(policy){
       util.byId('cal-space-percent').value=policy.word_space_percent;
       util.byId('cal-setuma-mode').value=policy.setuma_percent==='unlimited'?'unlimited':'percent';

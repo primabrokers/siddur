@@ -103,6 +103,9 @@ export function normalizeProfile(p) {
     stretch_position: src.stretch_position ? String(src.stretch_position) : 'anywhere',
     stretch_policy: src.stretch_policy ? {
       version: src.stretch_policy.version === 2 ? 2 : 1,
+      ...(src.stretch_policy.stages ? { stages: structuredClone(src.stretch_policy.stages) } : {}),
+      ...(src.stretch_policy.width_mode ? { width_mode: src.stretch_policy.width_mode } : {}),
+      ...(src.stretch_policy.rendering ? { rendering: structuredClone(src.stretch_policy.rendering) } : {}),
       caps_percent: Object.fromEntries(HEBREW_LETTERS.map(ch => [ch, src.stretch_policy.caps_percent?.[ch] ?? 0])),
       ...(src.stretch_policy.secondary ? { secondary: {
         caps_percent: { ...src.stretch_policy.secondary.caps_percent },

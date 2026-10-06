@@ -50,11 +50,11 @@
     var load=util.el('button',{class:'btn btn-primary',text:'Load Layout 1'});
     var panel=util.el('section',{class:'reference-start','aria-label':'Tikkun reference'},[
       util.el('strong',{text:'Start from the classic Tikkun'}),select,load,
-      util.el('p',{text:'The Tikkun supplies the verified Torah text, פ/ס markers and special passages; it does not force its page breaks. Your saved Classic profile is the default measurement baseline. Loading it creates an editable reflow copy, so the saved Classic profile is not changed. The selected units per row — 62 initially — reflow complete words and determine the new number of amudim. Exact reference columns remain optional in Measurements. Review with your sofer before writing.'})
+      util.el('p',{text:'The Tikkun supplies the verified Torah text, פ/ס markers and special passages; it does not force its page breaks. Your saved Classic kulmus is the default measurement baseline. Loading it creates an editable reflow copy, so the saved Classic kulmus is not changed. The selected units per row — 62 initially — reflow complete words and determine the new number of amudim. Exact reference columns remain optional in Measurements. Review with your sofer before writing.'})
     ]);
     bench.parentNode.insertBefore(panel,bench);
     load.addEventListener('click',async function(){
-      if(SS.calibration && SS.calibration.isDirty && SS.calibration.isDirty()){SS.toast('Save or discard your edited profile first.','error');return;}
+      if(SS.calibration && SS.calibration.isDirty && SS.calibration.isDirty()){SS.toast('Save or discard your edited kulmus first.','error');return;}
       load.disabled=true;load.textContent='Loading reference…';
       try {
         var rules=SS.calibration&&SS.calibration.requestedRules&&SS.calibration.requestedRules();
@@ -91,7 +91,7 @@
 
   function buildStatic() {
     // Sources sub-section
-    root.appendChild(util.el('div', { class: 'eyebrow', text: 'Sources' }));
+    root.appendChild(util.el('div', { class: 'eyebrow', text: 'Texts' }));
     root.appendChild(util.el('div', { id: 'sources-list' }));
 
     // F-20: built-in study-text picker — honest labels, never certified.
@@ -106,7 +106,7 @@
     });
     root.appendChild(tefillin);
     var imp = util.el('div', { class: 'import-block' });
-    var nameInput = util.el('input', { type: 'text', placeholder: 'Source name', 'data-i': 'name' });
+    var nameInput = util.el('input', { type: 'text', placeholder: 'Text name', 'data-i': 'name' });
     var tradInput = util.el('input', { type: 'text', placeholder: 'Tradition (optional)', 'data-i': 'tradition' });
     var fmtSel = util.el('select', { 'data-i': 'format' },
       [util.el('option', { value: 'txt', text: 'Text / STAM — detect English markers automatically' }),
@@ -165,7 +165,7 @@
     if (!list) return;
     util.clear(list);
     if (!state.sources || !state.sources.length) {
-      list.appendChild(util.el('div', { class: 'empty', text: 'No sources imported yet.' }));
+      list.appendChild(util.el('div', { class: 'empty', text: 'No texts imported yet.' }));
       return;
     }
     state.sources.forEach(function (s) {
@@ -228,7 +228,7 @@
     var tradition = util.qs('[data-i="tradition"]', root).value.trim();
     var format = util.qs('[data-i="format"]', root).value;
     var text = util.qs('[data-i="text"]', root).value;
-    if (!name) { SS.toast('Give the source a name.', 'error'); return; }
+    if (!name) { SS.toast('Give the text a name.', 'error'); return; }
     if (!text.trim()) { SS.toast('Paste some text to import.', 'error'); return; }
     await doImport({ name: name, tradition: tradition || null, text: text, format: format });
   }
@@ -256,7 +256,7 @@
       bus.emit('sources:updated');
       bus.emit('selection:changed');
       var sections = res.section_breaks || {};
-      SS.toast('Source imported: ' + res.letter_count + ' letters; ' + Number(sections.petucha || 0) + ' pesucha, ' + Number(sections.setuma || 0) + ' setuma' + (warnings.length ? ' (' + warnings.length + ' warnings)' : ''));
+      SS.toast('Text imported: ' + res.letter_count + ' letters; ' + Number(sections.petucha || 0) + ' pesucha, ' + Number(sections.setuma || 0) + ' setuma' + (warnings.length ? ' (' + warnings.length + ' warnings)' : ''));
     } catch (e) { SS.toast(e.message || String(e), 'error'); }
   }
 

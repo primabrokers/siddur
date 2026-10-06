@@ -66,7 +66,7 @@
     var box = util.byId(containerId);
     util.clear(box);
     if (!state.profiles || !state.profiles.length) {
-      box.appendChild(util.el('div', { class: 'empty', text: 'No profiles to compare.' }));
+      box.appendChild(util.el('div', { class: 'empty', text: 'No kulmus profiles to compare.' }));
       return;
     }
     var sel = { count: 0 };
@@ -88,7 +88,7 @@
     if (ids.length < 2 || ids.length > 3) { SS.toast('Select 2 or 3 profiles.', 'error'); return; }
     var src = SS.activeSource ? SS.activeSource() : null;
     var geom = SS.activeGeometry ? SS.activeGeometry() : null;
-    if (!src || !geom) { SS.toast('Select a source and geometry first.', 'error'); return; }
+    if (!src || !geom) { SS.toast('Select a text and klaf first.', 'error'); return; }
     try {
       var res = await API.compare({ source_id: src.id, geometry_id: geom.id, profile_ids: ids });
       lastResult = res;
