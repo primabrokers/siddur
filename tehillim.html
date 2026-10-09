@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Tehillim — Vecker</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5.0">
+<meta name="theme-color" content="#1C2440">
+<meta name="color-scheme" content="light">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Vecker">
+<!-- Not deferred: the inline script runs during parsing and needs these. -->
+<script src="js/config.js"></script>
+<script src="js/store.js"></script>
+<script src="js/texts.js"></script>
+<script src="js/platform.js" defer></script>
+<style>
+  :root{
+    --night:#1C2440; --ivory:#FBF8F1; --card:#FFFFFF;
+    --ink:#25293B; --ink-2:#6A6E80; --ink-3:#9A9DAC;
+    --gold:#B8811B; --gold-bg:#F5E7C8; --gold-ink:#6E4D0D;
+    --line:#E8E2D4; --line-2:#D9D2C0;
+    --serif:'Frank Ruhl Libre','David Libre',Georgia,'Times New Roman',serif;
+    --sans:'Heebo',-apple-system,'Segoe UI',Roboto,Arial,sans-serif;
+  }
+  *{box-sizing:border-box; margin:0; -webkit-tap-highlight-color:transparent;}
+  html{height:100%;}
+  body{background:var(--ivory); font-family:var(--sans); color:var(--ink);
+       min-height:100dvh; padding:0 0 env(safe-area-inset-bottom);}
+  .wrap{width:100%; max-width:560px; margin:0 auto; padding:calc(10px + env(safe-area-inset-top)) 16px 28px;}
+  header{display:flex; align-items:center; gap:10px; padding:6px 0 14px;}
+  header .back{border:1px solid var(--line-2); background:var(--card); color:var(--night);
+               width:34px; height:34px; border-radius:10px; font-size:17px; cursor:pointer; flex:none;
+               text-decoration:none; display:grid; place-items:center;}
+  header h1{font-family:var(--serif); font-size:22px; color:var(--night); flex:1;}
+  .status{font-size:11px; color:var(--ink-2);}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:14px; margin-bottom:12px;}
+  .card h2{font-size:11.5px; font-weight:700; color:var(--ink-2); text-transform:uppercase;
+           letter-spacing:.06em; margin-bottom:8px;}
+  .today{background:linear-gradient(165deg,#28304F 0%,var(--night) 62%); color:#F4E9CF;
+         border-radius:16px; padding:15px; margin-bottom:12px; text-decoration:none; display:block;}
+  /* Block: these are spans inside an anchor, so they stack rather than running
+     together on one line. */
+  .today .l,.today .v,.today .s{display:block;}
+  .today .l{font-size:10.5px; letter-spacing:.09em; text-transform:uppercase;
+            color:rgba(244,233,207,.62); font-weight:600;}
+  .today .v{font-size:26px; font-weight:700; color:#FFF; margin:3px 0 1px;}
+  .today .s{font-size:12.5px; color:rgba(244,233,207,.82);}
+  .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(58px,1fr)); gap:6px;}
+  .kap{border:1px solid var(--line); background:var(--card); border-radius:10px; padding:9px 0;
+       font-size:14px; font-weight:600; color:var(--ink); text-align:center; cursor:pointer;
+       font-family:var(--sans); min-height:40px;}
+  .kap.on{background:var(--gold-bg); border-color:#E8CE97; color:var(--gold-ink);}
+  .ph{padding:11px 0; border-top:1px solid var(--line);}
+  .ph:first-of-type{border-top:none;}
+  .ph .n{font-size:10.5px; color:var(--ink-3); font-weight:700; margin-bottom:3px;}
+  .ph .he{font-family:var(--serif); font-size:20px; line-height:1.9; direction:rtl; text-align:right;}
+  .ph .en{font-size:12.5px; line-height:1.65; color:var(--ink-2); margin-top:4px;}
+  .m-heb .ph .en{display:none;}
+  .seg{display:flex; gap:4px; background:#EFE9DA; border:1px solid var(--line-2);
+       border-radius:12px; padding:3px; margin-bottom:12px;}
+  .segbtn{flex:1; border:none; background:transparent; border-radius:9px; padding:9px 4px;
+          font-size:12.5px; font-weight:600; color:var(--ink-2); cursor:pointer; font-family:var(--sans);}
+  .segbtn.on{background:var(--card); color:var(--night); box-shadow:0 1px 2px rgba(40,36,20,.1);}
+  .loading{text-align:center; color:var(--ink-2); font-size:13px; padding:24px 0;}
+  .spin{display:inline-block; width:15px; height:15px; border:2px solid var(--line-2);
+        border-top-color:var(--gold); border-radius:50%; animation:sp .8s linear infinite;
+        vertical-align:-3px; margin-right:7px;}
+  @keyframes sp{to{transform:rotate(360deg);}}
+  @media (prefers-reduced-motion:reduce){.spin{animation:none;}}
+  .err{background:#F5DFDB; border:1px solid #E5C4BD; color:#7A2A1F; border-radius:12px;
+       padding:12px 14px; font-size:12.5px; line-height:1.6;}
+  .attr{font-size:10.5px; color:var(--ink-3); line-height:1.7; margin-top:12px;
+        padding-top:10px; border-top:1px dashed var(--line-2);}
+  .navbtns{display:flex; gap:8px; margin-top:14px;}
+  .navbtns button{flex:1; border:1px solid var(--line-2); background:var(--card);
+                  color:var(--night); border-radius:10px; padding:11px; font-size:13px;
+                  font-weight:600; cursor:pointer; font-family:var(--sans);}
+  .navbtns button:disabled{opacity:.4;}
+  .hide{display:none;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="back" href="index.html" aria-label="Back">‹</a>
+    <h1 id="h">Tehillim</h1>
+    <span class="status" id="status"></span>
+  </header>
+
+  <a class="today hide" id="today-card" href="#">
+    <span class="l">Today's Tehillim</span>
+    <span class="v" id="today-v"></span>
+    <span class="s" id="today-s"></span>
+  </a>
+
+  <div id="browse">
+    <div class="card">
+      <h2>All 150 kapitlach</h2>
+      <div class="grid" id="grid"></div>
+    </div>
+  </div>
+
+  <div id="reader" class="hide">
+    <div class="seg" role="tablist" aria-label="Display">
+      <button class="segbtn on" data-mode="inter">With English</button>
+      <button class="segbtn" data-mode="heb">Hebrew only</button>
+    </div>
+    <div class="card" id="rcard">
+      <div id="rbody"></div>
+      <div class="attr" id="rattr"></div>
+      <div class="navbtns">
+        <button id="prev">‹ Previous</button>
+        <button id="next">Next ›</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let mode = 'inter', cur = 0;   // cur = kapitel number, 0 = browsing
+
+function setStatus(t){ $('status').textContent = t || ''; }
+
+/* The monthly division, mirrored from index.html. Kept in both places
+   deliberately: this page must work standalone, and duplicating a 30-entry
+   table is cheaper than making a reader depend on the calendar engine.
+   VERIFY AGAINST A PRINTED SIDDUR BEFORE RELEASE. */
+const BY_DAY=[null,[1,9],[10,17],[18,22],[23,28],[29,34],[35,38],[39,43],[44,48],[49,54],
+  [55,59],[60,65],[66,68],[69,71],[72,76],[77,78],[79,82],[83,87],[88,89],[90,96],[97,103],
+  [104,105],[106,107],[108,112],[113,118],[119,119],[119,119],[120,134],[135,139],[140,144],[145,150]];
+
+function buildGrid(){
+  const g = $('grid');
+  g.innerHTML = '';
+  for (let i = 1; i <= 150; i++){
+    const b = document.createElement('button');
+    b.className = 'kap'; b.textContent = i;
+    b.addEventListener('click', () => open(i));
+    g.appendChild(b);
+  }
+}
+
+async function open(n){
+  if (n < 1 || n > 150) return;
+  cur = n;
+  $('browse').classList.add('hide');
+  $('reader').classList.remove('hide');
+  $('h').textContent = 'Tehillim ' + n;
+  $('rbody').innerHTML = '<div class="loading"><span class="spin"></span>Loading…</div>';
+  $('rattr').textContent = '';
+  $('prev').disabled = n <= 1; $('next').disabled = n >= 150;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  try {
+    // Tanach: ask for the older public-domain English by name rather than
+    // accepting Sefaria's current default.
+    const data = await Texts.section('Psalms ' + n, { preferOlderEnglish: true });
+    /* Same refusal as everywhere else: no gender-neutral English renders. */
+    const vcheck = window.Versions ? Versions.englishAllowed(data)
+      : { ok: false, reason: 'Translation could not be checked, so it is not shown.' };
+    const segs = Texts.segments(vcheck.ok ? data : Object.assign({}, data, { text: null }));
+    if (!segs.length) throw new Error('no text returned');
+    const body = $('rbody');
+    body.innerHTML = '';
+    segs.forEach((p, i) => {
+      const d = document.createElement('div');
+      d.className = 'ph';
+      d.innerHTML = '<div class="n"></div><div class="he"></div><div class="en"></div>';
+      d.children[0].textContent = (i + 1);
+      d.children[1].textContent = p.he;
+      d.children[2].textContent = p.en;
+      body.appendChild(d);
+    });
+    $('rattr').textContent = (vcheck.ok ? '' : vcheck.reason + ' ') + Texts.attribution(data);
+    setStatus(segs.length + ' pesukim');
+    applyMode();
+    // Remember where they were, so the app can offer to resume.
+    Store.set('tehillim:last', n).catch(() => {});
+  } catch (e) {
+    $('rbody').innerHTML = '<div class="err"><b>Couldn’t load this kapitel.</b><br>' +
+      'It hasn’t been saved on this device yet, so it needs a connection once. ' +
+      'Check your network and try again.</div>';
+    setStatus('offline');
+  }
+}
+
+function applyMode(){
+  $('rcard').classList.toggle('m-heb', mode === 'heb');
+}
+
+document.querySelectorAll('.segbtn[data-mode]').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.segbtn[data-mode]').forEach(x => x.classList.remove('on'));
+  b.classList.add('on'); mode = b.dataset.mode; applyMode();
+}));
+$('prev').addEventListener('click', () => open(cur - 1));
+$('next').addEventListener('click', () => open(cur + 1));
+
+/* Today's portion. The Hebrew day arrives in the URL (?day=N) from the Today
+   screen, which already has the calendar engine loaded; without it the card
+   simply stays hidden rather than guessing at a date. */
+(function(){
+  const day = Number(new URLSearchParams(location.search).get('day') || 0);
+  const start = Number(new URLSearchParams(location.search).get('k') || 0);
+  const p = BY_DAY[day];
+  if (p){
+    const label = day === 25 ? 'Kapitel 119 · verses 1–96'
+                : day === 26 ? 'Kapitel 119 · verses 97–176'
+                : (p[0] === p[1] ? 'Kapitel ' + p[0] : 'Kapitel ' + p[0] + '–' + p[1]);
+    $('today-v').textContent = label;
+    $('today-s').textContent = 'Day ' + day + ' of the month';
+    $('today-card').classList.remove('hide');
+    $('today-card').addEventListener('click', e => { e.preventDefault(); open(p[0]); });
+  }
+  buildGrid();
+  if (start) open(start);
+  Store.migrate().catch(() => {}).then(() => { Store.persist().catch(() => {}); });
+})();
+</script>
+</body>
+</html>
