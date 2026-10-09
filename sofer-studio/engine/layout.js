@@ -12,6 +12,7 @@ import { pageRanges } from './pagination.js';
 import { hasLetterMark, letterSizeScale } from './letter-marks.js';
 import { documentSettings, customGapWidth, inferredSongKinds } from './document-options.js';
 import { reflowDocument } from './document-flow.js';
+import { hyphenMetadata, joinedEnd } from './hyphen-groups.js';
 import { computeTefillin } from './tefillin.js';
 import { lineMeasurementProfile } from './line-measurement.js';
 import { totalWidth, interLetterGap, interWordGap, wordWidth, minColumnWidth, measurementUnitMm } from './width.js';
@@ -54,7 +55,8 @@ export function deriveGeometry(geometry, profile) {
   const outer = num(g.outer_margin_mm);
   const lineW = num(g.line_width_mm);
 
-  if (pitch < H && profile.stretch_policy?.rendering?.overlap_percent?.[profile.stretch_policy.rendering.font] == null) {
+  const rendering = profile.document_rendering || profile.stretch_policy?.rendering;
+  if (pitch < H && rendering?.overlap_percent?.[rendering.font] == null) {
     throw new Error(`baseline pitch ${pitch}mm is below letter height ${H}mm (overlap)`);
   }
   const inkExtent = (lines_per_amud - 1) * pitch + H;
@@ -140,14 +142,18 @@ export function petuchaGapMm(profile) {
 }
 
 function paragraphReserve(units, index, profile, geometry, overrides) {
-  if (profile.stretch_policy?.version !== 2) return 0;
   let reserve = 0, i = index;
+  const end = joinedEnd(units, i);
+  while (i < end) { reserve += interWordGap(profile) + measureWord(units[++i], profile, overrides); }
+  if (profile.stretch_policy?.version !== 2) return reserve;
   while (['setuma', 'custom_gap'].includes(units[i + 1]?.type)) {
     if (units[i + 1].type === 'setuma' && profile.parsha_mode === 'rambam') break;
     reserve += units[i + 1].type === 'custom_gap' ? units[i + 1].width_mm : setumaGapMm(profile, geometry);
     if (units[i + 2]?.type !== 'word') return reserve;
     reserve += measureWord(units[i + 2], profile, overrides);
     i += 2;
+    const end = joinedEnd(units, i);
+    while (i < end) { reserve += interWordGap(profile) + measureWord(units[++i], profile, overrides); }
   }
   return reserve + (units[i + 1]?.type === 'petucha' ? petuchaGapMm(profile) : 0);
 }
@@ -156,6 +162,7 @@ function paragraphReserve(units, index, profile, geometry, overrides) {
 
 export function buildWordUnits(source) {
   const units = [];
+  const hyphens = hyphenMetadata(source);
   const verseLetters = []; // [{ ref, letters: [{id,base,grapheme}] }] for override resolution
   let letterIdx = 0;
   let wordIdx = 0, pageMarker = 0, referenceMarker = 0, gapMarker = 0;
@@ -168,6 +175,7 @@ export function buildWordUnits(source) {
     const vl = { ref: verse.ref, letters: [] };
     verseLetters.push(vl);
     for (const t of verse.tokens) {
+      if (hyphens.get(t)?.hyphen_separator) continue;
       if (t.marker) {
         // Inline marker: preserves the gap boundary BETWEEN words (not verse end).
         units.push({ type: t.marker, break_kind: t.break_kind || null, verse: verse.ref,
@@ -202,6 +210,7 @@ export function buildWordUnits(source) {
       for (const l of letters) vl.letters.push(l);
       units.push({
         type: 'word',
+        ...hyphens.get(t),
         text: t.text,
         consonant: t.consonant,
         isShem: holy.size > 0,
@@ -401,7 +410,7 @@ export function fitLines(source, profile, geometry, opts = {}) {
       if (current.length === 0) {
         current.push({ ...u, width_mm: w, override: wordOverrides(u, overrideMap, profile) });
         currentWidth = w;
-      } else if (currentSong || joinsSetuma || currentWidth + addW + reserve <= lineW + 1e-9) {
+      } else if (currentSong || current.at(-1)?.keep_with_next || joinsSetuma || currentWidth + addW + reserve <= lineW + 1e-9) {
         current.push({ ...u, width_mm: w, override: wordOverrides(u, overrideMap, profile) });
         currentWidth += addW;
       } else {
@@ -618,9 +627,10 @@ export function stretchCandidatesOf(line, profile) {
 }
 
 export function needsSecondaryStretch(line, profile) {
+  if (!profile.stretch_policy?.stages) return false;
   if (line.song_layout) return line.song_layout.segments.some(segment => segment.secondary_required);
   if (line.blank_line || line.sefer_end || line.setuma_at_edge || (line.fixed_pattern && !line.manual_line_end)) return false;
-  return primaryStretchCandidatesOf({ ...line, fixed_pattern: false }, profile).reduce((sum, candidate) => sum + candidate.cap_mm, 0) < baseBudget(line) - .001;
+  return autoSuggestLine({ ...line, fixed_pattern: false }, profile).stretch_stage === 3;
 }
 
 export function autoSuggestLine(line, profile, opts = {}) {
@@ -1255,7 +1265,7 @@ export async function computeLayoutAsync(source, profile, geometry, opts = {}) {
       if (current.length === 0) {
         current.push({ ...u, width_mm: w, override: wordOverrides(u, overrideMap, profile) });
         currentWidth = w;
-      } else if (currentSong || joinsSetuma || currentWidth + addGap + w + reserve <= lineW + 1e-9) {
+      } else if (currentSong || current.at(-1)?.keep_with_next || joinsSetuma || currentWidth + addGap + w + reserve <= lineW + 1e-9) {
         current.push({ ...u, width_mm: w, override: wordOverrides(u, overrideMap, profile) });
         currentWidth += addGap + w;
       } else {

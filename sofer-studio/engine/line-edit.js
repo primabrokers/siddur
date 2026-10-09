@@ -22,6 +22,9 @@ export function moveWord(layout, { line_id, direction, line_key, next_line_key }
   if (direction === 'up' && !following) throw new Error('There is no following line');
   const originalItems = line => scaleItems(structuredClone(line?.items || []), 1 / (line?.line_measurement?.scale || 1));
   const a = originalItems(current), b = originalItems(following);
+  if (direction === 'down' && a.at(-1)?.keep_with_previous || direction === 'up' && b[0]?.keep_with_next) {
+    throw new Error('Hyphenated words must stay together on one line (בחד שיטה).');
+  }
   if (direction === 'down') {
     if (a.at(-1)?.type !== 'word') throw new Error('The last item must be a word');
     b.unshift(a.pop());

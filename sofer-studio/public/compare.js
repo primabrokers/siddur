@@ -90,7 +90,7 @@
     var geom = SS.activeGeometry ? SS.activeGeometry() : null;
     if (!src || !geom) { SS.toast('Select a text and klaf first.', 'error'); return; }
     try {
-      var res = await API.compare({ source_id: src.id, geometry_id: geom.id, profile_ids: ids });
+      var res = await API.compare({ source_id: src.id, geometry_id: geom.id, rendering: SS.documentFont?.get(), profile_ids: ids });
       lastResult = res;
       renderResults(res, 'cmp-results');
       renderMini(res);

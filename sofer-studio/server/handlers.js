@@ -69,6 +69,8 @@ export function publicLine(l, profile) {
     column_width_mm: l.column_width_mm || null, song_layout: l.song_layout || null, tefillin_section: l.tefillin_section || null,
     words: words.map((w) => ({
       text: w.text, consonant: w.consonant, isShem: !!w.isShem, uncertain: !!w.uncertain,
+      hyphen_notes: w.hyphen_notes || [], keep_with_next: !!w.keep_with_next, keep_with_previous: !!w.keep_with_previous,
+      display_hyphen_after: w.display_hyphen_after || [],
       shem: w.shem || null, letters: (w.letters || []).map((lt) => {
         const override = (w.override || []).find(o => o.id === lt.id);
         let width = override ? Number(override.mm) : profile ? totalWidth(lt.base, profile) : Number(lt.width_mm);
@@ -99,7 +101,7 @@ function getEngineSource(db, sourceId) {
     id: s.id, name: s.name, tradition: s.tradition, revision_hash: s.revision_hash,
     excerpt: s.excerpt, partial_corpus: !!s.partial_corpus, label: s.label, source_label: s.source_label,
     verses: s.verses || [], unusual_letters: s.unusual_letters || [],
-    format: s.format,
+    format: s.format, original: s.original,
     tefillin: s.format === 'tefillin' ? s.canonical?.tefillin : null,
     reference: s.format==='tikkun-reference' && s.canonical ? s.canonical.reference : null,
   };
@@ -331,6 +333,20 @@ export function handleGetPattern(ctx) {
 
 // ---- layout compute -------------------------------------------------------
 
+function documentRendering(profile, rendering) {
+  if (rendering != null) {
+    if (!rendering || !['stam', 'asirit'].includes(rendering.font) ||
+        !rendering.overlap_percent || typeof rendering.overlap_percent !== 'object' || Array.isArray(rendering.overlap_percent) ||
+        !Number.isFinite(rendering.overlap_percent[rendering.font]) ||
+        Object.entries(rendering.overlap_percent).some(([font, percent]) => !['stam', 'asirit'].includes(font) || !Number.isFinite(percent) || percent <= -100 || percent > 300)) {
+      throw new HttpError(400, 'Choose a font and an overlap greater than -100 and at most 300 percent');
+    }
+    // The effective document snapshot owns these settings; never update the Kulmus.
+    profile = { ...profile, document_rendering: structuredClone(rendering) };
+  }
+  return profile;
+}
+
 export async function handleComputeLayout(ctx) {
   const body = ctx.body || {};
   const source = getEngineSource(ctx.db, body.source_id);
@@ -338,6 +354,8 @@ export async function handleComputeLayout(ctx) {
   if (!profile) throw new HttpError(404, 'profile not found');
   const geometry = store.getGeometry(ctx.db, body.geometry_id);
   if (!geometry) throw new HttpError(404, 'geometry not found');
+  profile = documentRendering(profile, body.rendering);
+  body.name ||= [source.name, profile.name, geometry.name].filter(Boolean).join(' + ');
   profile = effectiveProfile(profile, geometry);
 
   const patternDefs = (body.pattern_ids || []).map((id) => store.getPattern(ctx.db, id)).filter(Boolean);
@@ -704,7 +722,7 @@ export async function handleCreateCandidate(ctx) {
   const geometry = store.getGeometry(ctx.db, body.geometry_id);
   if (!profile) throw new HttpError(404, 'profile not found');
   if (!geometry) throw new HttpError(404, 'geometry not found');
-  profile = effectiveProfile(profile, geometry);
+  profile = effectiveProfile(documentRendering(profile, (JSON.parse(parent.profile_snapshot || '{}').document_rendering || JSON.parse(parent.profile_snapshot || '{}').stretch_policy?.rendering)), geometry);
 
   const source = getEngineSource(ctx.db, parent.source_id);
   // Carry forward the parent's pattern_ids/annotations so a patterned locked layout
@@ -867,7 +885,7 @@ export function handleAdoptCandidate(ctx) {
   const newLayoutId = store.createLockedLayout(ctx.db, {
     source_id: cand.source_id, profile_id: cand.profile_id, geometry_id: cand.geometry_id,
     source_hash: getEngineSource(ctx.db, cand.source_id).revision_hash,
-    profile_snapshot: effectiveProfile(store.getProfile(ctx.db, cand.profile_id), store.getGeometry(ctx.db, cand.geometry_id)), geometry_snapshot: store.getGeometry(ctx.db, cand.geometry_id),
+    profile_snapshot: effectiveProfile(documentRendering(store.getProfile(ctx.db, cand.profile_id), (parent.snapshot.profile.document_rendering || parent.snapshot.profile.stretch_policy?.rendering)), store.getGeometry(ctx.db, cand.geometry_id)), geometry_snapshot: store.getGeometry(ctx.db, cand.geometry_id),
     pattern_ids: cand.pattern_ids || [], annotations: cand.annotations || {},
     validation: cand.validation || null,
   }, newLines, cand.summary || {});
@@ -899,7 +917,7 @@ export async function handleCompare(ctx) {
   if (ids.length < 2 || ids.length > 3) throw new HttpError(400, 'profile_ids must contain 2-3 profiles');
   const profiles = ids.map((id) => store.getProfile(ctx.db, id));
   if (profiles.some((p) => !p)) throw new HttpError(404, 'profile not found');
-  const result = await compareProfiles(source, geometry, profiles);
+  const result = await compareProfiles(source, geometry, profiles.map(p => documentRendering(p, body.rendering)));
   sendJson(ctx.res, 200, result);
 }
 

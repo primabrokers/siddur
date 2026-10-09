@@ -53,6 +53,7 @@ export function documentOptionsErrors(input) {
   for (const key of ['starts', 'gaps', 'page_widths']) if (flow[key] != null && (typeof flow[key] !== 'object' || Array.isArray(flow[key]))) return [...errors, key + ' must be an object'];
   for (const [id, width] of Object.entries(flow.page_widths || {})) if (!/^occ-\d+$/.test(id) || !(Number.isFinite(width) && width > 0 && width <= 1000)) errors.push('Invalid saved page width');
   if (flow.column_start != null && !['none', 'vav', 'hamelech'].includes(flow.column_start)) errors.push('Choose ordinary, vav or hamelech page starts');
+  if (flow.balance_width_step != null && !['units', '0.1mm'].includes(flow.balance_width_step)) errors.push('Choose whole units or 0.1 mm for balanced column widths');
   for (const key of ['fit_last_page', 'balance_segments', 'follow_reference_pages', 'fit_boundary_page', 'reflow_word_moves']) if (flow[key] != null && typeof flow[key] !== 'boolean') errors.push(key + ' must be true or false');
   if (flow.fit_last_page && flow.balance_segments) errors.push('Choose either last-page fitting or balancing every page');
   for (const [id, start] of Object.entries(flow.starts || {})) {

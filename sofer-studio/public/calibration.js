@@ -773,33 +773,8 @@
     var g = SS.geometry?.getDraft?.() || SS.activeGeometry?.();
     return Number(g?.baseline_pitch_mm) || 7.5;
   }
-  function buildFontControls(master) {
-    var font = util.el('select', { id: 'cal-font' }, [util.el('option', { value: 'stam', text: 'STaM Ashkenaz' }), util.el('option', { value: 'asirit', text: 'Asirit — supplied font' })]);
-    var overlap = util.el('input', { id: 'cal-letter-overlap', type: 'number', min: '-99', max: '300', step: 'any', 'aria-label': 'Letter overlap (%)' });
-    master.appendChild(util.el('label', { class: 'field' }, [util.el('span', { text: 'Font' }), font]));
-    master.appendChild(util.el('label', { class: 'field' }, [util.el('span', { text: 'Letter overlap (%)' }), overlap]));
-    function rendering() {
-      var policy = draft.stretch_policy;
-      if (!policy.rendering) policy.rendering = { font: 'stam', overlap_percent: { stam: draft.letter_height_mm / linePitch() * 100 - 100 } };
-      return policy.rendering;
-    }
-    font.addEventListener('change', function () {
-      var r = rendering(); r.font = font.value;
-      if (r.overlap_percent[r.font] == null) r.overlap_percent[r.font] = 0;
-      refreshColumnUnit(); markDirty();
-    });
-    overlap.addEventListener('input', function () {
-      var r = rendering(); r.overlap_percent[r.font] = Number(overlap.value);
-      refreshColumnUnit(); markDirty();
-    });
-  }
-  function renderFontControls() {
-    var r = draft.stretch_policy?.rendering, font = util.byId('cal-font'), overlap = util.byId('cal-letter-overlap');
-    if (!font || !overlap) return;
-    font.value = r?.font || 'stam';
-    if (document.activeElement !== overlap) overlap.value = Number((r?.overlap_percent?.[font.value] ?? (draft.letter_height_mm / linePitch() * 100 - 100)).toFixed(3));
-    overlap.title = 'Letter height = line height × (1 + overlap / 100). Negative values leave space between lines. Stored separately for each font.';
-  }
+  function buildFontControls(master) { SS.documentFont?.initControls(master); }
+  function renderFontControls() { SS.documentFont?.render(); }
   function heightUnitMm() {
     return draft.units_per_row > 0 ? columnWidth() / draft.units_per_row : Number(draft.unit_mm);
   }

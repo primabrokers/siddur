@@ -401,7 +401,7 @@
     var prof = SS.calibration?.getDraft?.() || (SS.activeProfile ? SS.activeProfile() : null);
     var L = draft.lines_per_amud;
     var P = draft.baseline_pitch_mm;
-    var H = prof ? (prof.letter_height_mm || 0) : 0;
+    var H = SS.documentFont ? SS.documentFont.height(P) : prof ? (prof.letter_height_mm || 0) : 0;
     var top = draft.top_margin_mm, bot = draft.bottom_margin_mm;
 
     var inkExtent = (L - 1) * P + H;
@@ -437,7 +437,7 @@
     derivedItem(derivedEl, 'Full yeria width', util.mm(fullYeria),
       '2\u00d7' + util.fmt(draft.outer_margin_mm) + ' + ' + k + '\u00d7' + util.fmt(draft.line_width_mm) + ' + ' + (k - 1) + '\u00d7' + util.fmt(draft.inter_column_gap_mm));
 
-    if (overlap && !prof?.stretch_policy?.rendering) {
+    if (overlap && !SS.documentFont && !prof?.stretch_policy?.rendering) {
       var warn = util.el('div', { class: 'banner warn', text: 'Line height (' + util.mm(P) + ') is less than letter height (' + util.mm(H) + ') — lines would overlap.' });
       derivedEl.prepend ? derivedEl.prepend(warn) : derivedEl.insertBefore(warn, derivedEl.firstChild);
     }

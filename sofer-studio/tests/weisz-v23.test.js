@@ -101,13 +101,13 @@ test('compact Setup preserves editable main measurements, selector navigation, a
   try {
     const w=dom.window;w.HTMLElement.prototype.scrollIntoView=function(){};w.confirm=()=>true;w.eval(asset('core.js'));
     const SS=w.SS;SS.api={listSources:async()=>[],listProfiles:async()=>[],listGeometries:async()=>[],listPatterns:async()=>[],listLayouts:async()=>[],session:async()=>({})};
-    for(const name of ['calibration.js','document-settings.js','geometry.js'])w.eval(asset(name));
+    for(const name of ['document-font.js','calibration.js','document-settings.js','geometry.js'])w.eval(asset(name));
     const ready=new Promise(resolve=>SS.bus.on('app:ready',resolve));w.eval(asset('app.js'));await ready;
     const d=w.document;
     assert.equal(d.querySelectorAll('#view-setup .workspace-subnav').length,0);
     const input=d.querySelector('#cal-letter-overlap');
     assert(input.closest('.setup-main-measurements'));input.value='20';input.dispatchEvent(new w.Event('input'));
-    assert.equal(SS.calibration.getDraft().letter_height_mm,9);
+    assert.equal(SS.documentFont.height(7.5),9);
     d.getElementById('profile-select').dispatchEvent(new w.Event('focus'));
     assert.equal(d.getElementById('section-setup-calibration').hidden,false);
     assert(d.querySelector('[data-measurement="holy_name"]'));

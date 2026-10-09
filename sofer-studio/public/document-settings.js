@@ -28,6 +28,10 @@
     fitting.value = flow.balance_segments ? 'balance' : flow.fit_last_page ? 'last' : 'none';
     fitting.addEventListener('change', function () { settings().fit_last_page = fitting.value === 'last'; settings().balance_segments = fitting.value === 'balance'; });
     host.appendChild(u.el('label', { class: 'field' }, [u.el('span', { text: 'Page fitting — round segment page count to the nearest whole page' }), fitting]));
+    var precision = u.el('select', { id: 'flow-balance-step' }, [['units','Whole units'], ['0.1mm','0.1 mm']].map(function (item) { return u.el('option', { value: item[0], text: item[1] }); }));
+    precision.value = flow.balance_width_step || 'units';
+    precision.addEventListener('change', function () { settings().balance_width_step = precision.value; });
+    host.appendChild(u.el('label', { class: 'field' }, [u.el('span', { text: 'Balanced column width increments' }), precision]));
     host.appendChild(toggle('Follow Davidovitch 245 page starts (v); unchecked ignores these markers', 'follow_reference_pages'));
     host.appendChild(toggle('Recalculate following text after moving words', 'reflow_word_moves'));
     host.appendChild(u.el('p', { class: 'profile-help', text: 'Page fitting changes column width in mm and units. Base letter size stays the same. Explicit song rows and paragraph spacing remain fixed.' }));

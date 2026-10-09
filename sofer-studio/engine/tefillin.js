@@ -21,12 +21,14 @@ export function partitionWords(words, rows, target, gap) {
   const previous = Array.from({ length: rows + 1 }, () => []); scores[0][0] = 0;
   for (let row = 1; row <= rows; row++) for (let end = row; end <= words.length - rows + row; end++) {
     for (let start = row - 1; start < end; start++) {
+      if (words[start]?.keep_with_previous || words[end - 1]?.keep_with_next) continue;
       const used = width(start, end), excess = Math.max(0, used - target);
       const cost = scores[row - 1][start] + ((target - used) / target) ** 2 + (excess > .001 ? 1e6 + excess ** 2 : 0);
       if (cost < scores[row][end]) { scores[row][end] = cost; previous[row][end] = start; }
     }
   }
   const output = []; let end = words.length;
+  if (!Number.isFinite(scores[rows][end])) throw new Error('Hyphenated words cannot be split across the fixed Tefillin rows');
   for (let row = rows; row; row--) { const start = previous[row][end]; output.unshift({ items: words.slice(start, end), width: width(start, end) }); end = start; }
   return output;
 }

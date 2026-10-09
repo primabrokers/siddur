@@ -247,7 +247,10 @@ export function deleteLayout(db, id) {
 }
 
 export function listLayouts(db) {
-  return db.prepare(`SELECT id, name, source_id, profile_id, geometry_id, status, created_at, locked_at FROM layouts ORDER BY created_at DESC`).all();
+  return db.prepare(`SELECT l.id, l.name, l.source_id, l.profile_id, l.geometry_id, l.status, l.created_at, l.locked_at,
+    s.name AS source_name, json_extract(l.profile_snapshot, '$.name') AS profile_name,
+    json_extract(l.geometry_snapshot, '$.name') AS geometry_name
+    FROM layouts l LEFT JOIN sources s ON s.id = l.source_id ORDER BY l.created_at DESC`).all();
 }
 
 export function getLayoutRow(db, id) {

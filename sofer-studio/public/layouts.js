@@ -47,7 +47,7 @@
     el.appendChild(thumb);
 
     var body = util.el('div', { class: 'lbody' });
-    body.appendChild(util.el('div', { class: 'lname', text: lay.name || ('Layout ' + lay.id) }));
+    body.appendChild(util.el('div', { class: 'lname', text: lay.name || [lay.source_name, lay.profile_name, lay.geometry_name].filter(Boolean).join(' + ') || 'Saved layout' }));
     body.appendChild(util.el('div', { class: 'lmeta', html: snapshotSummary(lay) }));
 
     var actions = util.el('div', { class: 'lactions' });
@@ -105,8 +105,8 @@
   function snapshotSummary(lay) {
     var parts = [];
     if (lay.source_rev || lay.source_hash) parts.push('text ' + shortId(lay.source_rev || lay.source_hash));
-    if (lay.profile_name) parts.push('kulmus ' + lay.profile_name);
-    if (lay.geometry_name) parts.push('geom ' + lay.geometry_name);
+    if (lay.profile_name) parts.push('kulmus ' + util.esc(lay.profile_name));
+    if (lay.geometry_name) parts.push('klaf ' + util.esc(lay.geometry_name));
     if (lay.created_at) parts.push(util.esc(String(lay.created_at).slice(0, 10)));
     if (lay.locked_at) parts.push('writing began ' + util.esc(String(lay.locked_at).slice(0, 10)));
     return parts.length ? parts.join(' · ') : 'snapshot';

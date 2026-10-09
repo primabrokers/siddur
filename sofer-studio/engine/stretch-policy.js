@@ -40,7 +40,7 @@ export function effectiveProfile(profile, geometry) {
   result.parsha_mode = geometry.parsha_mode || 'rambam_rosh';
   if (geometry.line_measurement) result.line_measurement = structuredClone(geometry.line_measurement);
   else delete result.line_measurement;
-  const rendering = result.stretch_policy?.rendering;
+  const rendering = result.document_rendering || result.stretch_policy?.rendering;
   const overlap = rendering?.overlap_percent?.[rendering.font];
   if (overlap != null) {
     result.letter_height_mm = Number(geometry.baseline_pitch_mm) * (1 + Number(overlap) / 100);

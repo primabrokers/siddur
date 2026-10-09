@@ -82,7 +82,7 @@
     sectionToggle.addEventListener('change', function () {
       container.classList.toggle('hide-section-guides', !sectionToggle.checked);
     });
-    [['letter-guides','Letter guides',false],['shortfall','ח״א marks',true],['numbers','Line numbers',true],['line-controls','Move words / word count',true]].forEach(function(spec){
+    [['letter-guides','Letter guides',false],['shortfall','ח״א marks',true],['numbers','Line numbers',true],['line-controls','Move words / word count',true],['hyphens','Hyphens',true],['red-words','Red words',true],['orange-lines','Orange lines (stage 3)',true]].forEach(function(spec){
       var checked = spec[2]; try { var saved=localStorage.getItem('sofer:preview-'+spec[0]); if(saved!=null)checked=saved==='1'; } catch(e){}
       var input=util.el('input',{type:'checkbox',id:'preview-'+spec[0],checked:checked});
       function apply(){container.classList.toggle('hide-'+spec[0],!input.checked); if(spec[0]==='letter-guides')container.classList.toggle('show-letter-guides',input.checked); scheduleFit();}
@@ -224,7 +224,7 @@
     util.byId('multiple-print-area')?.remove(); util.byId('multiple-page-style')?.remove();
     var area=util.el('div',{id:'multiple-print-area'});
     if(reverseLines)area.classList.add('reverse-lines');
-    ['hide-shortfall','hide-numbers'].forEach(function(name){if(container.classList.contains(name))area.classList.add(name);});
+    ['hide-shortfall','hide-numbers','hide-hyphens','hide-red-words','hide-orange-lines'].forEach(function(name){if(container.classList.contains(name))area.classList.add(name);});
     document.body.appendChild(area);
     var gap=4, availableW=size[0]-16, availableH=size[1]-16;
     var cellW=direction==='across'?(availableW-gap*(count-1))/count:availableW;
@@ -253,7 +253,7 @@
 
   function selectedFont(layout) {
     var profile=(layout||renderedLayout)?.snapshot?.profile;
-    return profile?.stretch_policy?.rendering?.font==='asirit'
+    return (profile?.document_rendering || profile?.stretch_policy?.rendering)?.font==='asirit'
       ? {family:'Sofer Asirit Unicode',em:1000,inkHeight:1489,roofTop:577,roofBottom:405,lamedRoof:973,lamedGuide:764}
       : {family:'Stam Ashkenaz CLM',em:2048,inkHeight:3080,roofTop:1050,roofBottom:700,lamedRoof:1960,lamedGuide:1410};
   }
@@ -380,6 +380,11 @@
         var next = rows[index + 1], tops = next && Array.from(next.querySelectorAll('.lk[data-ink-top]')).map(function (glyph) { return Number(glyph.dataset.inkTop); });
         var top = line.offsetHeight + (tops?.length ? Math.min.apply(null, tops) : 0);
         line.style.setProperty('--separator-top', ((bottom + top) / 2) + 'px');
+        var ownTops = Array.from(line.querySelectorAll('.lk[data-ink-top]')).map(function (glyph) { return Number(glyph.dataset.inkTop); });
+        var inkTop = ownTops.length ? Math.min.apply(null, ownTops) : 0;
+        var previous = rows[index - 1];
+        var previousBottom = previous ? Math.max(0, ...Array.from(previous.querySelectorAll('.lk[data-ink-bottom]')).map(function (glyph) { return Number(glyph.dataset.inkBottom); })) - previous.offsetHeight : inkTop - line.offsetHeight / 2;
+        line.style.setProperty('--annotation-top', Math.min(inkTop - 4, (previousBottom + inkTop) / 2) + 'px');
       });
     });
   }
@@ -595,13 +600,13 @@
     linesWrap.style.fontFamily = '"'+fontMetrics.family+'"';
     linesWrap.style.setProperty('--font-he','"'+fontMetrics.family+'"');
     var letterHeight = (songPage && songPage.letter_height_mm) || (profile && profile.letter_height_mm);
-    if (letterHeight) linesWrap.style.fontSize = (Number(letterHeight) * (profile?.stretch_policy?.rendering ? fontMetrics.em/fontMetrics.inkHeight : 1.3)) + 'mm';
+    if (letterHeight) linesWrap.style.fontSize = (Number(letterHeight) * ((profile?.document_rendering || profile?.stretch_policy?.rendering) ? fontMetrics.em/fontMetrics.inkHeight : 1.3)) + 'mm';
     var pageWidth = Math.max.apply(null, g.lines.map(function (l) { return l.column_width_mm || (geom && geom.line_width_mm) || 125; }));
     linesWrap.style.setProperty('--line-width', pageWidth + 'mm');
     amud.style.setProperty('--line-width', pageWidth + 'mm');
     linesWrap.style.minHeight = Number(geom?.lines_per_amud || g.lines.length) * Number(geom?.baseline_pitch_mm || pitch) + 'mm';
     if (songPage) { linesWrap.style.height=linesWrap.style.minHeight; linesWrap.style.overflow='visible'; }
-    if (g.lines.some(function(line){return (line.words||[]).some(function(word){return holyLabel(word) || (word.letters||[]).some(function(letter){return sizeNote(letter,word) || letterMarks(letter).some(function(mark){return mark.type==='margin_note';});});});})) amud.classList.add('has-margin-notes');
+    if (g.lines.some(function(line){return (line.words||[]).some(function(word){return word.hyphen_notes?.length || holyLabel(word) || (word.letters||[]).some(function(letter){return sizeNote(letter,word) || letterMarks(letter).some(function(mark){return mark.type==='margin_note';});});});})) amud.classList.add('has-margin-notes');
 
     if (placeholder) {
       // Keep the page's full geometry in the scroll track without its glyph DOM.
@@ -676,6 +681,7 @@
     el.appendChild(txt);
     if(line.secondary_stretch)el.classList.add('needs-secondary-stretch');
     (line.words||[]).forEach(function(word){
+      (word.hyphen_notes || []).forEach(function (note) { el.appendChild(util.el('span', { class: 'margin-note margin-comment hyphen-note', dir: 'rtl', lang: 'he', text: '° ' + note })); });
       var label = holyLabel(word);
       if (label) el.appendChild(util.el('span', { class: 'margin-note holy-name-note', dir: 'rtl', text: '° ' + label }));
       (word.letters||[]).forEach(function(letter){
@@ -730,7 +736,7 @@
   }
 
   function suggestsDrop(line, next) {
-    if (next && next.page_start) return false;
+    if (next && next.page_start || line.words?.at(-1)?.keep_with_previous) return false;
     var blocked=function(l){return !l||l.fixed_pattern||l.petucha_end||l.sefer_end||l.has_setuma||l.setuma_at_edge||(l.status&&l.status!=='pending');};
     if(blocked(line)||blocked(next)||line.tefillin_section!==next.tefillin_section||!line.words||line.words.length<2||!next.words||!next.words.length) return false;
     var before=Number(line.base_leftover_mm),after=Number(next.base_leftover_mm),word=Number(line.words[line.words.length-1].width_mm);
@@ -817,6 +823,7 @@
         var s = util.el('span', { class: 'lk' });
         var ink = util.el('span', {class:'ink-glyph', text:g});
         s.appendChild(ink);
+        if (word.display_hyphen_after?.includes(li)) s.appendChild(util.el('span', { class: 'hyphen-mark source-hyphen', text: '-' }));
         if (lt && Number.isFinite(Number(lt.width_mm))) {
           var targetWidth = Number(lt.width_mm) + addedWidth;
           s.style.width = targetWidth + 'mm'; s.dataset.widthMm = String(targetWidth);
@@ -831,12 +838,13 @@
         marks.forEach(function(mark){
           s.classList.add('marker-'+mark.type);
           if(mark.type==='backward_nun')ink.textContent='נ';
-          if(mark.type==='margin_note')s.appendChild(util.el('span',{class:'note-anchor',text:'°',title:mark.note}));
+          if(mark.type==='margin_note')s.appendChild(util.el('span',{class:'note-anchor',title:mark.note,'aria-label':'Margin note'}));
           if(mark.type==='four_tagin'){
             var svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 100 40');svg.setAttribute('class','four-tagin');svg.setAttribute('aria-label','Four tagin');svg.setAttribute('preserveAspectRatio','none');
             [14,38,62,86].forEach(function(x){var path=document.createElementNS(svg.namespaceURI,'path');path.setAttribute('d','M'+x+' 40 V12 M'+(x-6)+' 10 L'+x+' 2 L'+(x+6)+' 10 Z');path.setAttribute('fill','currentColor');path.setAttribute('stroke','currentColor');path.setAttribute('stroke-width','3');svg.appendChild(path);});s.appendChild(svg);
           }
         });
+        if (li === 0 && word.hyphen_notes?.length && !s.querySelector('.note-anchor')) s.appendChild(util.el('span', { class: 'note-anchor', title: word.hyphen_notes.join('; '), 'aria-label': 'Hyphen note' }));
         if (g === '\u05dc' && wordIndex === 0 && li === 0) s.classList.add('lamed-line-start');
         if (g === '\u05dc' && wordIndex === words.length - 1 && li === graphemes.length - 1) s.classList.add('lamed-line-end');
         if (tagginOn && TAGGIN[g]) s.classList.add('taggin');

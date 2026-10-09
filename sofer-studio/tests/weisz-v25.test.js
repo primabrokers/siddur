@@ -131,7 +131,7 @@ test('Kulmus controls hide inactive percentages, preserve three-stage choices, a
   try{
     const w=dom.window;w.confirm=()=>true;w.HTMLElement.prototype.scrollIntoView=function(){};w.eval(asset('core.js'));
     const SS=w.SS;SS.api={listSources:async()=>[],listProfiles:async()=>[],listGeometries:async()=>[],listPatterns:async()=>[],listLayouts:async()=>[],session:async()=>({})};
-    for(const name of ['calibration.js','document-settings.js','geometry.js'])w.eval(asset(name));
+    for(const name of ['document-font.js','calibration.js','document-settings.js','geometry.js'])w.eval(asset(name));
     const ready=new Promise(resolve=>SS.bus.on('app:ready',resolve));w.eval(asset('app.js'));await ready;
     const d=w.document;
     assert.equal(d.querySelectorAll('#cal-letter-rows tr').length,14);assert.equal(d.querySelectorAll('#cal-letter-rows-end tr').length,13);
@@ -142,15 +142,15 @@ test('Kulmus controls hide inactive percentages, preserve three-stage choices, a
     select.value='none';select.dispatchEvent(new w.Event('change'));assert(amount.hidden);
     const font=d.getElementById('cal-font'), overlap=d.getElementById('cal-letter-overlap');
     assert(font.closest('.setup-main-measurements'));font.value='asirit';font.dispatchEvent(new w.Event('change'));
-    overlap.value='20';overlap.dispatchEvent(new w.Event('input'));assert.equal(SS.calibration.getDraft().letter_height_mm,9);
+    overlap.value='20';overlap.dispatchEvent(new w.Event('input'));assert.equal(SS.documentFont.height(7.5),9);
     font.value='stam';font.dispatchEvent(new w.Event('change'));font.value='asirit';font.dispatchEvent(new w.Event('change'));assert.equal(overlap.value,'20');
     const mode=d.getElementById('cal-width-mode');mode.value='millimetres';mode.dispatchEvent(new w.Event('change'));
     assert(d.getElementById('cal-units-per-row').readOnly);assert.equal(d.getElementById('cal-units-per-row').value,'125');
     assert(d.getElementById('cal-units-per-row').closest('#geom-line-measurements'));
     [...d.querySelectorAll('button')].find(b=>b.textContent==='Use requested stretch rules').click();
     assert.equal(SS.calibration.getDraft().stretch_policy.width_mode,'millimetres');
-    assert.equal(SS.calibration.getDraft().stretch_policy.rendering.font,'asirit');
-    assert.equal(SS.calibration.getDraft().stretch_policy.rendering.overlap_percent.asirit,20);
+    assert.equal(SS.documentFont.get().font,'asirit');
+    assert.equal(SS.documentFont.get().overlap_percent.asirit,20);
   }finally{dom.window.close();}
 });
 

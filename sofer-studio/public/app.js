@@ -503,7 +503,8 @@
         profile_id: prof.id,
         geometry_id: geom.id,
         pattern_ids: patternIds,
-        annotations: annotations
+        annotations: annotations,
+        rendering: SS.documentFont?.get()
       };
       var layoutId;
       var result;
@@ -693,7 +694,7 @@
         if (viewName === 'setup') {
           section.removeAttribute('role'); section.removeAttribute('aria-labelledby');
           section.setAttribute('aria-label', entry[1]);
-          if (key === 'layouts') { button.removeAttribute('role'); button.className = 'btn btn-ghost btn-sm'; selectors.appendChild(button); }
+          if (key === 'layouts' || key === 'font') { button.removeAttribute('role'); button.className = 'btn btn-ghost btn-sm'; selectors.appendChild(button); }
         } else bar.appendChild(button);
         views[viewName].appendChild(section);
         sections[viewName][key] = section; sectionTabs[viewName][key] = button;
@@ -713,7 +714,7 @@
         ev.preventDefault(); ev.stopPropagation(); items[next].click(); items[next].focus();
       });
     }
-    heading(views.setup, 'Setup', 'Choose a text, kulmus or klaf to open its settings.');
+    heading(views.setup, 'Setup', 'Choose a text, kulmus, klaf or font to open its settings.');
     var selectors = util.el('div', { class: 'workspace-selectors' });
     ['source-select', 'profile-select', 'geometry-select'].forEach(function (id) {
       var select = util.byId(id); if (select) {
@@ -725,7 +726,7 @@
       }
     });
     move('btn-compute', selectors); views.setup.appendChild(selectors);
-    group('setup', [['book', 'Book & text'], ['calibration', 'Measurements'], ['geometry', 'Column settings'], ['layouts', 'Saved layouts']]);
+    group('setup', [['book', 'Book & text'], ['calibration', 'Measurements'], ['geometry', 'Column settings'], ['font', 'Font & overlap'], ['layouts', 'Saved layouts']]);
     move(util.qs('.reference-start'), sections.setup.book);
     var searchField = util.byId('search-input');
     if (searchField) move(searchField.closest('.app-field'), sections.setup.book);
@@ -738,15 +739,43 @@
     ['cal-font', 'cal-letter-overlap'].forEach(function (id) { var control = util.byId(id); if (control) move(control.closest('label'), mainMeasurements); });
     var rowUnits = util.byId('cal-units-per-row');
     if (rowUnits) move(rowUnits.closest('label'), util.byId('geom-line-measurements') || mainMeasurements);
-    selectors.after(mainMeasurements);
-    var summary = util.el('details', { id: 'setup-summary', class: 'setup-summary' }, [util.el('summary', { text: 'Summary' })]);
-    move(util.qs('.big-klaf'), summary); move('geom-derived', summary); views.setup.appendChild(summary);
+    sections.setup.font.appendChild(util.el('h2', { text: 'Font & overlap' }));
+    sections.setup.font.appendChild(mainMeasurements);
+    sections.setup.font.appendChild(util.el('p', { class: 'profile-help', text: 'These settings are saved with each computed layout. You can change them independently of the Kulmus.' }));
+    var summary = util.el('dialog', { id: 'setup-summary', class: 'document-summary', 'aria-label': 'Document summary' });
+    var summaryTitle = util.el('h2', { text: 'Summary' }), summaryClose = util.el('button', { type: 'button', class: 'btn btn-ghost', text: 'Close' });
+    var setupValues = util.el('div'), layoutValues = util.el('div');
+    move(util.qs('.big-klaf'), setupValues); move('geom-derived', setupValues);
+    [summaryTitle, layoutValues, setupValues, summaryClose].forEach(function (node) { summary.appendChild(node); });
+    app.appendChild(summary);
+    summaryClose.addEventListener('click', function () { summary.close(); });
+    function summaryButton(fromLayout) {
+      var button = util.el('button', { type: 'button', class: 'btn btn-ghost btn-sm', text: 'Summary', id: fromLayout ? 'layout-summary-button' : 'setup-summary-button' });
+      button.addEventListener('click', function () {
+        var lay = fromLayout && state.layout, g = lay?.snapshot?.geometry || SS.geometry?.getDraft() || {};
+        var p = lay?.snapshot?.profile || SS.calibration?.getDraft() || {}, r = lay ? (p.document_rendering || p.stretch_policy?.rendering) : SS.documentFont?.get();
+        summaryTitle.textContent = lay ? (lay.name || 'Layout summary') : 'Setup summary';
+        setupValues.hidden = !!lay; util.clear(layoutValues);
+        var values = [['Kulmus', p.name], ['Klaf', g.name], ['Font', r?.font === 'asirit' ? 'Asirit' : 'STaM Ashkenaz'],
+          ['Letter overlap', r?.overlap_percent?.[r.font] != null ? util.fmt(r.overlap_percent[r.font], 2) + '%' : 'Legacy letter height']];
+        if (lay) values = values.concat([['Columns', lay.summary?.total_amudim], ['Lines', lay.summary?.total_lines || lay.lines?.length],
+          ['Yerios', lay.summary?.total_yerios], ['Klaf length', util.fmt(lay.summary?.klaf_length_m, 2) + ' m'],
+          ['Lines per amud', g.lines_per_amud], ['Line height', util.mm(g.baseline_pitch_mm)], ['Base column width', util.mm(g.line_width_mm)],
+          ['Column height', util.mm(g.lines_per_amud * g.baseline_pitch_mm)], ['Top margin', util.mm(g.top_margin_mm)], ['Bottom margin', util.mm(g.bottom_margin_mm)]]);
+        values.forEach(function (pair) { layoutValues.appendChild(util.el('p', {}, [util.el('strong', { text: pair[0] + ': ' }), util.el('span', { text: pair[1] ?? '—' })])); });
+        summary.showModal();
+      }); return button;
+    }
+    selectors.appendChild(summaryButton(false));
 
     // The document and a single optional inspector are the only Layout content.
     var layoutBar = util.el('div', { class: 'workspace-document-label' }, [
       util.el('strong', { text: 'Your Tikkun' }), util.el('span', { id: 'workspace-layout-summary', text: 'Load a book in Setup to begin.' }),
       util.el('span', { class: 'workspace-line-hint', text: 'Click a line to edit its stretching' })]);
     views.layout.appendChild(layoutBar);
+    layoutBar.appendChild(summaryButton(true));
+    var savedLayouts = util.el('button', { type: 'button', class: 'btn btn-ghost btn-sm', text: 'Saved layouts' });
+    savedLayouts.addEventListener('click', function () { open('setup', 'layouts'); }); layoutBar.appendChild(savedLayouts);
     var documentGrid = util.el('div', { id: 'document-workspace' }); views.layout.appendChild(documentGrid);
     move('tikkun-region', documentGrid);
     var inspector = util.el('aside', { id: 'line-editor', 'aria-label': 'Line editor', hidden: true });

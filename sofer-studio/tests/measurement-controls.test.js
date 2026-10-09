@@ -16,7 +16,7 @@ function ui(saved) {
   w.HTMLElement.prototype.scrollIntoView=function(){};
   const SS=w.SS; SS.toast=()=>{}; SS.activeProfile=()=>saved; SS.activeGeometry=()=>null; SS.activeSource=()=>null;
   const f={dom,w,SS,d:w.document,body:null};
-  w.eval(source('calibration.js'));
+  w.eval(source('document-font.js')); w.eval(source('calibration.js'));
   SS.calibration.init({api:{getProfile:async()=>saved, createProfile:async p=>(f.body=structuredClone(p),{...p,id:'saved'}),
     updateProfile:async(_,p)=>(f.body=structuredClone(p),{...p,id:'saved'}),listProfiles:async()=>[]}});
   w.eval(source('geometry.js')); SS.geometry.init({api:{}});
@@ -59,9 +59,9 @@ test('Letter overlap replaces height controls while preserving the horizontal ro
     f.input('#geometry-body [data-field="line_width_mm"]',124); // one row unit = 2mm.
     const p=f.SS.calibration.getDraft(); assert.equal(p.letter_height_mm,5);
     const before=totalWidth('א',effectiveProfile(normalizeProfile(p),{line_width_mm:124,baseline_pitch_mm:7.5}));
-    f.input('#cal-letter-overlap',20); assert.equal(p.letter_height_mm,9);
+    const beforeDraft=JSON.stringify(p); f.input('#cal-letter-overlap',20); assert.equal(f.SS.documentFont.height(7.5),9); assert.equal(JSON.stringify(p),beforeDraft);
     assert.equal(totalWidth('א',effectiveProfile(normalizeProfile(p),{line_width_mm:124,baseline_pitch_mm:7.5})),before);
-    f.input('#geometry-body [data-field="line_width_mm"]',186); assert.equal(p.letter_height_mm,9); assert.equal(field.value,'20');
+    f.input('#geometry-body [data-field="line_width_mm"]',186); assert.equal(f.SS.documentFont.height(7.5),9); assert.equal(field.value,'20');
   } finally { f.dom.window.close(); }
 });
 test('legacy millimetre heights display as units without changing stored measurements on save',async()=>{

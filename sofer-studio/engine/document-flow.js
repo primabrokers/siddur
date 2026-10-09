@@ -3,6 +3,7 @@ import { interWordGap, measurementUnitMm } from './width.js';
 import { composeSongLine } from './song-layout.js';
 import { songSettings } from './column-options.js';
 import { lineLimits, shouldWrap, scaleItems, measureFinishedLine } from './line-measurement.js';
+import { joinedEnd } from './hyphen-groups.js';
 
 const gapItem = item => ['setuma_gap', 'custom_gap'].includes(item?.type);
 const firstId = line => line.words?.[0]?.letters?.[0]?.id;
@@ -47,11 +48,14 @@ function fit(stream, start, stop, width, profile, geometry, maxRows = Infinity, 
   const flush = flags => { if (items.length) { lines.push(row(items, width, profile, flags)); items = []; } };
   const reserve = index => {
     let reserved = 0;
+    const joined = () => { const end = Math.min(stop - 1, joinedEnd(stream, index)); while (index < end) reserved += interWordGap(profile) + stream[++index].width_mm; };
+    joined();
     while (gapItem(stream[index + 1]) && index + 1 < stop) {
       if (stream[index + 1].type === 'setuma_gap' && profile.parsha_mode === 'rambam') break;
       reserved += stream[index + 1].width_mm;
       if (stream[index + 2]?.type !== 'word' || index + 2 >= stop) return reserved;
       reserved += stream[index + 2].width_mm; index += 2;
+      joined();
     }
     return reserved + (stream[index + 1]?.petucha ? petuchaGapMm(profile) : 0);
   };
@@ -72,8 +76,8 @@ function fit(stream, start, stop, width, profile, geometry, maxRows = Infinity, 
     if (item.type === 'line_end' || item.type === 'end') { flush({ ...item, explicit: item.type === 'line_end' }); cursor++; continue; }
     const together = [...items, item];
     const rambamGap = item.type === 'setuma_gap' && profile.parsha_mode === 'rambam';
-    const reserved = rambamGap ? Number(stream[cursor + 1]?.width_mm || 0) : reserve(cursor);
-    if (items.length && (!gapItem(item) || rambamGap) && !gapItem(items.at(-1)) && shouldWrap(widthOf(items, profile), widthOf(together, profile) + reserved, width, rules)) {
+    const reserved = rambamGap ? Number(stream[cursor + 1]?.width_mm || 0) + reserve(cursor + 1) : reserve(cursor);
+    if (items.length && !items.at(-1)?.keep_with_next && (!gapItem(item) || rambamGap) && !gapItem(items.at(-1)) && shouldWrap(widthOf(items, profile), widthOf(together, profile) + reserved, width, rules)) {
       flush(); if (lines.length >= maxRows) break;
     }
     if (rules && !items.length && Number(item.width_mm || 0) + reserved > rules.maximum + .001) {
@@ -105,59 +109,91 @@ function fillRows(stream, profile, geometry, target, originalWidth) {
   return { ...result, width, previous_width_mm: originalWidth };
 }
 
-// Search integral row-unit widths against cumulative source measurements. Each
-// chosen endpoint is a whole-word boundary; the next target uses what remains.
+// Estimate paragraph slack in addition to measured ink and explicit spaces.
+// Pesuchah leaves half a line on average; the requested setumah estimate is /4.
+export function paragraphSlack(item, previous, next, profile, width) {
+  if (item.type === 'end' && item.petucha) return width / 2;
+  if (item.type !== 'setuma_gap') return 0;
+  return (Number(item.width_mm || 0) + Number(next?.width_mm || 0) +
+    (profile.parsha_mode === 'rambam' ? 0 : Number(previous?.width_mm || 0)) + interWordGap(profile)) / 4;
+}
+
+// Endpoint targets are estimates. A candidate always fills complete rows, and
+// the next page is targeted from the actual words left after the chosen page.
 function balancePages(stream, original, profile, geometry, maxRows) {
   if (original.some(page => page.manual_width)) return null;
   const start = original[0].start, end = original.at(-1).end;
   const count = Math.max(1, Math.round(original.reduce((sum, page) => sum + page.lines.length, 0) / maxRows));
-  const unit = measurementUnitMm(profile), prefix = [0];
+  const step = geometry.document_flow?.balance_width_step === '0.1mm' ? .1 : measurementUnitMm(profile);
+  const maximum = Math.max(1, Math.floor(1000 / step)), prefix = [0], pesuchas = [0];
   for (let i = start; i < end; i++) {
     const item = stream[i];
     const width = item.type === 'row' ? widthOf(item.line.items, profile) : Number(item.width_mm) || 0;
     const gap = item.type === 'word' && stream[i - 1]?.type === 'word' ? interWordGap(profile) : 0;
-    prefix.push(prefix.at(-1) + width + gap);
+    prefix.push(prefix.at(-1) + width + gap + paragraphSlack(item, stream[i - 1], stream[i + 1], profile, 0));
+    pesuchas.push(pesuchas.at(-1) + (item.type === 'end' && item.petucha ? 1 : 0));
   }
-  const at = cursor => prefix[cursor - start];
-  const pages = []; let cursor = start;
-  for (let remaining = count; remaining > 0 && cursor < end; remaining--) {
-    const target = at(cursor) + (at(end) - at(cursor)) / remaining;
+  const at = (cursor, width) => prefix[cursor - start] + pesuchas[cursor - start] * width / 2;
+  const attempts = new Map();
+  function choose(cursor, remaining) {
+    const key = cursor + ':' + remaining;
+    if (attempts.has(key)) return attempts.get(key);
     const cache = new Map();
-    const candidate = units => {
-      if (cache.has(units)) return cache.get(units);
+    const candidate = n => {
+      n = Math.max(1, Math.min(maximum, n));
+      if (cache.has(n)) return cache.get(n);
+      const width = Math.round(n * step * 1e8) / 1e8;
       let page;
-      try { page = fit(stream, cursor, end, units * unit, profile, geometry, maxRows); }
-      catch(error) {
-        if(error.code!=='MAX_LINE_UNITS')throw error;
-        const invalid={lines:[],cursor,width:units*unit,score:Infinity,units};cache.set(units,invalid);return invalid;
+      try { page = fit(stream, cursor, end, width, profile, geometry, maxRows); }
+      catch (error) {
+        if (error.code !== 'MAX_LINE_UNITS') throw error;
+        const invalid = { lines: [], cursor, width, score: Infinity, delta: -Infinity }; cache.set(n, invalid); return invalid;
       }
       const mode = geometry.document_flow?.column_start;
       if (remaining > 1 && ['vav', 'hamelech'].includes(mode) && !page.lines.some(line => line.fixed_pattern)) {
         for (let cut = page.cursor - 1; cut > cursor; cut--) {
           const item = stream[cut];
-          if (item.type === 'word' && !gapItem(stream[cut - 1]) && !gapItem(stream[cut + 1]) &&
+          if (item.type === 'word' && !item.keep_with_previous && !gapItem(stream[cut - 1]) && !gapItem(stream[cut + 1]) &&
               (mode === 'vav' ? item.consonant?.startsWith('ו') : item.consonant === 'המלך')) {
-            page = fit(stream, cursor, cut, units * unit, profile, geometry, maxRows); break;
+            page = fit(stream, cursor, cut, width, profile, geometry, maxRows); break;
           }
         }
       }
-      const overfull = page.lines.some(line => (!geometry.line_measurement || line.fixed_pattern) && line.width_mm + (line.petucha_end ? petuchaGapMm(profile) : 0) > units * unit + .001);
-      const score = overfull || page.cursor <= cursor || (remaining > 1 && page.cursor >= end) ? Infinity : Math.abs(at(page.cursor) - target);
-      const result = { ...page, score, units }; cache.set(units, result); return result;
+      // Consume trailing semantic end markers even if the final row is full.
+      while (page.cursor < end && stream[page.cursor]?.type === 'end' && !page.lines.at(-1)?.petucha_end && !stream[page.cursor].petucha) page.cursor++;
+      const target = at(cursor, width) + (at(end, width) - at(cursor, width)) / remaining;
+      const delta = at(page.cursor, width) - target;
+      const overfull = page.lines.some(line => (!geometry.line_measurement || line.fixed_pattern) && line.width_mm + (line.petucha_end ? petuchaGapMm(profile) : 0) > width + .001);
+      const valid = !overfull && page.lines.length === maxRows && page.cursor > cursor &&
+        (remaining === 1 ? page.cursor === end : page.cursor < end);
+      const result = { ...page, score: valid ? Math.abs(delta) : Infinity, delta }; cache.set(n, result); return result;
     };
-    let low = 1, high = Math.max(1, Math.floor(1000 / unit));
+    let low = 1, high = maximum;
     while (low < high) {
       const middle = Math.floor((low + high) / 2), page = candidate(middle);
-      if (at(page.cursor) < target) low = middle + 1; else high = middle;
+      if (page.delta < -.000001) low = middle + 1; else high = middle;
     }
-    // Inspect either side of the endpoint jump. In the final page, choose the
-    // narrowest integral width that fits everything without splitting words.
-    for (let n = Math.max(1, low - 2); n <= Math.min(Math.floor(1000 / unit), low + 2); n++) candidate(n);
-    candidate(Math.max(1, Math.round(original[0].width / unit)));
-    const best = [...cache.values()].filter(page => Number.isFinite(page.score) && (remaining !== 1 || page.cursor === end))
-      .sort((a, b) => a.score - b.score || a.units - b.units)[0];
-    if (!best) return null;
-    pages.push({ ...best, start: cursor, end: best.cursor, previous_width_mm: original[0].width }); cursor = best.cursor;
+    for (const offset of [0, 1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64]) { candidate(low - offset); candidate(low + offset); }
+    candidate(Math.round(original[0].width / step));
+    const choices = [...cache.values()].filter(page => Number.isFinite(page.score)).sort((a, b) => a.score - b.score || a.width - b.width);
+    // Check the final pages together: the closest estimated endpoint must not
+    // strand too few words to fill the last page at the selected precision.
+    const seen = new Set();
+    for (const best of choices) {
+      if (seen.has(best.cursor)) continue; seen.add(best.cursor);
+      const tail = remaining === 1 ? [] : remaining <= 3 ? choose(best.cursor, remaining - 1) : null;
+      if (remaining <= 3 && !tail) continue;
+      const page = { ...best, start: cursor, end: best.cursor, previous_width_mm: original[0].width };
+      const result = remaining <= 3 ? [page, ...tail] : [page];
+      attempts.set(key, result); return result;
+    }
+    attempts.set(key, null); return null;
+  }
+  const pages = []; let cursor = start;
+  while (pages.length < count) {
+    const chosen = choose(cursor, count - pages.length);
+    if (!chosen) return null;
+    pages.push(...chosen); cursor = chosen.at(-1).end;
   }
   if (cursor !== end || pages.length !== count) return null;
   if (original[0].lines[0]?.page_start) {
@@ -208,7 +244,7 @@ export function reflowDocument(lines, profile, geometry, options = {}) {
       let cut = -1;
       for (let i = page.cursor - 1; i > start; i--) {
         const item = stream[i];
-        if (item.type !== 'word' || gapItem(stream[i - 1]) || gapItem(stream[i + 1])) continue;
+        if (item.type !== 'word' || item.keep_with_previous || gapItem(stream[i - 1]) || gapItem(stream[i + 1])) continue;
         if (settings.column_start === 'vav' ? item.consonant?.startsWith('ו') : item.consonant === 'המלך') { cut = i; break; }
       }
       if (cut > start) {
